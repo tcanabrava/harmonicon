@@ -76,7 +76,7 @@ pub(crate) fn setup_welcome_menu(
          mut welcome: ResMut<WelcomeFlow>,
          mut page: ResMut<NextState<MenuPage>>| {
             welcome.return_to_welcome = true;
-            page.set(MenuPage::LessonTree);
+            page.set(MenuPage::LessonInstrument);
         },
     );
     // No header Back button: there is nowhere "back" to on a first launch.

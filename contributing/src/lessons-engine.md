@@ -421,3 +421,26 @@ scores and Bending Trainer drill records already live in, not a separate
 lessons-specific save file. Training tiers are keyed the same way, via
 `profile::training_key`, which is what lets the tree draw a ring of
 cleared tiers around a node without a second progress store.
+
+## Instrument curricula and lazy loading
+
+`InstrumentKind` identifies a lesson’s family; tuning, foot joint and keyboard
+size remain in the chart’s instrument configuration. Lesson format 2 adds an
+`instrument` field. Omitted fields in legacy packs mean harmonica. Generated
+bend training remains a harmonica adapter; other instruments currently use
+ordinary chart-backed lessons and shared teaching widgets.
+
+New packs use `<instrument>/<unit>/<lesson>/lesson.json`, with shared text in
+`<instrument>/locales/`. Existing `<unit>/<lesson>` harmonica packs still load.
+IDs stay globally unique so existing profile keys remain valid. Validation
+checks chart/lesson/directory agreement and rejects prerequisites that cross
+instrument curricula; graph and unit-gate validation run per instrument.
+
+`SelectedLessonInstrument(None)` means no manifests or lesson translations
+are read. The chooser clears the previous catalog and tree navigation state.
+Selecting an instrument triggers catalog discovery and scoped translation
+loading. The tree opens only after `LessonCatalogSet` and `LocalizationSet`
+have run for that selection. Returning from a lesson retains the selection;
+Back from the tree returns to the chooser. Pack updates reload the active
+curriculum only. An installed pack’s metadata can still be inspected before
+selection, independently of loading its lessons.

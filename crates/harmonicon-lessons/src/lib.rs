@@ -8,6 +8,7 @@ use bevy::prelude::*;
 
 use harmonicon_menu::menu::{MenuPage, scene};
 
+mod instrument_menu;
 mod lesson_reader;
 mod lesson_tree;
 
@@ -35,6 +36,15 @@ impl Plugin for LessonsUiPlugin {
             .init_resource::<lesson_tree::UnitSlides>()
             .init_resource::<lesson_tree::LessonTreeViewport>()
             .init_resource::<lesson_tree::PendingLessonFocus>()
+            .add_systems(OnEnter(MenuPage::LessonInstrument), instrument_menu::setup)
+            .add_systems(OnExit(MenuPage::LessonInstrument), scene::cleanup_menu)
+            .add_systems(
+                Update,
+                instrument_menu::open_loaded
+                    .after(harmonicon_song::lessons::LessonCatalogSet)
+                    .after(harmonicon_platform::localization::LocalizationSet)
+                    .run_if(in_state(MenuPage::LessonInstrument)),
+            )
             .add_systems(OnEnter(MenuPage::LessonTree), lesson_tree::setup_lesson_tree)
             .add_systems(OnExit(MenuPage::LessonTree), scene::cleanup_menu)
             .add_systems(

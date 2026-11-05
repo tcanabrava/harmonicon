@@ -3,6 +3,7 @@
 //! `lesson.json` schema types and parsing: [`LessonManifest`] and its
 //! [`PassCriteria`], schema-validated against `assets/lesson_schema.dtd.json`.
 
+use harmonicon_core::instrument::InstrumentKind;
 use harmonicon_core::training::{DrillSpec, DrillTechnique, Tier};
 use serde::Deserialize;
 
@@ -16,7 +17,7 @@ const SCHEMA: &str = include_str!("../../../../assets/lesson_schema.dtd.json");
 /// Bump it whenever `lesson.json` gains something an older build cannot
 /// parse — a new `widgets` or `pass_criteria` type, a new required field —
 /// in the same change that adds it.
-pub const LESSON_FORMAT_VERSION: u32 = 1;
+pub const LESSON_FORMAT_VERSION: u32 = 2;
 
 /// How a lesson is judged. `Accuracy`/`Technique` are judged when a
 /// chart-backed run reaches the results screen; `None` on [`LessonManifest`]
@@ -169,6 +170,9 @@ fn default_feel() -> String {
 /// field semantics.
 #[derive(Debug, Clone, PartialEq, Deserialize)]
 pub struct LessonManifest {
+    /// Legacy manifests are harmonica lessons; new curricula name their instrument.
+    #[serde(default)]
+    pub instrument: InstrumentKind,
     pub id: String,
     pub unit: String,
     /// An elective branch. Optional lessons can depend on the core, but unit
@@ -275,6 +279,7 @@ impl LessonManifest {
     /// field is empty. Set the rest with struct-update syntax.
     pub fn new(id: &str, unit: &str) -> Self {
         Self {
+            instrument: InstrumentKind::Harmonica,
             id: id.to_string(),
             unit: unit.to_string(),
             optional: false,
@@ -303,6 +308,9 @@ impl LessonManifest {
     /// The drill this lesson's trainings are built from, at `tier`, or
     /// `None` if it has no trainings.
     pub fn drill_spec(&self, tier: Tier) -> Option<DrillSpec> {
+        if self.instrument != InstrumentKind::Harmonica {
+            return None;
+        }
         let block = self.training.as_ref()?;
         let technique = match block.technique.as_str() {
             "bend" => DrillTechnique::Bend,
@@ -726,5 +734,26 @@ mod tests {
         )
         .unwrap_err();
         assert!(!err.is_empty());
+    }
+}
+
+#[cfg(test)]
+mod instrument_tests {
+    use super::*;
+    #[test]
+    fn legacy_lessons_are_harmonica_and_other_instruments_are_explicit() {
+        let old = br#"{"id":"old","unit":"u","title_key":"t","body_key":"b"}"#;
+        assert_eq!(parse_lesson(old).unwrap().instrument, InstrumentKind::Harmonica);
+        for kind in ["guitar", "piano", "flute"] {
+            let value = format!(
+                r#"{{"id":"new","unit":"u","title_key":"t","body_key":"b","instrument":"{kind}"}}"#
+            );
+            assert_eq!(parse_lesson(value.as_bytes()).unwrap().instrument.slug(), kind);
+        }
+    }
+    #[test]
+    fn flute_lessons_cannot_silently_launch_harmonica_bend_training() {
+        let value = br#"{"id":"flute-tone","unit":"u","title_key":"t","body_key":"b","instrument":"flute","training":{"technique":"bend","holes":[4]}}"#;
+        assert!(parse_lesson(value).is_err());
     }
 }

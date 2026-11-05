@@ -58,7 +58,7 @@ use bevy::ui_widgets::{Activate, Button as WidgetButton};
 use harmonicon_app::profile::PlayerProfile;
 use harmonicon_platform::localization::{Localization, LocalizationExt};
 use harmonicon_platform::theme::LoadedTheme;
-use harmonicon_song::lessons::{AvailableLessons, LessonsRescanned};
+use harmonicon_song::lessons::LessonsRescanned;
 use harmonicon_ui::dialogs::tooltip::Tooltip;
 
 use crate::lesson_reader::SelectedLesson;
@@ -242,7 +242,7 @@ fn node_centre(column: f32, row: f32) -> Vec2 {
 
 pub(crate) fn setup_lesson_tree(
     mut commands: Commands,
-    lessons: Res<AvailableLessons>,
+    mut curriculum: crate::instrument_menu::Curriculum,
     profile: Res<PlayerProfile>,
     mut collapsed: ResMut<CollapsedUnits>,
     mut expansions: ResMut<UnitExpansions>,
@@ -258,18 +258,33 @@ pub(crate) fn setup_lesson_tree(
     mut materials: ResMut<Assets<LessonEdgeMaterial>>,
     viewport: Res<LessonTreeViewport>,
 ) {
+    let Some(kind) = curriculum.selection.0.filter(|kind| Some(*kind) == curriculum.loaded.0)
+    else {
+        curriculum.page.set(MenuPage::LessonInstrument);
+        return;
+    };
+    let lessons = &curriculum.lessons;
+    let instrument = loc.msg(crate::instrument_menu::instrument_key(kind)).to_string();
+    let title =
+        loc.msg_args("lesson-tree-instrument-title", &[("instrument", instrument)]).to_string();
     // `_plain` plus a two-axis scroll area of our own: the shared
     // `spawn_menu_root` scrolls vertically only, and this canvas outgrows
     // any window in both directions once every unit's cluster is laid out
     // beside the last.
-    let (root, header, _page_root) = spawn_menu_root_plain(
-        &mut commands,
-        &loc.msg("lesson-tree-title"),
-        None,
-        &theme,
-        "LessonTree",
-    );
+    let (root, header, _page_root) =
+        spawn_menu_root_plain(&mut commands, &title, None, &theme, "LessonTree");
 
+    if lessons.0.is_empty() {
+        commands.entity(root).with_children(|parent| {
+            parent.spawn((
+                Text::new(loc.msg("lesson-instrument-empty").to_string()),
+                TextFont { font_size: FontSize::Px(18.0), ..default() },
+                Node { max_width: Val::Px(620.0), ..default() },
+            ));
+        });
+        spawn_back_button(&mut commands, header, &loc.msg("back"), back_to_play);
+        return;
+    }
     // A fresh build already reflects every toggle made so far.
     request.pending = false;
     let tree = match build_layout(&lessons, &profile, &laid_out_collapsed(&collapsed, &pending)) {
@@ -459,14 +474,8 @@ fn next_available_lesson(nodes: &[PlacedNode]) -> Option<&PlacedNode> {
 
 /// Back to Play — or to Welcome when the tree was opened as the first-run
 /// "start with a lesson" step, so the player can take the next one.
-fn back_to_play(
-    _: On<Activate>,
-    mut welcome: ResMut<harmonicon_app::app::WelcomeFlow>,
-    mut page: ResMut<NextState<MenuPage>>,
-) {
-    page.set(welcome.back_target(MenuPage::Play, MenuPage::Welcome, |w| {
-        w.lesson_done = true;
-    }));
+fn back_to_play(_: On<Activate>, mut page: ResMut<NextState<MenuPage>>) {
+    page.set(MenuPage::LessonInstrument);
 }
 
 /// A lesson dropped into `~/Harmonicon/lessons` while this page is open

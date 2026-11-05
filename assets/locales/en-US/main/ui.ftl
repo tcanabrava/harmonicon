@@ -800,7 +800,7 @@ tutorial-body-options = Volume, note style, and microphone calibration all live 
 tutorial-title-theme = Theme
 tutorial-body-theme = Pick a visual theme for the menus — swaps backgrounds and button style.
 tutorial-title-lessons = Lessons
-tutorial-body-lessons = A guided curriculum: single notes, chords, bends, and improvising over the blues.
+tutorial-body-lessons = Choose your instrument, then follow its lesson paths with explanations and short exercises.
 tutorial-title-jam-generate = Generate Jam
 tutorial-body-jam-generate = Spin up an instant backing track in any key and tempo — no song required.
 tutorial-title-song-editor = Song Editor
@@ -1101,3 +1101,8 @@ trainer-chord-board-help = Read the chord diagram for open and muted strings. Th
 trainer-reference-playing = Reference playing — your input is not being assessed.
 
 trainer-flute-pick-help = Choose a note on the score to repeat it · Tab and Enter work too · Dimmed notes are unavailable for this exercise. Gold: target · White outline: starting note.
+
+lesson-instrument-title = Lessons · Choose your instrument
+lesson-instrument-help = Choose what you play. Only that instrument’s lesson paths will be loaded.
+lesson-instrument-empty = No lessons are installed for this instrument yet. Choose another instrument, or add a lesson pack in Options → Lessons & songs.
+lesson-tree-instrument-title = {$instrument} · Lesson paths

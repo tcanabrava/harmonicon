@@ -76,6 +76,18 @@ fn generate_bundled_lesson_manifest() {
 /// name so the `01_`/`02_` prefixes give the curriculum order — so the two
 /// implementations can't drift.
 fn scan_lessons_for_manifest(root: &Path) -> Vec<(String, String, std::path::PathBuf)> {
+    let mut found = scan_unscoped_lessons(root);
+    for kind in ["harmonica", "guitar", "piano", "flute"] {
+        found.extend(
+            scan_unscoped_lessons(&root.join(kind))
+                .into_iter()
+                .map(|(unit, lesson, path)| (format!("{kind}/{unit}"), lesson, path)),
+        );
+    }
+    found
+}
+
+fn scan_unscoped_lessons(root: &Path) -> Vec<(String, String, std::path::PathBuf)> {
     let mut found = Vec::new();
     let Ok(rd) = std::fs::read_dir(root) else {
         return found;

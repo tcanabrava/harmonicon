@@ -42,6 +42,8 @@ pub enum MenuPage {
     /// each unit's own lessons hanging below it, prerequisite edges drawn
     /// inside a unit (see `harmonicon-lessons`).
     LessonTree,
+    /// Choose an instrument before loading the lesson curriculum.
+    LessonInstrument,
     /// One lesson's instructional page (+ Start for chart-backed lessons).
     LessonReader,
     /// The "Jam Session" choice on the Play menu lands here first: pick a
@@ -82,9 +84,10 @@ pub(crate) fn handle_menu_escape(
         MenuPage::Options => {
             welcome.back_target(MenuPage::Main, MenuPage::Welcome, |w| w.mic_done = true)
         }
-        MenuPage::LessonTree => {
+        MenuPage::LessonInstrument => {
             welcome.back_target(MenuPage::Play, MenuPage::Welcome, |w| w.lesson_done = true)
         }
+        MenuPage::LessonTree => MenuPage::LessonInstrument,
         MenuPage::Play | MenuPage::HelpAbout => MenuPage::Main,
         MenuPage::JamSessionMenu | MenuPage::NoteTrainerMenu => MenuPage::Play,
         MenuPage::ArtistList => match *mode {
@@ -303,7 +306,7 @@ mod tests {
         assert_eq!(page, MenuPage::Welcome);
         assert!(flow.mic_done && !flow.return_to_welcome, "consumed: {flow:?}");
 
-        let (page, flow) = escape_from(MenuPage::LessonTree, from_welcome);
+        let (page, flow) = escape_from(MenuPage::LessonInstrument, from_welcome);
         assert_eq!(page, MenuPage::Welcome);
         assert!(flow.lesson_done && !flow.return_to_welcome);
     }
@@ -313,7 +316,7 @@ mod tests {
         let (page, flow) = escape_from(MenuPage::Options, Default::default());
         assert_eq!(page, MenuPage::Main);
         assert!(!flow.mic_done);
-        let (page, _) = escape_from(MenuPage::LessonTree, Default::default());
+        let (page, _) = escape_from(MenuPage::LessonInstrument, Default::default());
         assert_eq!(page, MenuPage::Play);
     }
 }

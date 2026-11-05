@@ -269,6 +269,7 @@ pub(super) fn serialize_lesson(state: &EditorState) -> (String, Vec<String>) {
     let body_key = format!("lesson-{id}-body");
 
     let mut manifest = json!({
+        "instrument": state.effective_instrument().kind(),
         "id": id,
         "unit": unit,
         "title_key": title_key,
@@ -361,6 +362,19 @@ pub(super) fn save_lesson(
 /// as whatever's already in the editor; the author re-enters them to
 /// regenerate matching Fluent entries on the next save.
 pub(super) fn populate_from_lesson_manifest(manifest: &LessonManifest, state: &mut EditorState) {
+    if manifest.chart.is_none() {
+        use super::instrument_ui::InstrumentKind as EditorKind;
+        use harmonicon_core::instrument::InstrumentKind as Family;
+        if state.effective_instrument().kind() != manifest.instrument {
+            state.instrument = match manifest.instrument {
+                Family::Harmonica => EditorKind::Harmonica,
+                Family::Guitar => EditorKind::Guitar,
+                Family::Piano => EditorKind::Piano,
+                Family::Flute => EditorKind::Flute,
+            }
+            .selection();
+        }
+    }
     state.lesson_id = manifest.id.clone();
     state.lesson_unit = manifest.unit.clone();
     state.lesson_path = if manifest.optional { "elective".into() } else { "core".into() };
@@ -495,6 +509,27 @@ pub(super) fn handle_load_lesson_chosen(
                 warn!("Song editor: load failed ({}): {detail}", ev.path.display());
                 feedback.set(loc.msg_args("editor-load-failed", &[("detail", detail)]));
             }
+        }
+    }
+}
+
+#[cfg(test)]
+mod instrument_tests {
+    use super::*;
+    #[test]
+    fn instructional_lessons_keep_their_instrument_when_saved_and_reopened() {
+        for kind in super::super::instrument_ui::InstrumentKind::ALL {
+            let mut original = EditorState::default();
+            original.instrument = kind.selection();
+            original.lesson_id = "instrument-roundtrip".into();
+            original.lesson_unit = "basics".into();
+            let (json, warnings) = serialize_lesson(&original);
+            assert!(warnings.is_empty(), "{warnings:?}");
+            let manifest = parse_lesson(json.as_bytes()).unwrap();
+            assert_eq!(manifest.instrument, original.effective_instrument().kind());
+            let mut reopened = EditorState::default();
+            populate_from_lesson_manifest(&manifest, &mut reopened);
+            assert_eq!(reopened.effective_instrument().kind(), manifest.instrument);
         }
     }
 }

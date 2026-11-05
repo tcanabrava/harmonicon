@@ -112,7 +112,7 @@ const TOUR_STEPS: &[(TourTarget, &str, &str, f32)] = &[
         LIVE_SCREEN_STEP_SECONDS,
     ),
     (
-        TourTarget::Page(MenuPage::LessonTree),
+        TourTarget::Page(MenuPage::LessonInstrument),
         "tutorial-title-lessons",
         "tutorial-body-lessons",
         PAGE_STEP_SECONDS,

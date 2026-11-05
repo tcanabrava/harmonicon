@@ -798,7 +798,7 @@ tutorial-body-options = El volumen, el estilo de las notas y la calibración del
 tutorial-title-theme = Tema
 tutorial-body-theme = Elige un tema visual para los menús — cambia los fondos y el estilo de los botones.
 tutorial-title-lessons = Lecciones
-tutorial-body-lessons = Un plan guiado: notas únicas, acordes, bends e improvisación sobre el blues.
+tutorial-body-lessons = Elige tu instrumento y sigue sus rutas de aprendizaje con explicaciones y ejercicios cortos.
 tutorial-title-jam-generate = Generar Jam
 tutorial-body-jam-generate = Genera una base instantánea en cualquier tono y tempo — sin necesidad de una canción.
 tutorial-title-song-editor = Editor de Canciones
@@ -1100,3 +1100,8 @@ trainer-chord-board-help = Consulta el diagrama para las cuerdas al aire y silen
 trainer-reference-playing = Sonando la referencia — tu entrada no se está evaluando.
 
 trainer-flute-pick-help = Elige una nota en la partitura para repetirla · También puedes usar Tab y Intro · Las notas atenuadas no están disponibles para este ejercicio. Dorado: objetivo · Contorno blanco: nota inicial.
+
+lesson-instrument-title = Lecciones · Elige tu instrumento
+lesson-instrument-help = Elige el instrumento que tocas. Solo se cargarán sus rutas de aprendizaje.
+lesson-instrument-empty = Todavía no hay lecciones instaladas para este instrumento. Elige otro o añade un paquete en Opciones → Lecciones y canciones.
+lesson-tree-instrument-title = {$instrument} · Rutas de aprendizaje

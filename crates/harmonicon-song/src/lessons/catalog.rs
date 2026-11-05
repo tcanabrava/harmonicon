@@ -10,6 +10,11 @@ use std::path::Path;
 
 use bevy::prelude::*;
 
+use harmonicon_core::instrument::InstrumentKind;
+use harmonicon_platform::lesson_selection::SelectedLessonInstrument;
+#[cfg(not(target_arch = "wasm32"))]
+use harmonicon_platform::lesson_selection::lesson_roots;
+
 use super::manifest::{LessonManifest, parse_lesson};
 use harmonicon_platform::assets_management::ExternalFolderChanged;
 use harmonicon_platform::content_packs::{ContentPacks, ContentPacksChanged, ContentPacksSet};
@@ -34,11 +39,19 @@ pub struct LessonEntry {
     pub chart_asset_path: Option<String>,
 }
 
-/// Every lesson found at startup, in menu order (sorted by
+/// The selected instrument’s lessons, loaded after selection, in menu order (sorted by
 /// `<unit_dir>/<lesson_dir>` name — the `01_`/`02_` prefixes are the
 /// ordering mechanism). Units are displayed in order of first appearance.
 #[derive(Resource, Default)]
 pub struct AvailableLessons(pub Vec<LessonEntry>);
+
+/// Identifies the selection the current catalog has finished loading, even
+/// when that instrument has no lessons installed.
+#[derive(Resource, Default)]
+pub struct LoadedLessonInstrument(pub Option<InstrumentKind>);
+
+#[derive(SystemSet, Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct LessonCatalogSet;
 
 /// Groups lessons by unit, preserving both the lesson order and the order
 /// each unit first appears in. Returns `(unit, lessons-in-that-unit)` pairs
@@ -72,7 +85,12 @@ fn scan_lessons_root(root: &Path, asset_prefix: &str) -> Vec<LessonEntry> {
 
     let mut entries = Vec::new();
     let mut unit_dirs: Vec<_> = match std::fs::read_dir(root) {
-        Ok(rd) => rd.flatten().filter(is_visible_dir).map(|e| e.path()).collect(),
+        Ok(rd) => rd
+            .flatten()
+            .filter(is_visible_dir)
+            .filter(|e| InstrumentKind::from_slug(&e.file_name().to_string_lossy()).is_none())
+            .map(|e| e.path())
+            .collect(),
         Err(_) => return entries,
     };
     unit_dirs.sort();
@@ -117,10 +135,10 @@ fn scan_lessons_root(root: &Path, asset_prefix: &str) -> Vec<LessonEntry> {
 /// curriculum's ordering and prerequisites are unaffected by whatever a
 /// player drops in.
 #[cfg(not(any(target_arch = "wasm32", target_os = "android")))]
-fn scan_all_lessons(packs: Option<&ContentPacks>) -> Vec<LessonEntry> {
-    let mut entries = scan_lesson_packs(packs);
+fn scan_all_lessons(packs: Option<&ContentPacks>, kind: InstrumentKind) -> Vec<LessonEntry> {
+    let mut entries = scan_lesson_packs(packs, kind);
     if let Some(external_root) = dirs::home_dir().map(|h| h.join("Harmonicon/lessons")) {
-        entries.extend(scan_lessons_root(&external_root, "external://lessons"));
+        entries.extend(scan_selected_root(&external_root, "external://lessons", kind));
     }
     dedupe_by_id(entries)
 }
@@ -128,16 +146,16 @@ fn scan_all_lessons(packs: Option<&ContentPacks>) -> Vec<LessonEntry> {
 /// Packs only: an Android app has no `~/Harmonicon` a player could put a
 /// lesson in.
 #[cfg(target_os = "android")]
-fn scan_all_lessons(packs: Option<&ContentPacks>) -> Vec<LessonEntry> {
-    dedupe_by_id(scan_lesson_packs(packs))
+fn scan_all_lessons(packs: Option<&ContentPacks>, kind: InstrumentKind) -> Vec<LessonEntry> {
+    dedupe_by_id(scan_lesson_packs(packs, kind))
 }
 
 #[cfg(not(target_arch = "wasm32"))]
-fn scan_lesson_packs(packs: Option<&ContentPacks>) -> Vec<LessonEntry> {
+fn scan_lesson_packs(packs: Option<&ContentPacks>, kind: InstrumentKind) -> Vec<LessonEntry> {
     packs
         .into_iter()
         .flat_map(|p| p.usable(harmonicon_packs::pack::PackKind::Lessons))
-        .flat_map(|pack| scan_lessons_root(&pack.root, &pack.asset_prefix()))
+        .flat_map(|pack| scan_selected_root(&pack.root, &pack.asset_prefix(), kind))
         .collect()
 }
 
@@ -169,26 +187,51 @@ fn dedupe_by_id(entries: Vec<LessonEntry>) -> Vec<LessonEntry> {
 /// manifest is logged and skipped, never fatal — even though the pack's own
 /// CI (`validate-pack`) should have refused it first.
 #[cfg(target_arch = "wasm32")]
-fn scan_all_lessons(_packs: Option<&ContentPacks>) -> Vec<LessonEntry> {
-    let bundled = bundled::BUNDLED_LESSONS.iter().filter_map(|(unit, lesson, json)| {
-        let manifest = match parse_lesson(json.as_bytes()) {
-            Ok(m) => m,
-            Err(err) => {
-                warn!("Skipping invalid lesson {unit}/{lesson}: {err}");
-                return None;
-            }
-        };
-        let chart_asset_path =
-            manifest.chart.as_ref().map(|chart| format!("lessons/{unit}/{lesson}/{chart}"));
-        Some(LessonEntry { manifest, chart_asset_path })
-    });
-    dedupe_by_id(bundled.collect())
+fn scan_all_lessons(_packs: Option<&ContentPacks>, kind: InstrumentKind) -> Vec<LessonEntry> {
+    let bundled = bundled::BUNDLED_LESSONS
+        .iter()
+        .filter(|(unit, _, _)| {
+            let family =
+                unit.split('/').next().and_then(InstrumentKind::from_slug).unwrap_or_default();
+            family == kind
+        })
+        .filter_map(|(unit, lesson, json)| {
+            let manifest = match parse_lesson(json.as_bytes()) {
+                Ok(m) => m,
+                Err(err) => {
+                    warn!("Skipping invalid lesson {unit}/{lesson}: {err}");
+                    return None;
+                }
+            };
+            let chart_asset_path =
+                manifest.chart.as_ref().map(|chart| format!("lessons/{unit}/{lesson}/{chart}"));
+            Some(LessonEntry { manifest, chart_asset_path })
+        });
+    dedupe_by_id(bundled.filter(|entry| entry.manifest.instrument == kind).collect())
 }
 
-fn scan_lessons(mut available: ResMut<AvailableLessons>, packs: Option<Res<ContentPacks>>) {
-    available.0 = scan_all_lessons(packs.as_deref());
-    let ids: Vec<&str> = available.0.iter().map(|l| l.manifest.id.as_str()).collect();
-    info!("Found {} lesson(s): {:?}", ids.len(), ids);
+#[cfg(not(target_arch = "wasm32"))]
+fn scan_selected_root(root: &Path, prefix: &str, kind: InstrumentKind) -> Vec<LessonEntry> {
+    lesson_roots(root, kind)
+        .into_iter()
+        .flat_map(|dir| {
+            let prefix =
+                if dir == root { prefix.to_string() } else { format!("{prefix}/{}", kind.slug()) };
+            scan_lessons_root(&dir, &prefix)
+        })
+        .filter(|entry| entry.manifest.instrument == kind)
+        .collect()
+}
+
+fn scan_lessons(
+    mut available: ResMut<AvailableLessons>,
+    packs: Option<Res<ContentPacks>>,
+    selection: Res<SelectedLessonInstrument>,
+    mut loaded: ResMut<LoadedLessonInstrument>,
+) {
+    available.0 =
+        selection.0.map(|kind| scan_all_lessons(packs.as_deref(), kind)).unwrap_or_default();
+    loaded.0 = selection.0;
 }
 
 /// Fired only when a *live* filesystem event under `~/Harmonicon/lessons`
@@ -213,11 +256,15 @@ fn rescan_lessons_on_external_change(
     mut available: ResMut<AvailableLessons>,
     packs: Option<Res<ContentPacks>>,
     mut rescanned: MessageWriter<LessonsRescanned>,
+    selection: Res<SelectedLessonInstrument>,
+    mut loaded: ResMut<LoadedLessonInstrument>,
 ) {
     let external = changed.read().any(|ev| ev.top_level_dirs.contains("lessons"));
     let dirty = packs_changed.read().count() > 0 || external;
-    if dirty {
-        available.0 = scan_all_lessons(packs.as_deref());
+    if dirty || selection.is_changed() {
+        available.0 =
+            selection.0.map(|kind| scan_all_lessons(packs.as_deref(), kind)).unwrap_or_default();
+        loaded.0 = selection.0;
         let ids: Vec<&str> = available.0.iter().map(|l| l.manifest.id.as_str()).collect();
         info!("Re-scanned lessons: found {} lesson(s): {:?}", ids.len(), ids);
         rescanned.write(LessonsRescanned);
@@ -229,12 +276,17 @@ pub struct LessonsPlugin;
 impl Plugin for LessonsPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<AvailableLessons>()
+            .init_resource::<SelectedLessonInstrument>()
+            .init_resource::<LoadedLessonInstrument>()
             .add_message::<LessonsRescanned>()
             // Read by the rescan below; registered here too so an app
             // without `ContentPacksPlugin` (tests, tools) still runs.
             .add_message::<ContentPacksChanged>()
             .add_systems(Startup, scan_lessons.after(ContentPacksSet))
-            .add_systems(Update, rescan_lessons_on_external_change.after(ContentPacksSet));
+            .add_systems(
+                Update,
+                rescan_lessons_on_external_change.after(ContentPacksSet).in_set(LessonCatalogSet),
+            );
     }
 }
 
@@ -356,7 +408,7 @@ mod tests {
             status: PackStatus::Ready { manifest, commit: None },
         }]);
 
-        let entries = scan_lesson_packs(Some(&packs));
+        let entries = scan_lesson_packs(Some(&packs), InstrumentKind::Harmonica);
         assert_eq!(entries.len(), 1, "the .git copy must not be scanned");
         assert_eq!(
             entries[0].chart_asset_path.as_deref(),
@@ -381,6 +433,8 @@ mod tests {
     fn scan_lessons_does_not_duplicate_entries_when_run_again() {
         let mut world = World::new();
         world.init_resource::<AvailableLessons>();
+        world.init_resource::<LoadedLessonInstrument>();
+        world.insert_resource(SelectedLessonInstrument(Some(InstrumentKind::Harmonica)));
         let mut schedule = Schedule::default();
         schedule.add_systems(scan_lessons);
 
@@ -391,5 +445,53 @@ mod tests {
         let second = world.resource::<AvailableLessons>().0.len();
 
         assert_eq!(first, second);
+    }
+}
+
+#[cfg(all(test, not(target_arch = "wasm32")))]
+mod instrument_tests {
+    use super::*;
+    #[test]
+    fn only_the_selected_curriculum_is_read_and_chart_paths_keep_the_namespace() {
+        let root = tempfile::tempdir().unwrap();
+        let write = |rel: &str, text: &str| {
+            let path = root.path().join(rel);
+            std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+            std::fs::write(path, text).unwrap();
+        };
+        write(
+            "01_basics/01_old/lesson.json",
+            r#"{"id":"old","unit":"basics","title_key":"t","body_key":"b"}"#,
+        );
+        write(
+            "harmonica/01_basics/01_new/lesson.json",
+            r#"{"id":"new","unit":"basics","title_key":"t","body_key":"b"}"#,
+        );
+        write(
+            "flute/01_basics/01_tone/lesson.json",
+            r#"{"id":"flute-tone","instrument":"flute","unit":"flute-basics","title_key":"t","body_key":"b","chart":"song/chart.harpchart"}"#,
+        );
+        let flute = scan_selected_root(root.path(), "packs://test", InstrumentKind::Flute);
+        assert_eq!(flute.len(), 1);
+        assert_eq!(flute[0].manifest.id, "flute-tone");
+        assert_eq!(
+            flute[0].chart_asset_path.as_deref(),
+            Some("packs://test/flute/01_basics/01_tone/song/chart.harpchart")
+        );
+        let harp = scan_selected_root(root.path(), "packs://test", InstrumentKind::Harmonica);
+        assert_eq!(harp.iter().map(|e| e.manifest.id.as_str()).collect::<Vec<_>>(), ["new", "old"]);
+        assert!(scan_selected_root(root.path(), "packs://test", InstrumentKind::Piano).is_empty());
+    }
+    #[test]
+    fn startup_without_an_instrument_does_not_populate_the_catalog() {
+        let mut world = World::new();
+        world.init_resource::<AvailableLessons>();
+        world.init_resource::<LoadedLessonInstrument>();
+        world.init_resource::<SelectedLessonInstrument>();
+        world.init_resource::<LoadedLessonInstrument>();
+        let mut schedule = bevy::ecs::schedule::Schedule::default();
+        schedule.add_systems(scan_lessons);
+        schedule.run(&mut world);
+        assert!(world.resource::<AvailableLessons>().0.is_empty());
     }
 }

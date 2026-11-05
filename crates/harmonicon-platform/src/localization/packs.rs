@@ -25,6 +25,8 @@ use unic_langid::LanguageIdentifier;
 
 use super::ftl::LocaleBundle;
 use crate::content_packs::{ContentPacks, ContentPacksChanged};
+use crate::lesson_selection::SelectedLessonInstrument;
+use harmonicon_core::instrument::InstrumentKind;
 
 /// One bundle per language found in any usable pack, sorted by language tag.
 #[derive(Resource, Default, Clone)]
@@ -34,7 +36,7 @@ pub struct PackTranslations(pub Vec<LocaleBundle>);
 /// checkout's `.git`), sorted by path so the result doesn't depend on the
 /// order the filesystem lists entries in.
 #[cfg(not(target_arch = "wasm32"))]
-fn translation_files(root: &Path) -> Vec<(LanguageIdentifier, PathBuf)> {
+fn translation_files(root: &Path, skip_curricula: bool) -> Vec<(LanguageIdentifier, PathBuf)> {
     let mut found = Vec::new();
     let mut stack = vec![root.to_path_buf()];
     while let Some(dir) = stack.pop() {
@@ -45,7 +47,11 @@ fn translation_files(root: &Path) -> Vec<(LanguageIdentifier, PathBuf)> {
             let path = entry.path();
             let is_dir = entry.file_type().is_ok_and(|t| t.is_dir());
             if is_dir && !entry.file_name().to_string_lossy().starts_with('.') {
-                stack.push(path);
+                if !skip_curricula
+                    || InstrumentKind::from_slug(&entry.file_name().to_string_lossy()).is_none()
+                {
+                    stack.push(path);
+                }
             } else if !is_dir
                 && path.extension().is_some_and(|e| e == "ftl")
                 && dir.file_name().is_some_and(|d| d == "locales")
@@ -68,9 +74,16 @@ fn translation_files(root: &Path) -> Vec<(LanguageIdentifier, PathBuf)> {
 /// in `roots` order. Unreadable files are logged and skipped.
 #[cfg(not(target_arch = "wasm32"))]
 pub fn load_pack_translations<'a>(roots: impl IntoIterator<Item = &'a Path>) -> Vec<LocaleBundle> {
+    load_translation_scopes(roots.into_iter().map(|root| (root, false)))
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn load_translation_scopes<'a>(
+    roots: impl IntoIterator<Item = (&'a Path, bool)>,
+) -> Vec<LocaleBundle> {
     let mut by_lang: BTreeMap<String, (LanguageIdentifier, Vec<String>)> = BTreeMap::new();
-    for root in roots {
-        for (lang, path) in translation_files(root) {
+    for (root, skip_curricula) in roots {
+        for (lang, path) in translation_files(root, skip_curricula) {
             match std::fs::read_to_string(&path) {
                 Ok(source) => by_lang
                     .entry(lang.to_string())
@@ -89,12 +102,36 @@ pub fn load_pack_translations<'a>(_roots: impl IntoIterator<Item = &'a Path>) ->
     Vec::new()
 }
 
-fn usable_roots(packs: &ContentPacks) -> impl Iterator<Item = &Path> {
-    packs
+#[cfg(not(target_arch = "wasm32"))]
+fn selected_translations(
+    packs: &ContentPacks,
+    selection: &SelectedLessonInstrument,
+) -> Vec<LocaleBundle> {
+    let mut roots = Vec::new();
+    for entry in packs
         .0
         .iter()
-        .filter(|e| matches!(e.status, crate::content_packs::PackStatus::Ready { .. }))
-        .map(|e| e.root.as_path())
+        .filter(|entry| matches!(entry.status, crate::content_packs::PackStatus::Ready { .. }))
+    {
+        if entry.kind == harmonicon_packs::pack::PackKind::Lessons {
+            if let Some(kind) = selection.0 {
+                for root in crate::lesson_selection::lesson_roots(&entry.root, kind) {
+                    roots.push((root, true));
+                }
+            }
+        } else {
+            roots.push((entry.root.clone(), false));
+        }
+    }
+    load_translation_scopes(roots.iter().map(|(path, skip)| (path.as_path(), *skip)))
+}
+
+#[cfg(target_arch = "wasm32")]
+fn selected_translations(
+    _packs: &ContentPacks,
+    _selection: &SelectedLessonInstrument,
+) -> Vec<LocaleBundle> {
+    Vec::new()
 }
 
 /// Reads the packs' translations once [`ContentPacks`] is known. Replacing
@@ -103,9 +140,10 @@ fn usable_roots(packs: &ContentPacks) -> impl Iterator<Item = &Path> {
 pub(super) fn load_at_startup(
     packs: Option<Res<ContentPacks>>,
     mut translations: ResMut<PackTranslations>,
+    selection: Res<SelectedLessonInstrument>,
 ) {
     if let Some(packs) = packs {
-        *translations = PackTranslations(load_pack_translations(usable_roots(&packs)));
+        *translations = PackTranslations(selected_translations(&packs, &selection));
     }
 }
 
@@ -114,9 +152,10 @@ pub(super) fn reload_on_packs_changed(
     mut changed: MessageReader<ContentPacksChanged>,
     packs: Option<Res<ContentPacks>>,
     translations: ResMut<PackTranslations>,
+    selection: Res<SelectedLessonInstrument>,
 ) {
-    if changed.read().count() > 0 {
-        load_at_startup(packs, translations);
+    if changed.read().count() > 0 || selection.is_changed() {
+        load_at_startup(packs, translations, selection);
     }
 }
 
@@ -133,6 +172,42 @@ mod tests {
 
     fn lookup(bundles: &[LocaleBundle], lang: &str, key: &str) -> Option<String> {
         bundles.iter().find(|b| *b.locale() == lang).and_then(|b| b.content(key))
+    }
+
+    #[test]
+    fn lesson_translations_are_not_read_before_selection_and_do_not_mix_instruments() {
+        use crate::content_packs::{PackEntry, PackStatus};
+        use harmonicon_packs::{
+            pack::{PackKind, PackManifest},
+            repo::RepoSpec,
+        };
+        let root = tempfile::tempdir().unwrap();
+        write(root.path(), "harmonica/locales/en-US.ftl", "harp-only = Harmonica\n");
+        write(root.path(), "flute/locales/en-US.ftl", "flute-only = Flute\n");
+        write(root.path(), "flute/01_basics/01_tone/locales/en-US.ftl", "flute-tone = Tone\n");
+        let manifest = PackManifest::parse(
+            br#"{"schema":1,"kind":"lessons","id":"test","name":"Test","version":"1.0.0"}"#,
+        )
+        .unwrap()
+        .unwrap();
+        let packs = ContentPacks(vec![PackEntry {
+            kind: PackKind::Lessons,
+            spec: RepoSpec::Local { path: root.path().to_path_buf() },
+            slug: "test".into(),
+            root: root.path().to_path_buf(),
+            status: PackStatus::Ready { manifest, commit: None },
+        }]);
+        assert!(selected_translations(&packs, &SelectedLessonInstrument(None)).is_empty());
+        let flute =
+            selected_translations(&packs, &SelectedLessonInstrument(Some(InstrumentKind::Flute)));
+        assert_eq!(lookup(&flute, "en-US", "flute-tone").as_deref(), Some("Tone"));
+        assert!(lookup(&flute, "en-US", "harp-only").is_none());
+        let harp = selected_translations(
+            &packs,
+            &SelectedLessonInstrument(Some(InstrumentKind::Harmonica)),
+        );
+        assert_eq!(lookup(&harp, "en-US", "harp-only").as_deref(), Some("Harmonica"));
+        assert!(lookup(&harp, "en-US", "flute-only").is_none());
     }
 
     #[test]

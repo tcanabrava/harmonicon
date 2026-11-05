@@ -14,6 +14,8 @@ use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::path::{Path, PathBuf};
 
 use crate::song::validate::{Report, check_chart, content_dirs};
+use harmonicon_core::instrument::InstrumentKind;
+use harmonicon_platform::lesson_selection::lesson_roots;
 
 use super::graph::LessonGraph;
 use super::manifest::{LessonManifest, LessonWidget, parse_lesson};
@@ -132,76 +134,134 @@ fn valid_tab_token(token: &str) -> bool {
             || (suffix.len() <= 3 && suffix.bytes().all(|b| b == b'\'')))
 }
 
+fn chart_instrument(path: &Path) -> Option<InstrumentKind> {
+    let mut value = serde_json::from_slice(&std::fs::read(path).ok()?).ok()?;
+    crate::song::validate_and_migrate_chart(&mut value).ok()?;
+    let chart: harmonicon_core::chart::HarpChart = serde_json::from_value(value).ok()?;
+    Some(chart.instrument()?.kind())
+}
+
+/// All lesson manifests, including instrument namespaces and legacy harmonica packs.
+pub fn lesson_manifest_paths(root: &Path) -> Vec<PathBuf> {
+    InstrumentKind::ALL
+        .into_iter()
+        .flat_map(|kind| lesson_roots(root, kind))
+        .flat_map(|source| {
+            content_dirs(&source)
+                .into_iter()
+                .filter(|unit| {
+                    let name = unit.file_name().and_then(|s| s.to_str()).unwrap_or("");
+                    !matches!(name, "locales" | "scripts")
+                        && InstrumentKind::from_slug(name).is_none()
+                })
+                .flat_map(|unit| content_dirs(&unit))
+                .map(|lesson| lesson.join("lesson.json"))
+        })
+        .collect()
+}
+
 /// Validates the pack at `root`: `<unit>/<lesson>/lesson.json`, translations
 /// in `locales/` at the root and beside each lesson.
 pub fn validate_lesson_pack(root: &Path) -> Report {
     let mut report = Report::default();
-    let shared_keys = check_locales_dir(root, root, &mut report);
+    let root_keys = check_locales_dir(root, root, &mut report);
     let engine_keys = ftl_keys(ENGINE_STRINGS).unwrap_or_default();
 
     let mut lessons: Vec<(PathBuf, LessonManifest)> = Vec::new();
-    for unit in content_dirs(root).into_iter().filter(|d| !d.ends_with("locales")) {
-        for dir in content_dirs(&unit) {
-            let manifest_path = dir.join("lesson.json");
-            let bytes = match std::fs::read(&manifest_path) {
-                Ok(bytes) => bytes,
-                Err(_) => {
-                    report.error(&dir, root, "no lesson.json");
-                    continue;
-                }
-            };
-            let manifest = match parse_lesson(&bytes) {
-                Ok(m) => m,
-                Err(e) => {
-                    report.error(&manifest_path, root, e);
-                    continue;
-                }
-            };
-
-            if let Some(chart) = &manifest.chart {
-                let chart_path = dir.join(chart);
-                if chart_path.is_file() {
-                    check_chart(&chart_path, root, &mut report);
-                } else {
-                    report.error(&dir, root, format!("chart {chart} does not exist"));
-                }
+    for manifest_path in lesson_manifest_paths(root) {
+        let dir = manifest_path.parent().unwrap().to_path_buf();
+        let source = dir.parent().and_then(Path::parent).unwrap_or(root);
+        let expected = if source == root {
+            InstrumentKind::Harmonica
+        } else {
+            InstrumentKind::from_slug(source.file_name().and_then(|s| s.to_str()).unwrap_or(""))
+                .unwrap_or_default()
+        };
+        let mut shared_keys = root_keys.clone();
+        if source != root {
+            shared_keys.extend(check_locales_dir(source, root, &mut report));
+        }
+        let bytes = match std::fs::read(&manifest_path) {
+            Ok(bytes) => bytes,
+            Err(_) => {
+                report.error(&dir, root, "no lesson.json");
+                continue;
             }
+        };
+        let manifest = match parse_lesson(&bytes) {
+            Ok(m) => m,
+            Err(e) => {
+                report.error(&manifest_path, root, e);
+                continue;
+            }
+        };
 
-            let own_keys = check_locales_dir(&dir, root, &mut report);
-            for key in needed_keys(&manifest) {
-                if !own_keys.contains(&key)
-                    && !shared_keys.contains(&key)
-                    && !engine_keys.contains(&key)
-                {
+        if manifest.instrument != expected {
+            report.error(
+                &manifest_path,
+                root,
+                format!(
+                    "lesson instrument {:?} does not match its {:?} curriculum directory",
+                    manifest.instrument, expected
+                ),
+            );
+        }
+        if let Some(chart) = &manifest.chart {
+            let chart_path = dir.join(chart);
+            if chart_path.is_file() {
+                check_chart(&chart_path, root, &mut report);
+                if chart_instrument(&chart_path).is_some_and(|kind| kind != manifest.instrument) {
                     report.error(
-                        &dir,
+                        &chart_path,
                         root,
-                        format!("string {key:?} is not defined in any {FALLBACK_LANGUAGE}.ftl"),
+                        "chart instrument does not match the lesson instrument",
                     );
                 }
+            } else {
+                report.error(&dir, root, format!("chart {chart} does not exist"));
             }
+        }
 
-            for widget in &manifest.widgets {
-                if let LessonWidget::PhraseLooper { steps, .. } = widget {
-                    for step in steps {
-                        for token in step.split_whitespace().flat_map(|part| part.split('/')) {
-                            if !valid_tab_token(token) {
-                                report.error(&dir, root, format!("tab {token:?} in {step:?} is not notation the game can draw"));
-                            }
+        let own_keys = check_locales_dir(&dir, root, &mut report);
+        for key in needed_keys(&manifest) {
+            if !own_keys.contains(&key)
+                && !shared_keys.contains(&key)
+                && !engine_keys.contains(&key)
+            {
+                report.error(
+                    &dir,
+                    root,
+                    format!("string {key:?} is not defined in any {FALLBACK_LANGUAGE}.ftl"),
+                );
+            }
+        }
+
+        for widget in &manifest.widgets {
+            if let LessonWidget::PhraseLooper { steps, .. } = widget {
+                for step in steps {
+                    for token in step.split_whitespace().flat_map(|part| part.split('/')) {
+                        if !valid_tab_token(token) {
+                            report.error(
+                                &dir,
+                                root,
+                                format!(
+                                    "tab {token:?} in {step:?} is not notation the game can draw"
+                                ),
+                            );
                         }
                     }
                 }
             }
-
-            if manifest.track.is_none() {
-                report.warning(
-                    &dir,
-                    root,
-                    "no `track`: the skill tree will give it a row named after its unit",
-                );
-            }
-            lessons.push((dir, manifest));
         }
+
+        if manifest.track.is_none() {
+            report.warning(
+                &dir,
+                root,
+                "no `track`: the skill tree will give it a row named after its unit",
+            );
+        }
+        lessons.push((dir, manifest));
     }
 
     if lessons.is_empty() {
@@ -217,30 +277,45 @@ pub fn validate_lesson_pack(root: &Path) -> Report {
     }
     for (dir, m) in &lessons {
         for prerequisite in &m.prerequisites {
+            if lessons
+                .iter()
+                .any(|(_, other)| other.id == *prerequisite && other.instrument != m.instrument)
+            {
+                report.error(
+                    dir,
+                    root,
+                    format!("prerequisite {prerequisite:?} belongs to another instrument"),
+                );
+            }
             if !seen.contains(prerequisite.as_str()) {
                 report.error(dir, root, format!("prerequisite {prerequisite:?} names no lesson"));
             }
         }
     }
 
-    let manifests: Vec<&LessonManifest> = lessons.iter().map(|(_, m)| m).collect();
-    if let Err(e) = LessonGraph::build(&manifests) {
-        report.error(root, root, format!("the curriculum is not a drawable graph: {e}"));
-    }
-    let owned: Vec<LessonManifest> = manifests.iter().map(|m| (*m).clone()).collect();
-    for (lesson, prerequisite) in crossing_prerequisites(&owned) {
-        report.error(
+    for kind in InstrumentKind::ALL {
+        let manifests: Vec<&LessonManifest> =
+            lessons.iter().map(|(_, m)| m).filter(|m| m.instrument == kind).collect();
+        if let Err(e) = LessonGraph::build(&manifests) {
+            report.error(root, root, format!("the curriculum is not a drawable graph: {e}"));
+        }
+        let owned: Vec<LessonManifest> = manifests.iter().map(|m| (*m).clone()).collect();
+        for (lesson, prerequisite) in crossing_prerequisites(&owned) {
+            report.error(
             root,
             root,
             format!("{lesson} needs {prerequisite}, from a later unit, which unit gating can never satisfy"),
         );
-    }
-    for (lesson, elective) in core_prerequisites_on_optional(&owned) {
-        report.error(
-            root,
-            root,
-            format!("required lesson {lesson} depends on elective {elective}, making it mandatory"),
-        );
+        }
+        for (lesson, elective) in core_prerequisites_on_optional(&owned) {
+            report.error(
+                root,
+                root,
+                format!(
+                    "required lesson {lesson} depends on elective {elective}, making it mandatory"
+                ),
+            );
+        }
     }
     report
 }
@@ -281,6 +356,33 @@ mod tests {
         let text = std::fs::read_to_string(path).unwrap();
         assert!(text.contains(from), "{from:?} not in {}", path.display());
         std::fs::write(path, text.replace(from, to)).unwrap();
+    }
+
+    #[test]
+    fn a_flute_chart_cannot_be_published_as_a_harmonica_lesson() {
+        let pack = copy_of_fixture();
+        let chart = pack.path().join("01_basics/01_first/song/chart.harpchart");
+        std::fs::write(&chart, include_str!("../../tests/fixtures/flute-scale.harpchart")).unwrap();
+        assert!(
+            validate_lesson_pack(pack.path())
+                .errors
+                .iter()
+                .any(|error| error.contains("chart instrument does not match"))
+        );
+    }
+
+    #[test]
+    fn prerequisites_cannot_cross_instrument_curricula() {
+        let pack = copy_of_fixture();
+        let dir = pack.path().join("flute/01_basics/01_tone");
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(dir.join("lesson.json"), r#"{"id":"flute-tone","instrument":"flute","unit":"basics","track":"tone","title_key":"fixture-first-title","body_key":"fixture-first-body","prerequisites":["fixture-first"]}"#).unwrap();
+        assert!(
+            validate_lesson_pack(pack.path())
+                .errors
+                .iter()
+                .any(|error| error.contains("belongs to another instrument"))
+        );
     }
 
     #[test]

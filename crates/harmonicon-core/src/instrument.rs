@@ -10,10 +10,9 @@
 //! three questions, so gameplay, the Song Editor and the detection filter
 //! can ask them without naming a harmonica.
 //!
-//! The harmonica is the only instrument today; its implementation is a thin
-//! adapter over [`crate::pitch_map`] and [`crate::harmonica`], which remain
-//! the one place harmonica physics is stated. `docs/multi_instrument_plan.md`
-//! has the design and the instruments still to come.
+//! Guitar, piano, flute and harmonica each supply their physical guidance.
+//! The harmonica adapter delegates to [`crate::pitch_map`] and
+//! [`crate::harmonica`], which remain the source of its reed layout.
 //!
 //! **A position is guidance, not something scored.** A microphone hears the
 //! pitch, not which hole or string made it, so the judge only ever compares
@@ -30,6 +29,44 @@ use crate::pitch_map::{HoleAssignment, Technique, playable_assignments};
 use flute::{FingeringAssignment, Flute};
 use guitar::{FretAssignment, Guitar, StringTechnique};
 use piano::Piano;
+
+/// Instrument family used to select curricula independently of tuning or setup.
+#[derive(
+    Clone,
+    Copy,
+    Debug,
+    Default,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    serde::Serialize,
+    serde::Deserialize,
+)]
+#[serde(rename_all = "lowercase")]
+pub enum InstrumentKind {
+    #[default]
+    Harmonica,
+    Guitar,
+    Piano,
+    Flute,
+}
+
+impl InstrumentKind {
+    pub const ALL: [Self; 4] = [Self::Harmonica, Self::Guitar, Self::Piano, Self::Flute];
+    pub const fn slug(self) -> &'static str {
+        match self {
+            Self::Harmonica => "harmonica",
+            Self::Guitar => "guitar",
+            Self::Piano => "piano",
+            Self::Flute => "flute",
+        }
+    }
+    pub fn from_slug(value: &str) -> Option<Self> {
+        Self::ALL.into_iter().find(|kind| kind.slug() == value)
+    }
+}
 
 /// The instrument a chart part is played on. A closed enum rather than a
 /// trait object, so a chart can name its instrument in JSON and every UI
@@ -49,6 +86,14 @@ impl From<Harmonica> for Instrument {
 }
 
 impl Instrument {
+    pub const fn kind(&self) -> InstrumentKind {
+        match self {
+            Self::Harmonica(_) => InstrumentKind::Harmonica,
+            Self::Guitar(_) => InstrumentKind::Guitar,
+            Self::Piano(_) => InstrumentKind::Piano,
+            Self::Flute(_) => InstrumentKind::Flute,
+        }
+    }
     /// How the synth sounds this instrument, for demos and auditions.
     pub fn synth_voice(&self) -> crate::synth::Voice {
         match self {

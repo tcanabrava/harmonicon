@@ -119,24 +119,30 @@ fn print_choice_report(root: &std::path::Path) {
         .filter_map(|path| std::fs::read(path).ok())
         .filter_map(|bytes| harmonicon_song::lessons::parse_lesson(&bytes).ok())
         .collect();
-    let Ok(graph) = LessonGraph::build(&manifests) else {
-        return; // validation reports why
-    };
-    let chain = UnitChain::build(&manifests);
-    let report = choice_report(&graph, &chain, 3000, 4, 0x5eed);
-    println!("{} lessons, 3000 playthroughs, counting while at least 4 remain", manifests.len());
-    println!("fewest lessons ever on offer: {}", report.fewest);
-    println!("only lesson on offer, by how often:");
-    for (id, count) in &report.sole_options {
-        println!("  {count:>6}  {id}");
+    for kind in harmonicon_core::instrument::InstrumentKind::ALL {
+        let manifests: Vec<_> =
+            manifests.iter().filter(|m| m.instrument == kind).cloned().collect();
+        if manifests.is_empty() {
+            continue;
+        }
+        println!("{} curriculum", kind.slug());
+        let Ok(graph) = LessonGraph::build(&manifests) else {
+            continue; // validation reports why
+        };
+        let chain = UnitChain::build(&manifests);
+        let report = choice_report(&graph, &chain, 3000, 4, 0x5eed);
+        println!(
+            "{} lessons, 3000 playthroughs, counting while at least 4 remain",
+            manifests.len()
+        );
+        println!("fewest lessons ever on offer: {}", report.fewest);
+        println!("only lesson on offer, by how often:");
+        for (id, count) in &report.sole_options {
+            println!("  {count:>6}  {id}");
+        }
     }
 }
 
 fn glob_lessons(root: &std::path::Path) -> Vec<PathBuf> {
-    use harmonicon_song::song::validate::content_dirs;
-    content_dirs(root)
-        .iter()
-        .flat_map(|unit| content_dirs(unit))
-        .map(|lesson| lesson.join("lesson.json"))
-        .collect()
+    harmonicon_song::lessons::validate::lesson_manifest_paths(root)
 }

@@ -108,6 +108,10 @@ pub fn localization_ready(ready: Res<LocalizationReady>) -> bool {
     ready.0
 }
 
+/// Lesson routing waits for the newly selected curriculum's text to be merged.
+#[derive(SystemSet, Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct LocalizationSet;
+
 pub struct LocalizationPlugin;
 
 impl Plugin for LocalizationPlugin {
@@ -123,6 +127,7 @@ impl Plugin for LocalizationPlugin {
             .init_resource::<Localization>()
             .insert_resource(default_locale())
             .init_resource::<PackTranslations>()
+            .init_resource::<crate::lesson_selection::SelectedLessonInstrument>()
             // Read by `packs::reload_on_packs_changed`; registered here too
             // so an app without `ContentPacksPlugin` (tests, tools) runs.
             .add_message::<ContentPacksChanged>()
@@ -134,7 +139,8 @@ impl Plugin for LocalizationPlugin {
                     packs::reload_on_packs_changed.after(ContentPacksSet),
                     build_localization,
                 )
-                    .chain(),
+                    .chain()
+                    .in_set(LocalizationSet),
             );
     }
 }

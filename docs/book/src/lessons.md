@@ -1,6 +1,11 @@
 # Lessons
 
-**Play → Lessons** is a guided curriculum, drawn as a skill tree. Along the
+**Play → Lessons** first asks which instrument you play: harmonica, guitar,
+piano or flute. The game then loads only that instrument’s lessons and text.
+Use Back from the tree to choose another instrument. If no course is installed
+for your choice, the page says so and points to Options → Lessons & songs.
+
+The selected curriculum is drawn as a skill tree. Along the
 top runs a row of **unit** nodes — Unit 1, Unit 2, and so on — and each
 unit's lessons hang below it, connected by the order you take them in. The
 tree is wider and taller than the window: scroll in both directions to see
@@ -63,6 +68,18 @@ practice-skills lessons, which are about how you work rather than what
 you play. Rather than pretend to grade them, the game asks you to say
 when you've read and understood them.
 
+## Flute: first steps
+
+The flute path begins with setup and a steady B4, then introduces breathing,
+rests and pulse. Next, connect B4–A4–G4, add C5 and D5, and play short phrases
+using those five notes. An E4/E5 octave exercise is optional after the main
+path. All exercises fit both C-foot and B-foot concert flutes.
+
+Nine short exercises use the normal flute score and horizontal fingering
+view. Pitch and timing count toward passing; posture, comfortable breathing,
+fingering choice and articulation quality need your own listening or a
+teacher’s feedback. The setup lesson is completed by self-assessment.
+
 ## Practice tools on the page
 
 Some reader pages carry interactive tools below the explanation, there to
@@ -98,7 +115,7 @@ the feel you picked. That pairing is the whole point of lessons like
 *Counting the Bars* and *The Turnaround*: you hear where you are and see
 where you are at the same time.
 
-## Core units and electives
+## Harmonica: core units and electives
 
 The curriculum runs to a hundred lessons across seventeen units. Units 1
 to 6 are the numbered **core course**, taken in order; three more — Rhythm
