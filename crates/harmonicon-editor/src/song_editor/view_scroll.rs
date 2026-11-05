@@ -81,7 +81,7 @@ pub(super) fn scroll_keyboard(
     mut state: ResMut<EditorState>,
 ) {
     let delta: f32 = wheel.read().map(|ev| ev.y).sum();
-    if delta == 0.0 || !keyboard.iter().any(Hovered::get) {
+    if delta == 0.0 || !super::piano_note::is_piano(&state) || !keyboard.iter().any(Hovered::get) {
         return;
     }
     let keys = (-delta * 3.0).round() as i32;
@@ -494,6 +494,54 @@ pub(super) fn drag_grid_scrollbar(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn wheel_over_flute_keyboard_keeps_notes_aligned_and_piano_still_scrolls() {
+        use super::super::instrument_ui::InstrumentKind;
+        use bevy::input::mouse::MouseScrollUnit;
+        let mut app = App::new();
+        app.add_message::<MouseWheel>()
+            .insert_resource(super::super::document_picker::fresh(
+                InstrumentKind::Flute.selection(),
+            ))
+            .add_systems(Update, scroll_keyboard);
+        let window = app.world_mut().spawn_empty().id();
+        app.world_mut().spawn((super::super::ui::EditorKeyboard, Hovered(true)));
+        for delta in [-20.0, 20.0] {
+            app.world_mut().write_message(MouseWheel {
+                unit: MouseScrollUnit::Line,
+                phase: bevy::input::touch::TouchPhase::Moved,
+                x: 0.0,
+                y: delta,
+                window,
+            });
+            app.update();
+            let mut state = app.world_mut().resource_mut::<EditorState>();
+            assert_eq!(state.row_offset, 0);
+            let lowest_row = state.display_rows();
+            state.notes.clear();
+            super::super::interaction::select_or_add(&mut state, lowest_row, 0);
+            assert_eq!(state.notes[0].row(), lowest_row);
+            assert_eq!(state.display_row(&state.notes[0]), usize::from(lowest_row - 1));
+            assert_eq!(
+                state.notes[0].target.sounding_pitch(&state.effective_instrument()),
+                Some(60.0)
+            );
+        }
+        app.insert_resource(super::super::document_picker::fresh(
+            InstrumentKind::Piano.selection(),
+        ));
+        let before = app.world().resource::<EditorState>().row_offset;
+        app.world_mut().write_message(MouseWheel {
+            unit: MouseScrollUnit::Line,
+            phase: bevy::input::touch::TouchPhase::Moved,
+            x: 0.0,
+            y: -1.0,
+            window,
+        });
+        app.update();
+        assert_eq!(app.world().resource::<EditorState>().row_offset, before + 3);
+    }
 
     // ── scrollbar_needed ─────────────────────────────────────────────────────
 

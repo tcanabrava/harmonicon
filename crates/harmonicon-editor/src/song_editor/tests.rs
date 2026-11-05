@@ -4442,3 +4442,41 @@ fn piano_placement_updates_grid_score_and_scrollbar_without_harmonica_access() {
         assert_eq!(world.get::<Children>(track).unwrap().len(), 1);
     }
 }
+
+#[test]
+fn switching_loading_and_undoing_back_to_flute_clear_piano_pitch_offsets() {
+    use super::instrument_ui::InstrumentKind;
+    use bevy::prelude::*;
+    let mut app = App::new();
+    app.insert_resource(super::document_picker::fresh(InstrumentKind::Piano.selection()))
+        .init_resource::<UndoHistory>()
+        .add_message::<super::state::DocumentCommand>()
+        .add_systems(Update, super::undo::apply_document_commands);
+    assert!(app.world().resource::<EditorState>().row_offset > 0);
+    app.world_mut().write_message(super::state::DocumentCommand::SelectInstrument(
+        InstrumentKind::Flute.selection(),
+    ));
+    app.update();
+    assert_eq!(app.world().resource::<EditorState>().row_offset, 0);
+
+    let mut flute = super::document_picker::fresh(InstrumentKind::Flute.selection());
+    let lowest = flute.row_count();
+    super::flute_note::place(&mut flute, lowest, 0, 12);
+    let chart = serde_json::from_str(&serialize_harpchart(&flute)).unwrap();
+    let mut piano = super::document_picker::fresh(InstrumentKind::Piano.selection());
+    load_harpchart(&chart, &mut piano, &mut Scroll::default());
+    assert_eq!(piano.row_offset, 0);
+    assert!(piano.row_visible(piano.notes[0].row()));
+
+    let mut history = UndoHistory::default();
+    history.record_if_changed(&flute);
+    flute.notes.clear();
+    history.record_if_changed(&flute);
+    flute = super::document_picker::fresh(InstrumentKind::Piano.selection());
+    history.record_if_changed(&flute);
+    history.undo(&mut flute);
+    assert_eq!(flute.row_offset, 0);
+    assert!(super::flute_note::is_flute(&flute));
+    history.undo(&mut flute);
+    assert!(flute.row_visible(flute.notes[0].row()));
+}

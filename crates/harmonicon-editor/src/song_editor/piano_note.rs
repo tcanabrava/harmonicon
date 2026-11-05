@@ -96,6 +96,9 @@ fn max_offset(state: &EditorState) -> u8 {
 /// Scrolls the window `delta` keys down (up for negative), within the
 /// keyboard.
 pub(super) fn scroll_keys(state: &mut EditorState, delta: i32) {
+    if !is_piano(state) {
+        return;
+    }
     let offset = (i32::from(state.row_offset) + delta).clamp(0, i32::from(max_offset(state)));
     let offset = offset as u8;
     if state.row_offset != offset {
@@ -114,6 +117,14 @@ pub(super) fn reveal_row(state: &mut EditorState, row: u8) {
         scroll_keys(state, row - first - MARGIN);
     } else if row > last {
         scroll_keys(state, row - last + MARGIN);
+    }
+}
+
+/// Instrument changes discard the previous instrument's pitch-window offset.
+pub(super) fn reset_window(state: &mut EditorState) {
+    state.row_offset = 0;
+    if is_piano(state) {
+        centre_on_notes(state);
     }
 }
 

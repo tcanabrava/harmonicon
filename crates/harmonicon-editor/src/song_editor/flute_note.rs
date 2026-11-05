@@ -37,16 +37,19 @@ pub(super) fn fingering_count(flute: &Flute, note: &GridNote) -> usize {
     fingering_of(note).map_or(0, |at| flute.fingerings_for(at.note).len())
 }
 
-/// The pitch of grid row `row`.
-fn row_note(row: u8) -> u8 {
-    FLUTE_TOP_NOTE + 1 - row
-}
-
 /// Places a note on `row` at `tick` on its standard fingering, with the
 /// armed expression, and selects it. It is cut short at the next onset,
 /// and a note still sounding at `tick` ends there: one voice. Refused, and
 /// reported, on another note's onset.
 pub(super) fn place(state: &mut EditorState, row: u8, tick: usize, len: usize) {
+    let Instrument::Flute(flute) = state.effective_instrument() else { return };
+    let Some(pitch) = (FLUTE_TOP_NOTE + 1)
+        .checked_sub(row)
+        .filter(|&pitch| !flute.fingerings_for(pitch).is_empty())
+    else {
+        state.unplayable_notice = true;
+        return;
+    };
     if state.notes.iter().any(|n| n.tick == tick) {
         state.unplayable_notice = true;
         return;
@@ -62,7 +65,7 @@ pub(super) fn place(state: &mut EditorState, row: u8, tick: usize, len: usize) {
         len,
         expr: state.sticky_expr,
         target: NoteTarget::Positioned(PlayPosition::Fingering(FingeringAssignment {
-            note: row_note(row),
+            note: pitch,
             alternate: 0,
         })),
     };
@@ -152,6 +155,25 @@ mod tests {
 
     fn at(state: &EditorState, id: u32) -> FingeringAssignment {
         fingering_of(state.note_by_id(id).expect("note exists")).expect("a fingering")
+    }
+
+    #[test]
+    fn out_of_range_placement_leaves_existing_notes_unchanged() {
+        for foot in [FootJoint::C, FootJoint::B] {
+            let mut state = flute_state();
+            state.instrument = super::super::state::InstrumentSelection::Configured {
+                instrument: Flute::new(foot).into(),
+                harmonica_origin: None,
+            };
+            let lowest_row = state.row_count();
+            place(&mut state, lowest_row, 0, 24);
+            let before = state.notes.clone();
+            for row in [0, state.row_count() + 1, u8::MAX] {
+                place(&mut state, row, 12, 12);
+                assert_eq!(state.notes, before);
+                assert!(state.unplayable_notice);
+            }
+        }
     }
 
     /// Row 1 is C7; E4 is 32 semitones lower.

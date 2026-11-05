@@ -110,6 +110,7 @@ impl Snapshot {
     }
 
     fn restore(self, state: &mut EditorState) {
+        let instrument_changed = state.instrument != self.instrument;
         state.instrument = self.instrument;
         state.key = self.key;
         state.notes = self.notes;
@@ -119,6 +120,9 @@ impl Snapshot {
         state.phrase_annotations = self.phrase_annotations;
         state.expression_intensities = self.expression_intensities;
         state.prune_selection();
+        if instrument_changed {
+            super::piano_note::reset_window(state);
+        }
     }
 }
 
@@ -280,6 +284,7 @@ pub(super) fn apply_document_commands(
                 }
                 state.instrument = instrument.clone();
                 state.content_kind = super::state::ContentKind::Song;
+                super::piano_note::reset_window(&mut state);
             }
         }
     }
