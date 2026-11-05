@@ -9,6 +9,10 @@ use harmonicon_core::instrument::{
 };
 use harmonicon_platform::localization::LocalizationExt;
 
+/// A separate child lets flex layout center the label inside its circular marker.
+#[derive(Component)]
+pub(super) struct FingerLabel;
+
 /// The colour string `string` is drawn in, string 1 first: the same on the
 /// play highway, its fretboard strip and the Song Editor's tab view, so a
 /// string reads as one thing everywhere.
@@ -772,30 +776,36 @@ fn spawn_neck(
                     }
                     for next in [true, false] {
                         for string in 1..=guitar.string_count() {
-                            board.spawn((
-                                NeckDot { next, string },
-                                Text::new(""),
-                                TextFont { font_size: FontSize::Px(13.0), ..default() },
-                                TextLayout::no_wrap(),
-                                TextColor(if next {
-                                    NECK_NEXT
-                                } else {
-                                    Color::srgb(0.08, 0.08, 0.10)
-                                }),
-                                Node {
-                                    align_items: AlignItems::Center,
-                                    justify_content: JustifyContent::Center,
-                                    position_type: PositionType::Absolute,
-                                    width: Val::Px(if next { 24.0 } else { 22.0 }),
-                                    height: Val::Px(if next { 24.0 } else { 22.0 }),
-                                    border_radius: BorderRadius::MAX,
-                                    border: UiRect::all(Val::Px(2.0)),
-                                    ..default()
-                                },
-                                UiTransform::from_translation(Val2::all(Val::Percent(-50.0))),
-                                BorderColor::all(if next { NECK_NEXT } else { NECK_NOW }),
-                                BackgroundColor(if next { Color::NONE } else { NECK_NOW }),
-                            ));
+                            board
+                                .spawn((
+                                    NeckDot { next, string },
+                                    Node {
+                                        align_items: AlignItems::Center,
+                                        justify_content: JustifyContent::Center,
+                                        position_type: PositionType::Absolute,
+                                        width: Val::Px(if next { 24.0 } else { 22.0 }),
+                                        height: Val::Px(if next { 24.0 } else { 22.0 }),
+                                        border_radius: BorderRadius::MAX,
+                                        border: UiRect::all(Val::Px(2.0)),
+                                        ..default()
+                                    },
+                                    UiTransform::from_translation(Val2::all(Val::Percent(-50.0))),
+                                    BorderColor::all(if next { NECK_NEXT } else { NECK_NOW }),
+                                    BackgroundColor(if next { Color::NONE } else { NECK_NOW }),
+                                ))
+                                .with_children(|circle| {
+                                    circle.spawn((
+                                        FingerLabel,
+                                        Text::new(""),
+                                        TextFont { font_size: FontSize::Px(13.0), ..default() },
+                                        TextLayout::no_wrap(),
+                                        TextColor(if next {
+                                            NECK_NEXT
+                                        } else {
+                                            Color::srgb(0.08, 0.08, 0.10)
+                                        }),
+                                    ));
+                                });
                         }
                     }
                 })
@@ -813,8 +823,12 @@ pub(super) fn update_neck_overview(
         (&NeckRegion, &mut Node, &mut BackgroundColor, &mut BorderColor, &mut NeckMotion),
         (Without<NeckDot>, Without<NeckLabel>),
     >,
-    mut dots: Query<(&NeckDot, &mut Node, &mut Text), (Without<NeckRegion>, Without<NeckLabel>)>,
-    mut labels: Query<(&NeckLabel, &mut Text, &mut Node), (Without<NeckRegion>, Without<NeckDot>)>,
+    mut dots: Query<(&NeckDot, &mut Node, &Children), (Without<NeckRegion>, Without<NeckLabel>)>,
+    mut labels: Query<
+        (&NeckLabel, &mut Text, &mut Node),
+        (Without<NeckRegion>, Without<NeckDot>, Without<FingerLabel>),
+    >,
+    mut fingers: Query<&mut Text, With<FingerLabel>>,
     time: Res<Time>,
 ) {
     let Ok(NeckOverview(guitar)) = boards.single() else { return };
@@ -862,7 +876,8 @@ pub(super) fn update_neck_overview(
             node.width = Val::Percent(value.y);
         }
     }
-    for (dot, mut node, mut text) in &mut dots {
+    for (dot, mut node, children) in &mut dots {
+        let Ok(mut text) = fingers.get_mut(children[0]) else { continue };
         let group = if dot.next { &next_positions } else { &now_positions };
         if let Some(position) = group.iter().find(|p| p.string == dot.string) {
             node.display = Display::Flex;
@@ -995,14 +1010,19 @@ fn suggested_finger(
 pub(super) fn update_trainer_neck(
     trainer: Res<super::note_trainer::NoteTrainer>,
     boards: Query<&NeckOverview>,
-    mut dots: Query<(&NeckDot, &mut Node, &mut Text), (Without<NeckRegion>, Without<NeckLabel>)>,
+    mut dots: Query<(&NeckDot, &mut Node, &Children), (Without<NeckRegion>, Without<NeckLabel>)>,
     mut regions: Query<(&NeckRegion, &mut Node), (Without<NeckDot>, Without<NeckLabel>)>,
-    mut labels: Query<(&NeckLabel, &mut Text), (Without<NeckDot>, Without<NeckRegion>)>,
+    mut labels: Query<
+        (&NeckLabel, &mut Text),
+        (Without<NeckDot>, Without<NeckRegion>, Without<FingerLabel>),
+    >,
+    mut fingers: Query<&mut Text, With<FingerLabel>>,
 ) {
     let Ok(NeckOverview(guitar)) = boards.single() else { return };
     let positions = trainer.guitar_targets();
     let columns = f32::from(guitar.frets) + 1.0;
-    for (dot, mut node, mut text) in &mut dots {
+    for (dot, mut node, children) in &mut dots {
+        let Ok(mut text) = fingers.get_mut(children[0]) else { continue };
         let position = positions.iter().find(|p| !dot.next && p.string == dot.string);
         node.display = if position.is_some() { Display::Flex } else { Display::None };
         if let Some(position) = position {

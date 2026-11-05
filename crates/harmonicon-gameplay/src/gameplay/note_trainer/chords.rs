@@ -186,6 +186,9 @@ fn names(notes: &[u8]) -> String {
 #[derive(Component)]
 pub(crate) struct Panel;
 #[derive(Component)]
+pub(crate) struct CircleLabel;
+
+#[derive(Component)]
 pub(crate) struct Mark {
     string: usize,
     above: bool,
@@ -268,28 +271,35 @@ pub(super) fn spawn_diagram(parent: &mut ChildSpawnerCommands) {
                     UiTransform::from_translation(Val2::new(Val::Percent(-50.0), Val::Px(0.0))),
                 ));
                 for above in [true, false] {
-                    diagram.spawn((
-                        Mark { string, above },
-                        Text::new(""),
-                        TextFont { font_size: FontSize::Px(16.0), ..default() },
-                        TextColor(if above { Color::WHITE } else { Color::BLACK }),
-                        Node {
-                            position_type: PositionType::Absolute,
-                            left: Val::Percent(x),
-                            width: Val::Px(24.0),
-                            height: Val::Px(24.0),
-                            border_radius: BorderRadius::MAX,
-                            align_items: AlignItems::Center,
-                            justify_content: JustifyContent::Center,
-                            ..default()
-                        },
-                        UiTransform::from_translation(Val2::all(Val::Percent(-50.0))),
-                        BackgroundColor(if above {
-                            Color::NONE
-                        } else {
-                            Color::srgb(0.98, 0.82, 0.35)
-                        }),
-                    ));
+                    diagram
+                        .spawn((
+                            Mark { string, above },
+                            Node {
+                                position_type: PositionType::Absolute,
+                                left: Val::Percent(x),
+                                width: Val::Px(24.0),
+                                height: Val::Px(24.0),
+                                border_radius: BorderRadius::MAX,
+                                align_items: AlignItems::Center,
+                                justify_content: JustifyContent::Center,
+                                ..default()
+                            },
+                            UiTransform::from_translation(Val2::all(Val::Percent(-50.0))),
+                            BackgroundColor(if above {
+                                Color::NONE
+                            } else {
+                                Color::srgb(0.98, 0.82, 0.35)
+                            }),
+                        ))
+                        .with_children(|circle| {
+                            circle.spawn((
+                                CircleLabel,
+                                Text::new(""),
+                                TextFont { font_size: FontSize::Px(16.0), ..default() },
+                                TextLayout::no_wrap(),
+                                TextColor(if above { Color::WHITE } else { Color::BLACK }),
+                            ));
+                        });
                 }
             }
             for fret in 0..=4 {
@@ -311,8 +321,9 @@ pub(crate) fn update(
     trainer: Res<NoteTrainer>,
     loc: Res<Localization>,
     mut panels: Query<&mut Drawer, With<Panel>>,
-    mut marks: Query<(&Mark, &mut Node, &mut Text), Without<BoardHelp>>,
-    mut help: Query<&mut Text, (With<BoardHelp>, Without<Mark>)>,
+    mut marks: Query<(&Mark, &mut Node, &Children), Without<BoardHelp>>,
+    mut labels: Query<&mut Text, With<CircleLabel>>,
+    mut help: Query<&mut Text, (With<BoardHelp>, Without<Mark>, Without<CircleLabel>)>,
 ) {
     for mut panel in &mut panels {
         panel.open = trainer.chord.is_some();
@@ -328,7 +339,8 @@ pub(crate) fn update(
     }
     let Some(chord) = &trainer.chord else { return };
     let shape = chord.shape();
-    for (mark, mut node, mut text) in &mut marks {
+    for (mark, mut node, children) in &mut marks {
+        let Ok(mut text) = labels.get_mut(children[0]) else { continue };
         let fret = shape.frets[mark.string];
         if mark.above {
             node.top = Val::Px(-18.0);
