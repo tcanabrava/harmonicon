@@ -70,11 +70,12 @@ fn validate_and_parse_chart(
 
     // Deserializes from a borrow: no copy of the whole JSON tree.
     let chart = <HarpChart as serde::Deserialize>::deserialize(&*chart_value)?;
-    // What an event must name depends on the chart's instrument (a hole, a
-    // string, or for a flute only its note), which a schema can't express
-    // from inside an event; the engine's own check, the one `validate-pack`
-    // runs, decides it here too.
-    let problems = harmonicon_core::chart_check::instrument_problems(&chart);
+    // What a schema can't express: what an event must name depends on the
+    // chart's instrument (a hole, a string, or for a flute only its note),
+    // and the tempo and meter maps must run in tick order. Everything that
+    // reads a chart file — `validate-pack` and the Song Editor included —
+    // comes through here, so this is the one place it is checked.
+    let problems = harmonicon_core::chart_check::chart_problems(&chart);
     if !problems.is_empty() {
         return Err(SongLoadError::Validation(problems.join("\n")));
     }

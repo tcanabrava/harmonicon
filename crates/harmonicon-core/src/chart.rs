@@ -252,9 +252,11 @@ const MIGRATIONS: &[Migration] = &[
 
 /// Fixes up a chart's raw JSON in place so it validates against the current
 /// schema, running every [`MIGRATIONS`] step whose `target_version` is newer
-/// than the chart's own declared `metadata.format_version` (a missing or
-/// unparsable version is treated as older than everything, since almost
-/// every chart old enough to need migrating predates the field itself).
+/// than the chart's own declared `metadata.format_version` (a missing
+/// version is treated as older than everything, since almost every chart
+/// old enough to need migrating predates the field itself). A version that
+/// is present but malformed is left alone, migrations and all, so the
+/// schema's version pattern rejects it rather than this stamping over it.
 /// Called by `song::loader` on the raw JSON *before* schema validation —
 /// migrating after validation would be too late, since an old chart with a
 /// since-removed field fails validation before ever reaching typed
@@ -270,11 +272,13 @@ const MIGRATIONS: &[Migration] = &[
 /// chart that passes through here never gets re-evaluated against the same
 /// migrations again (e.g. on a re-save from the Song Editor).
 pub fn migrate_chart_json(value: &mut serde_json::Value) -> bool {
-    let declared = value
-        .get("metadata")
-        .and_then(|m| m.get("format_version"))
-        .and_then(|v| v.as_str())
-        .and_then(parse_format_version);
+    let declared = match value.get("metadata").and_then(|m| m.get("format_version")) {
+        None => None,
+        Some(version) => match version.as_str().and_then(parse_format_version) {
+            Some(parsed) => Some(parsed),
+            None => return false,
+        },
+    };
 
     let mut needs_version_bump = false;
     let mut changed = false;
@@ -354,6 +358,20 @@ mod migration_tests {
             value.get("fx_mapping").is_some(),
             "migrations below the declared version don't run"
         );
+    }
+
+    #[test]
+    fn a_malformed_version_is_left_for_validation_to_reject() {
+        for bad in [json!("1.8"), json!("one"), json!(18)] {
+            let mut value = json!({
+                "metadata": { "format_version": bad.clone() },
+                "song": {},
+                "fx_mapping": {},
+            });
+            assert!(!migrate_chart_json(&mut value));
+            assert_eq!(value["metadata"]["format_version"], bad, "not stamped over");
+            assert!(value.get("fx_mapping").is_some(), "no migration ran");
+        }
     }
 
     #[test]
@@ -780,8 +798,10 @@ pub struct Combo {
 }
 
 /// Convert a tick position to absolute seconds, accounting for tempo changes.
-/// `resolution` is ticks per quarter note; `tempo_map` must be sorted by tick.
-/// Assumes the first entry covers tick 0 (standard for MIDI-derived charts).
+/// `resolution` is ticks per quarter note; `tempo_map` should be sorted by
+/// tick and start at tick 0, which `chart_check::timing_problems` enforces
+/// for a loaded chart. An out-of-order point contributes no time rather
+/// than underflowing.
 pub fn tick_to_seconds(tick: u64, resolution: u32, tempo_map: &[TempoPoint]) -> f64 {
     if tempo_map.is_empty() || resolution == 0 {
         return 0.0;
@@ -795,7 +815,7 @@ pub fn tick_to_seconds(tick: u64, resolution: u32, tempo_map: &[TempoPoint]) -> 
             break;
         }
         let seg_end = point.tick.min(tick);
-        let seg_ticks = seg_end - prev_tick;
+        let seg_ticks = seg_end.saturating_sub(prev_tick);
         elapsed += (seg_ticks as f64 / resolution as f64) * (60.0 / prev_bpm);
         if tick <= point.tick {
             return elapsed;
@@ -825,7 +845,7 @@ pub fn seconds_to_tick(secs: f64, resolution: u32, tempo_map: &[TempoPoint]) -> 
     let mut prev_bpm = tempo_map[0].bpm as f64;
 
     for point in tempo_map.iter().skip(1) {
-        let seg_ticks = point.tick - prev_tick;
+        let seg_ticks = point.tick.saturating_sub(prev_tick);
         let seg_secs = (seg_ticks as f64 / resolution as f64) * (60.0 / prev_bpm);
         if secs <= elapsed + seg_secs {
             let remaining_ticks = (secs - elapsed) / (60.0 / prev_bpm) * resolution as f64;
@@ -983,6 +1003,20 @@ mod tests {
     #[test]
     fn empty_tempo_map_returns_zero() {
         assert_eq!(tick_to_seconds(999, 480, &[]), 0.0);
+    }
+
+    #[test]
+    fn an_out_of_order_tempo_map_converts_without_underflowing() {
+        // Validation rejects this map; a caller that skipped it must still
+        // get a finite answer in both directions rather than a panic.
+        let map = vec![
+            TempoPoint { tick: 0, bpm: 120.0 },
+            TempoPoint { tick: 960, bpm: 180.0 },
+            TempoPoint { tick: 480, bpm: 60.0 },
+        ];
+        let secs = tick_to_seconds(1440, 480, &map);
+        assert!(secs.is_finite() && secs > 0.0, "got {secs}");
+        assert!(seconds_to_tick(10.0, 480, &map) > 0);
     }
 
     // ── seconds_to_tick ───────────────────────────────────────────────────────

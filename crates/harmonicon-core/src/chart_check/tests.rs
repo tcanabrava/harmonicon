@@ -109,3 +109,40 @@ fn a_guitar_chart_round_trips_its_instrument_and_positions() {
     let back: HarpChart = serde_json::from_value(json).unwrap();
     assert_eq!(back.instrument_spec, chart.instrument_spec);
 }
+
+fn timing(json: &str) -> Timing {
+    serde_json::from_str(json).unwrap()
+}
+
+#[test]
+fn ordered_timing_maps_have_no_problems() {
+    let sound = timing(
+        r#"{"resolution":12,"tempo_map":[{"tick":0,"bpm":120},{"tick":48,"bpm":90}],
+            "time_signature_map":[{"tick":0,"time_signature":"4/4"},{"tick":96,"time_signature":"3/4"}]}"#,
+    );
+    assert_eq!(timing_problems(&sound), Vec::<String>::new());
+    let sound_chart = chart(HARMONICA, r#"{"hole":4,"action":"blow"}"#);
+    assert_eq!(chart_problems(&sound_chart), Vec::<String>::new());
+}
+
+#[test]
+fn a_tempo_map_must_start_at_zero_and_run_forward() {
+    let late = timing(r#"{"resolution":12,"tempo_map":[{"tick":24,"bpm":120}]}"#);
+    assert!(timing_problems(&late)[0].contains("starts at tick 24"));
+    let backwards = timing(
+        r#"{"resolution":12,"tempo_map":[{"tick":0,"bpm":120},{"tick":96,"bpm":90},{"tick":48,"bpm":60}]}"#,
+    );
+    assert_eq!(
+        timing_problems(&backwards),
+        vec!["timing.tempo_map[2] is at tick 48, before the point ahead of it at 96"]
+    );
+}
+
+#[test]
+fn a_meter_map_must_run_forward() {
+    let backwards = timing(
+        r#"{"resolution":12,"tempo_map":[{"tick":0,"bpm":120}],
+            "time_signature_map":[{"tick":96,"time_signature":"3/4"},{"tick":0,"time_signature":"4/4"}]}"#,
+    );
+    assert!(timing_problems(&backwards)[0].starts_with("timing.time_signature_map[1]"));
+}

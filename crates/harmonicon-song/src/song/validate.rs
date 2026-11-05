@@ -8,7 +8,6 @@
 use std::path::{Path, PathBuf};
 
 use harmonicon_core::chart::HarpChart;
-use harmonicon_core::chart_check::instrument_problems;
 use harmonicon_core::harmonica::{Harmonica, chromatic_harp};
 use harmonicon_core::pitch_map::HARP_KEYS;
 
@@ -71,9 +70,6 @@ pub fn check_chart(path: &Path, root: &Path, report: &mut Report) {
     let Ok(chart) = serde_json::from_value::<HarpChart>(value) else {
         return; // the loader's own deserialize already passed above
     };
-    for problem in instrument_problems(&chart) {
-        report.error(path, root, problem);
-    }
     if let Some(harp @ Harmonica::Chromatic { .. }) = &chart.harmonica
         && !HARP_KEYS
             .iter()

@@ -4,11 +4,10 @@
 //! plain file writes.
 //!
 //! Everything here is the bottom of `docs/physical_design_plan.md`'s level
-//! order — the music theory (`harmonica`, `chart`, `note_parser`), the
-//! scoring maths (`scoring`), pitch/MIDI conversion (`midi`), and the
-//! crash-safe config write (`config_file`). The game crate re-exports these
-//! under their historical paths (`crate::chart`, `crate::scoring`,
-//! `crate::midi`, ...), so call sites read exactly as before.
+//! order: music theory (`harmonica`, `instrument`, `chart`, `note_parser`),
+//! the scoring maths (`scoring`), pitch/MIDI conversion (`midi`), the synth,
+//! and the crash-safe config write (`config_file`). Call sites name this
+//! crate directly (`harmonicon_core::chart`), not a re-export.
 //!
 //! Being a separate crate is what *enforces* the layering: Cargo cannot
 //! express a circular dependency, so nothing here can ever reach back up

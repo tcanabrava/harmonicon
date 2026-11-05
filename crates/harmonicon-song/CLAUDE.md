@@ -30,10 +30,12 @@ load-bearing about *this* crate.
     deserialization, so migrating after would be too late) — a small
     ordered list of `Migration { target_version, apply }` steps, each
     skipped once a chart's own `metadata.format_version` already meets
-    `target_version` (missing/unparsable counts as older than everything,
-    since almost every chart old enough to need migrating predates the
-    field). Currently one step: `strip_legacy_fx_mapping`, folded into
-    `1.1.0`. A step's `apply` returns whether it actually changed anything,
+    `target_version` (missing counts as older than everything, since
+    almost every chart old enough to need migrating predates the field; a
+    *malformed* version is left untouched so the schema's version pattern
+    rejects it, rather than being stamped over). Currently two steps:
+    `strip_legacy_fx_mapping` (`1.1.0`) and `add_legacy_song_genre`
+    (`1.7.0`). A step's `apply` returns whether it actually changed anything,
     separate from whether it was *attempted* — most charts below a step's
     threshold don't actually have the specific problem it fixes (e.g. a
     declared-1.0.0 chart that never used `fx_mapping`), so `song::loader`
@@ -74,8 +76,11 @@ load-bearing about *this* crate.
     string position, or for a flute only its note and optional
     `fingering`; bend sign; techniques per instrument; a position sounding
     its stated `note`; a note within a flute's foot joint) are core's
-    `chart_check::instrument_problems`. **The loader runs it too**, after
-    the schema, not only `validate-pack`: a schema can't make a nested
+    `chart_check::instrument_problems`, run by the loader after the schema
+    as part of `chart_check::chart_problems` (which also requires the tempo
+    and meter maps in tick order, the tempo map starting at tick 0).
+    `validate_and_migrate_chart` is the one place this runs; `validate-pack`
+    and the Song Editor both go through it. A schema can't make a nested
     event's shape depend on the root's instrument, so since the flute's
     note-only event became schema-legal, only that check refuses a guitar
     event missing its string. A guitar chart plays on Play 2D's

@@ -718,12 +718,6 @@ pub(super) fn load_harpchart(v: &serde_json::Value, state: &mut EditorState, scr
 pub(super) fn validated_harpchart(text: &str) -> Result<serde_json::Value, String> {
     let mut value: serde_json::Value = serde_json::from_str(text).map_err(|e| e.to_string())?;
     harmonicon_song::song::validate_and_migrate_chart(&mut value).map_err(|e| e.to_string())?;
-    let typed: harmonicon_core::chart::HarpChart =
-        serde_json::from_value(value.clone()).map_err(|e| e.to_string())?;
-    let instrument_problems = harmonicon_core::chart_check::instrument_problems(&typed);
-    if !instrument_problems.is_empty() {
-        return Err(instrument_problems.join("\n"));
-    }
     let unsupported = unsupported_chart_features(&value);
     if !unsupported.is_empty() {
         return Err(format!(

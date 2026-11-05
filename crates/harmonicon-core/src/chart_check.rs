@@ -1,18 +1,56 @@
 // SPDX-License-Identifier: MIT
 
-//! The rules a chart must follow that the schema can't state, because they
-//! depend on which instrument the chart names: a harmonica chart's events
-//! name holes and a guitar chart's name strings and frets, and each
-//! instrument's techniques only make sense on it.
+//! The rules a chart must follow that the schema can't state: its tempo and
+//! meter maps run in tick order, and its events fit the instrument it names
+//! (a harmonica chart's events name holes and a guitar chart's name strings
+//! and frets, and each instrument's techniques only make sense on it).
 //!
 //! Messages are for a chart author reading `validate-pack` output, not for
 //! a player, so they are plain English rather than localized.
 
-use crate::chart::{FretPosition, HarpChart, Modifier, NoteEvent};
+use crate::chart::{FretPosition, HarpChart, Modifier, NoteEvent, Timing};
 use crate::instrument::flute::{FingeringAssignment, Flute};
 use crate::instrument::guitar::{FretAssignment, Guitar, StringTechnique};
 use crate::instrument::{Instrument, InstrumentModel, PlayPosition};
 use crate::midi::note_to_midi;
+
+/// Every rule `chart` breaks that its schema can't catch: [`timing_problems`]
+/// and [`instrument_problems`]. Empty for a sound chart. What a loader or
+/// validator should run.
+pub fn chart_problems(chart: &HarpChart) -> Vec<String> {
+    let mut problems = timing_problems(&chart.timing);
+    problems.extend(instrument_problems(chart));
+    problems
+}
+
+/// Where `timing`'s maps break the order every tick↔seconds conversion
+/// assumes: the tempo map must start at tick 0 (before its first point
+/// there is no tempo to count with), and both maps must be in tick order.
+/// The schema can bound each point but not compare neighbours.
+pub fn timing_problems(timing: &Timing) -> Vec<String> {
+    let mut problems = Vec::new();
+    if let Some(first) = timing.tempo_map.first()
+        && first.tick != 0
+    {
+        problems.push(format!("timing.tempo_map starts at tick {}, not 0", first.tick));
+    }
+    let tempo_ticks = timing.tempo_map.iter().map(|p| p.tick);
+    problems.extend(out_of_order("timing.tempo_map", tempo_ticks));
+    let meter_ticks = timing.time_signature_map.iter().flatten().map(|p| p.tick);
+    problems.extend(out_of_order("timing.time_signature_map", meter_ticks));
+    problems
+}
+
+/// The first point in `ticks` earlier than the one before it, if any.
+fn out_of_order(field: &str, ticks: impl Iterator<Item = u64>) -> Option<String> {
+    let ticks: Vec<u64> = ticks.collect();
+    let index = ticks.windows(2).position(|pair| pair[1] < pair[0])? + 1;
+    Some(format!(
+        "{field}[{index}] is at tick {}, before the point ahead of it at {}",
+        ticks[index],
+        ticks[index - 1]
+    ))
+}
 
 /// Every way `chart`'s events disagree with its instrument, each naming the
 /// track item and event it is about. Empty for a sound chart.
