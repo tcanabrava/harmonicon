@@ -43,6 +43,8 @@ use harmonicon_ui::dialogs::tab_bar::{TabSelect, spawn_tab_bar};
 use super::GameplayRoot;
 use super::flute_visuals::{FluteDrawing, FluteKey, paint_flute_keys};
 mod piano;
+mod selection;
+pub(super) use selection::sync_controls;
 pub(super) mod teaching;
 use super::guitar_visuals::spawn_trainer_neck;
 use harmonicon_core::instrument::flute::Flute;
@@ -71,11 +73,13 @@ pub struct Practice {
     /// (`restore_progress`).
     restored: bool,
     revealed: bool,
+    auto_advance: bool,
+    awaiting_release: bool,
 }
 
 impl Practice {
     pub fn new(drills: Vec<Drill>) -> Self {
-        Self { drills, ..default() }
+        Self { drills, auto_advance: true, ..default() }
     }
 
     pub fn drill(&self) -> Option<&Drill> {
@@ -93,6 +97,7 @@ impl Practice {
         self.heard = None;
         self.heard_midi = None;
         self.revealed = false;
+        self.awaiting_release = false;
     }
 
     /// Feeds one frame: the pitch heard nearest the target (`None` in
@@ -110,6 +115,13 @@ impl Practice {
         let Some(drill) = self.drill().copied() else { return false };
         self.heard = midi.map(|m| hear(&drill, m));
         self.heard_midi = midi;
+        if self.awaiting_release {
+            if !matches!(self.heard, Some(Heard::Target { cents }) if cents.abs() <= tolerance_cents)
+            {
+                self.awaiting_release = false;
+            }
+            return false;
+        }
         match self.heard {
             Some(Heard::Target { cents }) if cents.abs() <= tolerance_cents => self.held += dt,
             _ => self.held = 0.0,
@@ -119,7 +131,12 @@ impl Practice {
         }
         self.landed += 1;
         self.celebrate = LANDED_SECS;
-        self.step_by(1);
+        if self.auto_advance {
+            self.step_by(1);
+        } else {
+            self.held = 0.0;
+            self.awaiting_release = true;
+        }
         true
     }
 
@@ -383,6 +400,9 @@ fn guitar_instruction(loc: &Localization, guitar: &Guitar, drill: &Drill) -> Str
 /// The live line under the instruction: what the tuner hears against the
 /// drill. A landing outranks it for a moment.
 fn status(loc: &Localization, practice: &Practice, tolerance_cents: f32) -> String {
+    if practice.awaiting_release {
+        return loc.msg("trainer-release-repeat").to_string();
+    }
     if practice.celebrate > 0.0 {
         let next = practice.drill().map(|d| note_name(d.target)).unwrap_or_default();
         return String::from(loc.msg_args("note-trainer-landed", &[("note", next)]));
@@ -519,6 +539,32 @@ pub(super) fn setup(
     let previous = String::from(loc.msg("note-trainer-previous"));
     let next = String::from(loc.msg("note-trainer-next"));
     let listen = String::from(loc.msg("note-trainer-listen"));
+    if trainer.guitar().is_some() {
+        commands.entity(root).with_children(|p| {
+            p.spawn((
+                selection::Controls,
+                Node {
+                    width: Val::Percent(100.0),
+                    flex_wrap: FlexWrap::Wrap,
+                    column_gap: Val::Px(16.0),
+                    row_gap: Val::Px(8.0),
+                    padding: UiRect::all(Val::Px(16.0)),
+                    flex_shrink: 0.0,
+                    ..default()
+                },
+            ));
+            p.spawn((
+                selection::Backdrops,
+                Node {
+                    position_type: PositionType::Absolute,
+                    width: Val::Percent(100.0),
+                    height: Val::Percent(100.0),
+                    ..default()
+                },
+                bevy::picking::Pickable::IGNORE,
+            ));
+        });
+    }
     let mut content = root;
     commands.entity(root).with_children(|parent| {
         content = harmonicon_ui::dialogs::scroll_area::spawn_scroll_area(
@@ -527,69 +573,120 @@ pub(super) fn setup(
             Color::srgb(0.1, 0.12, 0.16),
         );
     });
+    commands.entity(content).insert(Node {
+        width: Val::Percent(100.0),
+        flex_grow: 1.0,
+        flex_basis: Val::Px(0.0),
+        min_width: Val::Px(0.0),
+        min_height: Val::Px(0.0),
+        flex_direction: FlexDirection::Column,
+        align_items: AlignItems::Stretch,
+        overflow: Overflow::scroll_y(),
+        row_gap: Val::Px(16.0),
+        ..default()
+    });
     commands.entity(content).with_children(|root| {
         root.spawn(Node {
             width: Val::Percent(100.0),
+            flex_direction: if trainer.guitar().is_some() {
+                FlexDirection::Row
+            } else {
+                FlexDirection::Column
+            },
+            flex_wrap: FlexWrap::Wrap,
+            column_gap: Val::Px(16.0),
+            align_items: AlignItems::Center,
             flex_shrink: 0.0,
-            flex_direction: FlexDirection::Column,
-            row_gap: Val::Px(12.0),
-            padding: UiRect::axes(Val::Px(24.0), Val::Px(12.0)),
             ..default()
         })
-        .with_children(|card| {
-            card.spawn((
-                InstructionLabel,
-                Text::new(""),
-                TextFont { font_size: FontSize::Px(28.0), ..default() },
-                TextColor(Color::WHITE),
-            ));
-            card.spawn((
-                StatusLabel,
-                Text::new(""),
-                TextFont { font_size: FontSize::Px(22.0), ..default() },
-                TextColor(Color::srgb(0.75, 0.85, 1.0)),
-            ));
-            card.spawn((
-                Node {
+        .with_children(|workspace| {
+            workspace
+                .spawn(Node {
                     width: Val::Percent(100.0),
-                    max_width: Val::Px(320.0),
-                    height: Val::Px(10.0),
+                    flex_basis: if trainer.guitar().is_some() { Val::Px(420.0) } else { Val::Auto },
+                    flex_grow: 1.0,
+                    min_width: Val::Px(0.0),
+                    flex_shrink: 0.0,
+                    flex_direction: FlexDirection::Column,
+                    row_gap: Val::Px(12.0),
+                    padding: UiRect::axes(Val::Px(24.0), Val::Px(12.0)),
                     ..default()
-                },
-                BackgroundColor(Color::srgb(0.12, 0.13, 0.18)),
-            ))
-            .with_children(|track| {
-                track.spawn((
-                    HoldBar,
-                    Node { width: Val::Percent(0.0), height: Val::Percent(100.0), ..default() },
-                    BackgroundColor(Color::srgb(0.35, 0.85, 0.45)),
-                ));
-            });
-            card.spawn(Node { column_gap: Val::Px(8.0), ..default() }).with_children(|row| {
-                row.spawn_empty().apply_scene(button::small(
-                    &previous,
-                    |_: On<Activate>, mut t: ResMut<NoteTrainer>| {
-                        t.practice.step_by(-1);
-                    },
-                ));
-                row.spawn_empty().apply_scene(button::small(&listen, play_reference));
-                row.spawn_empty().apply_scene(button::small(
-                    &next,
-                    |_: On<Activate>, mut t: ResMut<NoteTrainer>| {
-                        t.practice.step_by(1);
-                    },
-                ));
-            });
-            card.spawn((
-                LandedLabel,
-                Text::new(""),
-                TextFont { font_size: FontSize::Px(16.0), ..default() },
-                TextColor(Color::srgb(0.6, 0.65, 0.75)),
-            ));
+                })
+                .with_children(|card| {
+                    card.spawn((
+                        InstructionLabel,
+                        Text::new(""),
+                        TextFont { font_size: FontSize::Px(28.0), ..default() },
+                        TextColor(Color::WHITE),
+                    ));
+                    card.spawn((
+                        StatusLabel,
+                        Text::new(""),
+                        TextFont { font_size: FontSize::Px(22.0), ..default() },
+                        TextColor(Color::srgb(0.75, 0.85, 1.0)),
+                    ));
+                    card.spawn((
+                        Node {
+                            width: Val::Percent(100.0),
+                            max_width: Val::Px(320.0),
+                            height: Val::Px(10.0),
+                            ..default()
+                        },
+                        BackgroundColor(Color::srgb(0.12, 0.13, 0.18)),
+                    ))
+                    .with_children(|track| {
+                        track.spawn((
+                            HoldBar,
+                            Node {
+                                width: Val::Percent(0.0),
+                                height: Val::Percent(100.0),
+                                ..default()
+                            },
+                            BackgroundColor(Color::srgb(0.35, 0.85, 0.45)),
+                        ));
+                    });
+                    card.spawn(Node { column_gap: Val::Px(8.0), ..default() }).with_children(
+                        |row| {
+                            row.spawn_empty().apply_scene(button::small(
+                                &previous,
+                                |_: On<Activate>, mut t: ResMut<NoteTrainer>| {
+                                    t.practice.step_by(-1);
+                                },
+                            ));
+                            row.spawn_empty().apply_scene(button::small(&listen, play_reference));
+                            row.spawn_empty().apply_scene(button::small(
+                                &next,
+                                |_: On<Activate>, mut t: ResMut<NoteTrainer>| {
+                                    t.practice.step_by(1);
+                                },
+                            ));
+                        },
+                    );
+                    card.spawn((
+                        LandedLabel,
+                        Text::new(""),
+                        TextFont { font_size: FontSize::Px(16.0), ..default() },
+                        TextColor(Color::srgb(0.6, 0.65, 0.75)),
+                    ));
+                });
+            if let Some(font) = font.as_deref() {
+                workspace
+                    .spawn(Node {
+                        width: Val::Percent(100.0),
+                        flex_basis: if trainer.guitar().is_some() {
+                            Val::Px(400.0)
+                        } else {
+                            Val::Auto
+                        },
+                        flex_grow: 1.0,
+                        min_width: Val::Px(0.0),
+                        ..default()
+                    })
+                    .with_children(|score| {
+                        teaching::spawn_staff(score, font, trainer.piano().is_some(), &loc)
+                    });
+            }
         });
-        if let Some(font) = font.as_deref() {
-            teaching::spawn_staff(root, font, trainer.piano().is_some(), &loc);
-        }
         root.spawn(Node {
             width: Val::Percent(100.0),
             flex_direction: FlexDirection::Column,
@@ -607,7 +704,13 @@ pub(super) fn setup(
         .with_children(|strip| {
             match (trainer.guitar(), trainer.flute(), trainer.piano()) {
                 (Some(guitar), _, _) => {
-                    spawn_trainer_neck(strip, guitar, &loc);
+                    let board = spawn_trainer_neck(strip, guitar, &loc);
+                    selection::make_board_selectable(&mut strip.commands(), board);
+                    strip.spawn((
+                        Text::new(loc.msg("trainer-board-help").to_string()),
+                        TextFont { font_size: FontSize::Px(15.0), ..default() },
+                        TextColor(Color::WHITE),
+                    ));
                     strip
                         .spawn((
                             PositionHint,

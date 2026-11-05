@@ -1060,3 +1060,13 @@ bending-breath-out = Blow · breathe out ↓
 bending-breath-in = Draw · breathe in ↑
 bending-target-focus-natural = Hole {$hole} · {$breath}
 bending-target-focus = Hole {$hole} · {$breath} · {$technique}
+
+trainer-choose-note = Choose note
+trainer-choose-position = String / fret
+trainer-position = String {$string} · fret {$fret}
+trainer-auto-on = Auto-advance: on
+trainer-auto-off = Auto-advance: off · repeat target
+trainer-release-repeat = Good. Release the note, then play it again.
+trainer-board-help = Click a string and fret to choose a target. Picking a target turns automatic advancement off.
+
+trainer-string-only = String {$string}

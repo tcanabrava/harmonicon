@@ -70,3 +70,13 @@ keeping a position until the target requires a move. These are suggestions,
 not required hand assignments: pitch detection cannot tell which hand played.
 The drills cover C3–C6. **Listen** uses the piano voice. On short screens,
 scroll to reach the keyboard.
+
+## Choosing and repeating a guitar target
+
+Use **Choose note** to pick a pitch, then **String / fret** to choose one
+of its available positions. You can also click directly on a string and
+fret. The controls follow the selected exercise tab, so harmonic positions
+and bend targets stay playable. Choosing a target switches **Auto-advance**
+off: practise it until you choose another. After a successful hold, release
+the note before trying again. Turn Auto-advance on for the guided sequence.
+The instructions and score sit together above the full-width fretboard.

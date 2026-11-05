@@ -1057,3 +1057,13 @@ bending-breath-out = Sopre · expire ↓
 bending-breath-in = Aspire · inspire ↑
 bending-target-focus-natural = Furo {$hole} · {$breath}
 bending-target-focus = Furo {$hole} · {$breath} · {$technique}
+
+trainer-choose-note = Escolher nota
+trainer-choose-position = Corda / traste
+trainer-position = Corda {$string} · traste {$fret}
+trainer-auto-on = Avanço automático: sim
+trainer-auto-off = Avanço automático: não · repetir alvo
+trainer-release-repeat = Bom. Solte a nota e toque novamente.
+trainer-board-help = Clique em uma corda e traste para escolher um alvo. A seleção desativa o avanço automático.
+
+trainer-string-only = Corda {$string}

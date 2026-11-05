@@ -1059,3 +1059,13 @@ bending-breath-out = Sopla · exhala ↓
 bending-breath-in = Aspira · inhala ↑
 bending-target-focus-natural = Agujero {$hole} · {$breath}
 bending-target-focus = Agujero {$hole} · {$breath} · {$technique}
+
+trainer-choose-note = Elegir nota
+trainer-choose-position = Cuerda / traste
+trainer-position = Cuerda {$string} · traste {$fret}
+trainer-auto-on = Avance automático: sí
+trainer-auto-off = Avance automático: no · repetir objetivo
+trainer-release-repeat = Bien. Suelta la nota y vuelve a tocarla.
+trainer-board-help = Haz clic en una cuerda y traste para elegir un objetivo. La selección desactiva el avance automático.
+
+trainer-string-only = Cuerda {$string}

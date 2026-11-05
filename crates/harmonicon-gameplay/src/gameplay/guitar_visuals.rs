@@ -646,8 +646,8 @@ pub(super) fn spawn_trainer_neck(
     parent: &mut ChildSpawnerCommands,
     guitar: &Guitar,
     loc: &harmonicon_platform::localization::Localization,
-) {
-    spawn_neck(parent, guitar, loc, 180.0, true);
+) -> Entity {
+    spawn_neck(parent, guitar, loc, 180.0, true)
 }
 
 fn spawn_neck(
@@ -656,7 +656,8 @@ fn spawn_neck(
     loc: &harmonicon_platform::localization::Localization,
     height: f32,
     label_every_fret: bool,
-) {
+) -> Entity {
+    let mut board_id = Entity::PLACEHOLDER;
     parent
         .spawn(Node {
             width: Val::Percent(100.0),
@@ -677,7 +678,7 @@ fn spawn_neck(
                 TextFont { font_size: FontSize::Px(13.0), ..default() },
                 TextColor(Color::srgb(0.7, 0.75, 0.82)),
             ));
-            panel
+            board_id = panel
                 .spawn((
                     NeckOverview(guitar.clone()),
                     Node {
@@ -797,8 +798,10 @@ fn spawn_neck(
                             ));
                         }
                     }
-                });
+                })
+                .id();
         });
+    board_id
 }
 
 pub(super) fn update_neck_overview(
