@@ -80,3 +80,9 @@ and bend targets stay playable. Choosing a target switches **Auto-advance**
 off: practise it until you choose another. After a successful hold, release
 the note before trying again. Turn Auto-advance on for the guided sequence.
 The instructions and score sit together above the full-width fretboard.
+
+In **Bends**, the note picker chooses the starting pitch. Choose its string
+and fret, then the half- or whole-step interval. Establish the unbent note
+briefly before bending; hitting the final pitch alone does not complete the
+exercise. The live trace rises with pitch and shows a green target band.
+Overshoot feedback asks you to relax the bend. Release between focused attempts.

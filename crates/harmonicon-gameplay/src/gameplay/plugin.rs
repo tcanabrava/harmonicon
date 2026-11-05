@@ -170,6 +170,7 @@ impl Plugin for GameplayPlugin {
                 note_trainer::update_labels.after(note_trainer::listen),
                 note_trainer::sync_score.after(note_trainer::listen),
                 note_trainer::sync_controls.after(note_trainer::listen),
+                note_trainer::update_bend.after(note_trainer::listen),
                 super::guitar_visuals::update_trainer_neck.after(note_trainer::listen),
                 note_trainer::update_position_hint.after(note_trainer::listen),
                 note_trainer::update_flute_drawing.after(note_trainer::listen),

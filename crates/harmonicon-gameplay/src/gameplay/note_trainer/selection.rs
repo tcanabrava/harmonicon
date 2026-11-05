@@ -20,6 +20,14 @@ impl NoteTrainer {
             && matches!(d.position, PlayPosition::Fret(at) if Some(at.technique) == current_technique));
         let Some(index) = preferred.or_else(|| self.practice.drills.iter().position(matches))
         else {
+            self.practice.selection_notice = Some((
+                if self.kind == TechniqueKind::Glide && fret == 0 {
+                    "trainer-bend-open-string"
+                } else {
+                    "trainer-position-unavailable"
+                },
+                2.5,
+            ));
             return false;
         };
         self.practice.index = index;
@@ -81,8 +89,14 @@ pub(crate) fn sync_controls(
         }
     }
     let Some(drill) = trainer.practice.drill() else { return };
-    let mut pitches: Vec<u8> =
-        trainer.practice.drills.iter().map(|d| d.target.round() as u8).collect();
+    let display_pitch = |d: &Drill| {
+        if d.kind == TechniqueKind::Glide {
+            d.start.unwrap_or(d.target).round() as u8
+        } else {
+            d.target.round() as u8
+        }
+    };
+    let mut pitches: Vec<u8> = trainer.practice.drills.iter().map(display_pitch).collect();
     pitches.sort_unstable();
     pitches.dedup();
     let options: Vec<String> = pitches.iter().map(|&m| midi_to_note(i32::from(m))).collect();
@@ -90,9 +104,13 @@ pub(crate) fn sync_controls(
         &mut commands,
         host,
         overlay,
-        &loc.msg("trainer-choose-note"),
+        &loc.msg(if trainer.kind == TechniqueKind::Glide {
+            "trainer-bend-start-pitch"
+        } else {
+            "trainer-choose-note"
+        }),
         &options,
-        &note_name(drill.target),
+        &midi_to_note(i32::from(display_pitch(drill))),
         move |ev: On<ComboboxSelect>, mut trainer: ResMut<NoteTrainer>| {
             let Some(&pitch) = pitches.get(ev.index) else { return };
             let string = trainer.practice.drill().and_then(|d| match d.position {
@@ -103,7 +121,7 @@ pub(crate) fn sync_controls(
                 .practice
                 .drills
                 .iter()
-                .filter(|d| d.target.round() as u8 == pitch)
+                .filter(|d| display_pitch(d) == pitch)
                 .min_by_key(|d| match d.position {
                     PlayPosition::Fret(at) => (Some(at.string) != string, at.fret),
                     _ => (true, 0),
@@ -118,7 +136,12 @@ pub(crate) fn sync_controls(
         .practice
         .drills
         .iter()
-        .filter(|d| (d.target - drill.target).abs() < 0.01)
+        .filter(|d| display_pitch(d) == display_pitch(drill))
+        .filter(|d| {
+            trainer.kind != TechniqueKind::Glide
+                || matches!((d.position, drill.position),
+            (PlayPosition::Fret(a), PlayPosition::Fret(b)) if a.technique == b.technique)
+        })
         .filter_map(|d| match d.position {
             PlayPosition::Fret(at) => Some(at),
             _ => None,
@@ -154,6 +177,39 @@ pub(crate) fn sync_controls(
             }
         },
     );
+    if trainer.kind == TechniqueKind::Glide {
+        let options =
+            [loc.msg("trainer-bend-half").to_string(), loc.msg("trainer-bend-whole").to_string()];
+        let selected =
+            match drill.position {
+                PlayPosition::Fret(FretAssignment {
+                    technique: StringTechnique::Bend(d), ..
+                }) if d > 1.5 => 1,
+                _ => 0,
+            };
+        spawn_combobox(
+            &mut commands,
+            host,
+            overlay,
+            &loc.msg("trainer-bend-interval"),
+            &options,
+            &options[selected],
+            |ev: On<ComboboxSelect>, mut trainer: ResMut<NoteTrainer>| {
+                let Some(Drill { position: PlayPosition::Fret(at), .. }) =
+                    trainer.practice.drill().copied()
+                else {
+                    return;
+                };
+                let depth = if ev.index == 0 { 1.0 } else { 2.0 };
+                let index = trainer.practice.drills.iter().position(|d| matches!(d.position,
+                    PlayPosition::Fret(p) if p.string == at.string && p.fret == at.fret && p.technique == StringTechnique::Bend(depth)));
+                if let Some(index) = index {
+                    trainer.practice.index = index;
+                    trainer.select_guitar_position(at.string, at.fret);
+                }
+            },
+        );
+    }
     commands.entity(host).with_children(|p| {
         p.spawn_empty().apply_scene(button::small(
             &loc.msg(if trainer.practice.auto_advance {

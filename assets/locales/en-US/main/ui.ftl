@@ -1070,3 +1070,16 @@ trainer-release-repeat = Good. Release the note, then play it again.
 trainer-board-help = Click a string and fret to choose a target. Picking a target turns automatic advancement off.
 
 trainer-string-only = String {$string}
+
+trainer-bend-steps = 1 · Establish the starting note   →   2 · Bend up   →   3 · Hold the target
+trainer-bend-trace-help = Recent pitch · higher pitch is upward · green band is the target tolerance
+trainer-bend-pitches = {$start} → {$target}
+trainer-bend-start-first = Play and settle on {$start} first, then bend upward.
+trainer-bend-too-high = Too high ({$cents} cents). Relax the bend.
+trainer-bend-half = Half step (+1 semitone)
+trainer-bend-whole = Whole step (+2 semitones)
+trainer-bend-interval = Bend interval
+
+trainer-bend-start-pitch = Starting note
+trainer-bend-open-string = Choose a fretted note: this bend needs a fret to push against.
+trainer-position-unavailable = That position is not available for this exercise.

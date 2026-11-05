@@ -1067,3 +1067,16 @@ trainer-release-repeat = Bom. Solte a nota e toque novamente.
 trainer-board-help = Clique em uma corda e traste para escolher um alvo. A seleção desativa o avanço automático.
 
 trainer-string-only = Corda {$string}
+
+trainer-bend-steps = 1 · Estabilize a nota inicial → 2 · Faça o bend → 3 · Sustente o alvo
+trainer-bend-trace-help = Afinação recente · notas mais altas ficam acima · faixa verde: tolerância do alvo
+trainer-bend-pitches = {$start} → {$target}
+trainer-bend-start-first = Toque e estabilize {$start} primeiro; depois faça o bend.
+trainer-bend-too-high = Muito alto ({$cents} cents). Relaxe o bend.
+trainer-bend-half = Meio tom (+1 semitom)
+trainer-bend-whole = Um tom (+2 semitons)
+trainer-bend-interval = Intervalo do bend
+
+trainer-bend-start-pitch = Nota inicial
+trainer-bend-open-string = Escolha uma nota com traste: este bend precisa de uma nota pressionada.
+trainer-position-unavailable = Essa posição não está disponível para este exercício.
