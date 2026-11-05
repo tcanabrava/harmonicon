@@ -15,8 +15,13 @@ use crate::synth::{Expr, PhraseNote, TICKS_PER_BEAT, render_pcm};
 
 pub const DEFAULT_TEMPO_US: u32 = 500_000; // 120 BPM if the file specifies none
 
+/// The file's ticks per quarter note. A header claiming 0 is refused: every
+/// tick-to-seconds conversion divides by it.
 pub fn ticks_per_quarter(smf: &Smf) -> Result<u32, String> {
     match smf.header.timing {
+        Timing::Metrical(tpq) if tpq.as_int() == 0 => {
+            Err("the MIDI header gives 0 ticks per quarter note".to_string())
+        }
         Timing::Metrical(tpq) => Ok(tpq.as_int() as u32),
         Timing::Timecode(..) => {
             Err("timecode-based MIDI timing is not supported (need metrical)".to_string())
@@ -272,6 +277,19 @@ pub fn smf_bytes(tracks: Vec<Vec<midly::TrackEvent<'static>>>) -> Vec<u8> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_header_with_zero_ticks_per_quarter_is_refused() {
+        let smf = |tpq: u16| Smf {
+            header: midly::Header {
+                format: midly::Format::SingleTrack,
+                timing: Timing::Metrical(midly::num::u15::from(tpq)),
+            },
+            tracks: vec![],
+        };
+        assert_eq!(ticks_per_quarter(&smf(480)), Ok(480));
+        assert!(ticks_per_quarter(&smf(0)).is_err());
+    }
 
     // ── track_name_of / note_on_count ────────────────────────────────────────
 

@@ -63,6 +63,23 @@ const RELEASE_SECS: f32 = 0.045;
 /// Extra silence appended after the last note so the release isn't clipped.
 const TAIL_SECS: f32 = 0.25;
 
+/// The longest buffer a render produces (15 minutes, ~160 MB of `f32`).
+/// Note positions can come from a file — a MIDI backing track's deltas run
+/// to 2²⁸ ticks each — so without a bound a corrupt one sizes the buffer
+/// past what memory holds and aborts the game while it loads. Anything
+/// later is cut off.
+pub const MAX_RENDER_SECS: f32 = 15.0 * 60.0;
+
+/// How many samples [`render_pcm_with`] allocates for `notes`: through the
+/// last note's end plus [`TAIL_SECS`], at most [`MAX_RENDER_SECS`], and at
+/// least one. A non-finite `secs_per_tick` gives the cap, never a panic.
+fn render_len(notes: &[PhraseNote], secs_per_tick: f32) -> usize {
+    let end_tick = notes.iter().map(|n| n.tick.saturating_add(n.len)).max().unwrap_or(0);
+    // `f32::min` returns the other operand for NaN, so NaN and ∞ both cap.
+    let secs = (end_tick as f32 * secs_per_tick + TAIL_SECS).min(MAX_RENDER_SECS);
+    ((secs * SAMPLE_RATE as f32).ceil() as usize).max(1)
+}
+
 /// Breath-noise amplitude relative to the tonal signal (7 %).
 const BREATH_NOISE_AMP: f32 = 0.07;
 /// Exponential decay rate of the breath-noise burst after the attack peak.
@@ -276,10 +293,7 @@ pub fn render_pcm(notes: &[PhraseNote], secs_per_tick: f32) -> Vec<f32> {
 /// Renders `notes` on a `secs_per_tick` grid in `voice`, mixed and
 /// normalised to peak at most 1.0.
 pub fn render_pcm_with(notes: &[PhraseNote], secs_per_tick: f32, voice: Voice) -> Vec<f32> {
-    let end_tick = notes.iter().map(|n| n.tick + n.len).max().unwrap_or(0);
-    let total =
-        ((end_tick as f32 * secs_per_tick + TAIL_SECS) * SAMPLE_RATE as f32).ceil() as usize;
-    let mut buf = vec![0.0f32; total.max(1)];
+    let mut buf = vec![0.0f32; render_len(notes, secs_per_tick)];
 
     let attack_samples = (SAMPLE_RATE as f32 * ATTACK_SECS) as usize;
     // One sample's worth of the breath noise's exponential decay. Multiplying
@@ -290,8 +304,15 @@ pub fn render_pcm_with(notes: &[PhraseNote], secs_per_tick: f32, voice: Voice) -
         let Some(freq) = n.freq else {
             continue;
         };
+        // Float-to-int casts saturate, so a far-off note lands at or past the
+        // end; clamping here keeps every voice's `start + i` arithmetic
+        // inside the buffer.
         let start = (n.tick as f32 * secs_per_tick * SAMPLE_RATE as f32) as usize;
-        let dur = (n.len as f32 * secs_per_tick * SAMPLE_RATE as f32) as usize;
+        if start >= buf.len() {
+            continue;
+        }
+        let dur = ((n.len as f32 * secs_per_tick * SAMPLE_RATE as f32) as usize)
+            .min(buf.len() - start);
 
         // Unique per-note LCG seed so each note has an independent breath-noise
         // stream — the slice index stands in for a per-note identity (e.g.
@@ -534,5 +555,30 @@ mod tests {
         let vib = note(Expr::Vibrato(5.0));
         let diff = plain.iter().zip(&vib).map(|(a, b)| (a - b).abs()).fold(0.0f32, f32::max);
         assert!(diff > 0.01, "vibrato left the waveform unchanged");
+    }
+
+    #[test]
+    fn the_render_length_is_capped_whatever_the_notes_say() {
+        let cap = (MAX_RENDER_SECS * SAMPLE_RATE as f32).ceil() as usize;
+        let far = [PhraseNote { tick: usize::MAX, len: usize::MAX, freq: Some(440.0), expr: Expr::None }];
+        assert_eq!(render_len(&far, 0.01), cap, "tick + len would overflow");
+        let one = [PhraseNote { tick: 0, len: 1, freq: Some(440.0), expr: Expr::None }];
+        assert_eq!(render_len(&one, f32::NAN), cap);
+        assert_eq!(render_len(&one, f32::INFINITY), cap);
+        assert_eq!(render_len(&[], 0.01), (TAIL_SECS * SAMPLE_RATE as f32).ceil() as usize);
+    }
+
+    #[test]
+    fn a_note_past_the_cap_is_dropped_and_one_crossing_it_is_cut() {
+        // A plucked note adds its release to its length, the sum that would
+        // overflow for an unclamped duration.
+        let notes = [
+            PhraseNote { tick: 0, len: 10, freq: Some(220.0), expr: Expr::None },
+            PhraseNote { tick: 10, len: usize::MAX / 2, freq: Some(330.0), expr: Expr::None },
+            PhraseNote { tick: usize::MAX / 2, len: 10, freq: Some(440.0), expr: Expr::None },
+        ];
+        let pcm = render_pcm_with(&notes, 0.1, Voice::PluckedString);
+        assert_eq!(pcm.len(), (MAX_RENDER_SECS * SAMPLE_RATE as f32).ceil() as usize);
+        assert!(pcm.iter().all(|s| s.is_finite()));
     }
 }
