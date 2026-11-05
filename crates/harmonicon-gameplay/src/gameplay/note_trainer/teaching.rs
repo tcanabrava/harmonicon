@@ -65,7 +65,22 @@ pub(crate) fn spawn_staff(
 }
 
 pub(crate) fn sync_score(trainer: Res<NoteTrainer>, mut notes: ResMut<MusicScoreNotes>) {
-    let next = notation(trainer.practice.drill());
+    let next = if let (Some(chord), Some(guitar)) = (&trainer.chord, trainer.guitar()) {
+        chord
+            .shape()
+            .pitches(guitar)
+            .into_iter()
+            .map(|midi| NotationNote {
+                start_beat: 0.0,
+                duration_beats: 1.0,
+                midi,
+                tied_from_previous: false,
+                highlighted: true,
+            })
+            .collect()
+    } else {
+        notation(trainer.practice.drill())
+    };
     if notes.0 != next {
         notes.0 = next;
     }

@@ -1083,3 +1083,19 @@ trainer-bend-interval = Bend interval
 trainer-bend-start-pitch = Starting note
 trainer-bend-open-string = Choose a fretted note: this bend needs a fret to push against.
 trainer-position-unavailable = That position is not available for this exercise.
+
+trainer-chords-tab = Chords
+trainer-chord-choose = Choose chord
+trainer-chord-play = {$chord} · strum the unmuted strings
+trainer-chord-count = Successful strums this session: {$count}
+trainer-chord-needs-poly = This detector hears one pitch at a time. Enable chord detection below to assess simultaneous notes.
+trainer-chord-release = Good. Stop the strings ringing, then strum again.
+trainer-chord-extra = Also hearing {$notes}. Check the muted strings and frets.
+trainer-chord-hold = All target pitches detected. Hold the chord steady.
+trainer-chord-missing = Heard {$heard}/{$total} pitches · missing: {$notes}
+trainer-chord-diagram-help = Standard tuning · ○ open · × do not strum · 1–4 finger numbers
+trainer-chord-assessment-help = The microphone checks sounding pitches, not fingers or physical strings. Strum the marked shape together.
+trainer-chord-detector = Use chord detection (NMF)
+trainer-chord-board-help = Read the chord diagram for open and muted strings. The fretboard marks the full shape.
+
+trainer-reference-playing = Reference playing — your input is not being assessed.

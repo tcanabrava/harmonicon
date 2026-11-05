@@ -100,7 +100,9 @@ pub(crate) fn update(
     mut labels: Query<&mut Text, With<Summary>>,
     mut visuals: Query<(&Visual, &mut Node)>,
 ) {
-    let active = trainer.guitar().is_some() && trainer.kind == TechniqueKind::Glide;
+    let active = trainer.chord.is_none()
+        && trainer.guitar().is_some()
+        && trainer.kind == TechniqueKind::Glide;
     for mut panel in &mut panels {
         panel.open = active;
     }

@@ -82,6 +82,11 @@ readback. Expect the recorded clip to run slower than real time, and don't
 use it to judge performance or timing. It shows *what* happened, not *how
 fast*.
 
+Radio-based tabs emit `bevy_ui_widgets::ValueChange<bevy_ecs::entity::Entity>`
+instead of `Activate`. Dev builds register this event too: set `source` to
+the radio-group entity, `value` to the chosen radio-button entity, and
+`is_final` to `true` when triggering it through BRP.
+
 ## Inspecting and mutating state
 
 ```bash

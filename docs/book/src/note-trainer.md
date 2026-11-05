@@ -25,8 +25,9 @@ note in tune until the bar fills and the drill is **landed**; the next one
 follows on its own. **‹ Previous** and **Next ›** move through the drills
 yourself, and **Listen** plays the target on a plucked string.
 
-Each tab keeps its own progress, for the guitar and the flute separately:
-how many drills you've landed, and which drill you were on. Coming back,
+Single-note exercise tabs keep their own saved progress, separately for
+guitar, flute and piano: how many drills you've landed, and which drill
+you were on. Coming back,
 even after closing the game, picks up there.
 
 The full fretboard shows every physical fret, with string 1 at the top,
@@ -86,3 +87,29 @@ and fret, then the half- or whole-step interval. Establish the unbent note
 briefly before bending; hitting the final pitch alone does not complete the
 exercise. The live trace rises with pitch and shows a green target band.
 Overshoot feedback asks you to relax the bend. Release between focused attempts.
+
+![Choosing a whole-step bend](images/note-trainer-guitar-bends.png)
+
+## Guitar chords
+
+In standard tuning, **Chords** offers Em, E, Am, A, D, Dm, C and G. Choose
+a chord from the combobox. Its diagram marks open strings with ○, muted
+strings with ×, and fretting fingers with 1–4; the full fretboard and staff
+show the same shape and sounding pitches. **Listen** plays the whole chord.
+
+Strum the unmuted strings together and hold until the bar fills. Feedback
+names missing and unexpected pitches. Notes plucked one at a time cannot
+accumulate into a completed chord. Stop the strings ringing between attempts.
+The count reports successful strums this session, not mastery. Auto-advance
+can cycle the chord list; leave it off to repeat one chord.
+
+A polyphonic detector is required. If a monophonic detector is selected, the
+trainer explains why it cannot assess the chord and offers **Use chord
+detection (NMF)**. The microphone checks pitches, not which finger or physical
+string produced them; use the diagram to check your hand and muted strings.
+
+Guitar opens with Auto-advance off and preserves that choice across exercise
+tabs. Reference playback temporarily pauses assessment so hearing the app's
+own reference through the microphone cannot complete an attempt.
+
+![Chord selection and fingering](images/note-trainer-guitar-chords.png)

@@ -25,6 +25,7 @@
 use bevy::audio::{AudioPlayer, AudioSource, PlaybackSettings, Volume};
 use bevy::prelude::*;
 use bevy::ui_widgets::Activate;
+use harmonicon_audio::AudioSettings;
 
 use harmonicon_app::app::AppState;
 use harmonicon_audio::pitch_detect::{
@@ -43,6 +44,8 @@ use harmonicon_ui::dialogs::tab_bar::{TabSelect, spawn_tab_bar};
 use super::GameplayRoot;
 use super::flute_visuals::{FluteDrawing, FluteKey, paint_flute_keys};
 mod bend;
+mod chords;
+pub(super) use chords::update as update_chords;
 mod layout;
 mod piano;
 mod selection;
@@ -81,6 +84,7 @@ pub struct Practice {
     awaiting_release: bool,
     started: bool,
     start_held: f32,
+    silence_secs: f32,
     trace_tick: f32,
     selection_notice: Option<(&'static str, f32)>,
     trace: std::collections::VecDeque<Option<f32>>,
@@ -109,6 +113,7 @@ impl Practice {
         self.awaiting_release = false;
         self.started = false;
         self.start_held = 0.0;
+        self.silence_secs = 0.0;
         self.trace.clear();
         self.trace_tick = 0.0;
         self.selection_notice = None;
@@ -132,6 +137,11 @@ impl Practice {
         let Some(drill) = self.drill().copied() else { return false };
         self.heard = midi.map(|m| hear(&drill, m));
         self.heard_midi = midi;
+        self.silence_secs = if midi.is_none() { self.silence_secs + dt } else { 0.0 };
+        if self.silence_secs >= 0.2 {
+            self.started = false;
+            self.start_held = 0.0;
+        }
         if drill.kind == TechniqueKind::Glide {
             if let Some(start) = drill.start {
                 self.trace_tick += dt;
@@ -204,7 +214,11 @@ impl Practice {
 
     /// How far through the hold the player is, 0 to 1.
     pub fn hold_fraction(&self, hold_secs: f32) -> f32 {
-        if hold_secs <= 0.0 { 1.0 } else { (self.held / hold_secs).clamp(0.0, 1.0) }
+        if self.awaiting_release || hold_secs <= 0.0 {
+            1.0
+        } else {
+            (self.held / hold_secs).clamp(0.0, 1.0)
+        }
     }
 }
 
@@ -215,6 +229,8 @@ pub struct NoteTrainer {
     instrument: Instrument,
     kind: TechniqueKind,
     practice: Practice,
+    chord: Option<chords::ChordPractice>,
+    reference_remaining: f32,
 }
 
 impl Default for NoteTrainer {
@@ -227,8 +243,9 @@ impl NoteTrainer {
     /// A fresh session on `instrument`, on its first kind of drill.
     pub fn for_instrument(instrument: Instrument) -> Self {
         let kind = instrument.techniques().first().copied().unwrap_or(TechniqueKind::Target);
-        let practice = Practice::new(drills(&instrument, kind));
-        Self { instrument, kind, practice }
+        let mut practice = Practice::new(drills(&instrument, kind));
+        practice.auto_advance = !matches!(instrument, Instrument::Guitar(_));
+        Self { instrument, kind, practice, chord: None, reference_remaining: 0.0 }
     }
 
     /// Switches to `instrument`, keeping the session when it is the same
@@ -240,6 +257,9 @@ impl NoteTrainer {
     }
 
     pub(super) fn guitar_targets(&self) -> Vec<FretAssignment> {
+        if let Some(chord) = &self.chord {
+            return chord.shape().positions();
+        }
         if self.practice.revealed {
             match self.practice.drill().map(|d| d.position) {
                 Some(PlayPosition::Fret(at)) => vec![at],
@@ -247,6 +267,20 @@ impl NoteTrainer {
             }
         } else {
             lit(self.practice.drill())
+        }
+    }
+
+    fn offers_chords(&self) -> bool {
+        self.guitar().is_some_and(|g| {
+            g.strings == harmonicon_core::instrument::guitar::STANDARD_TUNING && g.capo == 0
+        })
+    }
+
+    fn step_by(&mut self, delta: isize) {
+        if let Some(chord) = &mut self.chord {
+            chord.step_by(delta);
+        } else {
+            self.practice.step_by(delta);
         }
     }
 
@@ -305,12 +339,18 @@ impl NoteTrainer {
         kind: TechniqueKind,
         profile: &mut harmonicon_app::profile::PlayerProfile,
     ) -> bool {
+        let leaving_chord = self.chord.take().is_some();
         if self.kind == kind {
+            if leaving_chord {
+                self.practice.step_by(0);
+            }
             return false;
         }
         let remembered = self.remember(profile);
         self.kind = kind;
+        let auto_advance = self.practice.auto_advance;
         self.practice = Practice::new(drills(&self.instrument, kind));
+        self.practice.auto_advance = auto_advance;
         remembered
     }
 }
@@ -527,17 +567,30 @@ pub struct LandedLabel;
 /// trainer's A4 reference.
 fn play_reference(
     _: On<Activate>,
-    trainer: Res<NoteTrainer>,
+    mut trainer: ResMut<NoteTrainer>,
     settings: Res<BendingTrainerSettings>,
     mut sources: ResMut<Assets<AudioSource>>,
     mut commands: Commands,
 ) {
     use harmonicon_core::synth::{Expr, PhraseNote, SAMPLE_RATE, render_pcm_with};
-    let Some(drill) = trainer.practice.drill() else { return };
-    let freq = settings.a4_hz * 2f32.powf((drill.target - 69.0) / 12.0);
-    let note = PhraseNote { tick: 0, len: 1, freq: Some(freq), expr: Expr::None };
-    let pcm = render_pcm_with(&[note], 1.5, trainer.instrument.synth_voice());
+    let targets: Vec<f32> = if let (Some(chord), Some(guitar)) = (&trainer.chord, trainer.guitar())
+    {
+        chord.shape().pitches(guitar).into_iter().map(f32::from).collect()
+    } else {
+        trainer.practice.drill().map(|d| vec![d.target]).unwrap_or_default()
+    };
+    let notes: Vec<PhraseNote> = targets
+        .into_iter()
+        .map(|target| PhraseNote {
+            tick: 0,
+            len: 1,
+            freq: Some(settings.a4_hz * 2f32.powf((target - 69.0) / 12.0)),
+            expr: Expr::None,
+        })
+        .collect();
+    let pcm = render_pcm_with(&notes, 1.5, trainer.instrument.synth_voice());
     let wav = harmonicon_core::wav::encode_wav(&pcm, SAMPLE_RATE);
+    trainer.reference_remaining = 1.8;
     commands.spawn((
         AudioPlayer::<AudioSource>(sources.add(AudioSource { bytes: wav.into() })),
         PlaybackSettings::DESPAWN.with_volume(Volume::Linear(0.6)),
@@ -549,6 +602,7 @@ pub(super) fn listen(
     mut reader: MessageReader<PitchEvent>,
     mut trainer: ResMut<NoteTrainer>,
     settings: Res<BendingTrainerSettings>,
+    audio: Res<AudioSettings>,
     time: Res<Time>,
     mut last: Local<Vec<PitchInfo>>,
     mut last_at: Local<f64>,
@@ -560,6 +614,43 @@ pub(super) fn listen(
     }
     if time.elapsed_secs_f64() - *last_at > 0.25 {
         last.clear();
+    }
+    trainer.reference_remaining = (trainer.reference_remaining - time.delta_secs()).max(0.0);
+    if trainer.reference_remaining > 0.0 {
+        trainer.practice.held = 0.0;
+        trainer.practice.heard = None;
+        trainer.practice.heard_midi = None;
+        trainer.practice.started = false;
+        trainer.practice.start_held = 0.0;
+        if let Some(chord) = &mut trainer.chord {
+            chord.held = 0.0;
+        }
+        last.clear();
+        return;
+    }
+    if let Some(guitar) = trainer.guitar().cloned() {
+        let auto = trainer.practice.auto_advance;
+        if let Some(chord) = &mut trainer.chord {
+            let expected = chord.shape().pitches(&guitar);
+            let heard: Vec<f32> = last
+                .iter()
+                .filter(|p| p.frequency.is_finite() && p.frequency > 0.0)
+                .map(|p| 69.0 + 12.0 * (p.frequency / settings.a4_hz).log2())
+                .collect();
+            if chord.listen(
+                &expected,
+                &heard,
+                time.delta_secs(),
+                settings.tolerance_cents,
+                settings.hold_secs,
+                audio.pitch_algorithm.is_polyphonic(),
+            ) && auto
+            {
+                chord.step_by(1);
+                chord.awaiting_release = true;
+            }
+            return;
+        }
     }
     let Some(target) = trainer.practice.drill().map(|d| d.target) else { return };
     let midi = nearest_midi(&last, target, settings.a4_hz);
@@ -580,6 +671,7 @@ pub(super) fn update_labels(
     trainer: Res<NoteTrainer>,
     settings: Res<BendingTrainerSettings>,
     loc: Res<Localization>,
+    audio: Res<AudioSettings>,
     mut texts: ParamSet<(
         Query<&mut Text, With<InstructionLabel>>,
         Query<&mut Text, With<StatusLabel>>,
@@ -593,27 +685,49 @@ pub(super) fn update_labels(
             text.0 = value;
         }
     };
-    let what =
-        practice.drill().map(|d| instruction(&loc, &trainer.instrument, d)).unwrap_or_default();
+    let what = if let Some(chord) = &trainer.chord {
+        loc.msg_args("trainer-chord-play", &[("chord", chord.shape().name.to_string())]).to_string()
+    } else {
+        practice.drill().map(|d| instruction(&loc, &trainer.instrument, d)).unwrap_or_default()
+    };
     for mut text in &mut texts.p0() {
         set(&mut text, what.clone());
     }
-    let now = status(&loc, practice, settings.tolerance_cents);
+    let now = if trainer.reference_remaining > 0.0 {
+        loc.msg("trainer-reference-playing").to_string()
+    } else if let (Some(chord), Some(guitar)) = (&trainer.chord, trainer.guitar()) {
+        chord.status(guitar, &audio, &loc)
+    } else {
+        status(&loc, practice, settings.tolerance_cents)
+    };
     for mut text in &mut texts.p1() {
         set(&mut text, now.clone());
     }
-    let count = String::from(loc.msg_args(
-        "note-trainer-count",
-        &[
-            ("landed", practice.landed.to_string()),
-            ("index", (practice.index + 1).to_string()),
-            ("total", practice.drills.len().to_string()),
-        ],
-    ));
+    let count = if let Some(chord) = &trainer.chord {
+        loc.msg_args("trainer-chord-count", &[("count", chord.landed.to_string())]).to_string()
+    } else {
+        String::from(loc.msg_args(
+            "note-trainer-count",
+            &[
+                ("landed", practice.landed.to_string()),
+                ("index", (practice.index + 1).to_string()),
+                ("total", practice.drills.len().to_string()),
+            ],
+        ))
+    };
     for mut text in &mut texts.p2() {
         set(&mut text, count.clone());
     }
-    let width = Val::Percent(practice.hold_fraction(settings.hold_secs) * 100.0);
+    let fraction = if let Some(chord) = &trainer.chord {
+        if chord.awaiting_release {
+            1.0
+        } else {
+            (chord.held / settings.hold_secs.max(0.01)).clamp(0.0, 1.0)
+        }
+    } else {
+        practice.hold_fraction(settings.hold_secs)
+    };
+    let width = Val::Percent(fraction * 100.0);
     for mut node in &mut bars {
         if node.width != width {
             node.width = width;
@@ -629,7 +743,9 @@ pub(super) fn update_position_hint(
     mut hints: Query<&mut harmonicon_ui::dialogs::drawer::Drawer, With<PositionHint>>,
 ) {
     for mut hint in &mut hints {
-        hint.open = trainer.kind == TechniqueKind::Position && !trainer.practice.revealed;
+        hint.open = trainer.chord.is_none()
+            && trainer.kind == TechniqueKind::Position
+            && !trainer.practice.revealed;
     }
 }
 
@@ -825,9 +941,47 @@ mod bend_progress_tests {
         assert!(!practice.listen(Some(drill.target), 1.0, 20.0, 0.6));
         assert!(!practice.listen(drill.start, 0.2, 20.0, 0.6));
         assert!(practice.started);
+        practice.listen(None, 0.3, 20.0, 0.6);
+        assert!(!practice.started, "a stopped note starts a new gesture");
+        assert!(!practice.listen(Some(drill.target), 0.7, 20.0, 0.6));
+        practice.listen(drill.start, 0.2, 20.0, 0.6);
         assert!(practice.listen(Some(drill.target), 0.7, 20.0, 0.6));
         assert!(practice.awaiting_release);
         practice.listen(None, 0.1, 20.0, 0.6);
         assert!(!practice.started, "another bend must establish its starting pitch again");
+    }
+}
+
+#[cfg(test)]
+mod reference_tests {
+    use super::*;
+    #[test]
+    fn reference_playback_cannot_complete_an_attempt_through_the_microphone() {
+        let mut app = App::new();
+        let mut trainer = NoteTrainer::default();
+        trainer.reference_remaining = 1.8;
+        let target = trainer.practice.drill().unwrap().target;
+        app.insert_resource(trainer)
+            .init_resource::<BendingTrainerSettings>()
+            .init_resource::<AudioSettings>()
+            .init_resource::<Time>()
+            .init_resource::<harmonicon_app::profile::PlayerProfile>()
+            .add_message::<PitchEvent>()
+            .add_systems(Update, listen);
+        for _ in 0..10 {
+            app.world_mut()
+                .resource_mut::<Time>()
+                .advance_by(std::time::Duration::from_secs_f32(0.1));
+            app.world_mut().write_message(PitchEvent(vec![PitchInfo {
+                midi: 0,
+                note: String::new(),
+                octave: 0,
+                frequency: midi_to_freq_hz(target),
+            }]));
+            app.update();
+        }
+        let trainer = app.world().resource::<NoteTrainer>();
+        assert_eq!(trainer.practice.landed, 0);
+        assert_eq!(trainer.practice.held, 0.0);
     }
 }

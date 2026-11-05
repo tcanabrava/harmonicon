@@ -50,6 +50,9 @@ pub(super) fn make_board_selectable(commands: &mut Commands, board: Entity) {
             move |_: On<bevy::picking::events::PointerClick>,
                   cursors: Query<&RelativeCursorPosition>,
                   mut trainer: ResMut<NoteTrainer>| {
+                if trainer.chord.is_some() {
+                    return;
+                }
                 let Some(cursor) = cursors.get(board).ok().and_then(|p| p.normalized) else {
                     return;
                 };
@@ -74,11 +77,17 @@ pub(crate) fn sync_controls(
     loc: Res<Localization>,
     controls: Query<(Entity, Option<&Children>), With<Controls>>,
     overlays: Query<(Entity, Option<&Children>), With<Backdrops>>,
-    mut last: Local<Option<(Entity, TechniqueKind, usize, bool)>>,
+    mut last: Local<Option<(Entity, TechniqueKind, usize, bool, Option<usize>)>>,
 ) {
     let Ok((host, children)) = controls.single() else { return };
     let Ok((overlay, overlay_children)) = overlays.single() else { return };
-    let key = (host, trainer.kind, trainer.practice.index, trainer.practice.auto_advance);
+    let key = (
+        host,
+        trainer.kind,
+        trainer.practice.index,
+        trainer.practice.auto_advance,
+        trainer.chord.as_ref().map(|c| c.index),
+    );
     if *last == Some(key) && !loc.is_changed() {
         return;
     }
@@ -87,6 +96,22 @@ pub(crate) fn sync_controls(
         for &child in children {
             commands.entity(child).despawn();
         }
+    }
+    if trainer.chord.is_some() {
+        chords::controls(&mut commands, host, overlay, &trainer, &loc);
+        commands.entity(host).with_children(|p| {
+            p.spawn_empty().apply_scene(button::small(
+                &loc.msg(if trainer.practice.auto_advance {
+                    "trainer-auto-on"
+                } else {
+                    "trainer-auto-off"
+                }),
+                |_: On<Activate>, mut trainer: ResMut<NoteTrainer>| {
+                    trainer.practice.auto_advance = !trainer.practice.auto_advance
+                },
+            ));
+        });
+        return;
     }
     let Some(drill) = trainer.practice.drill() else { return };
     let display_pitch = |d: &Drill| {

@@ -29,6 +29,9 @@ pub(crate) fn setup(
             Node {
                 width: Val::Percent(100.0),
                 height: Val::Percent(100.0),
+                min_height: Val::Px(0.0),
+                max_height: Val::Percent(100.0),
+                min_width: Val::Px(0.0),
                 flex_direction: FlexDirection::Column,
                 ..default()
             },
@@ -65,9 +68,19 @@ pub(crate) fn setup(
         .id();
     commands.entity(root).add_child(tabs);
     let kinds = trainer.kinds();
-    let labels: Vec<String> =
+    let mut labels: Vec<String> =
         kinds.iter().map(|&k| String::from(loc.msg(kind_key(&trainer.instrument, k)))).collect();
-    let selected = kinds.iter().position(|&k| k == trainer.kind).unwrap_or(0);
+    let mut selected = kinds.iter().position(|&k| k == trainer.kind).unwrap_or(0);
+    if trainer.offers_chords() {
+        labels.insert(1, loc.msg("trainer-chords-tab").to_string());
+        selected = if trainer.chord.is_some() {
+            1
+        } else if selected > 0 {
+            selected + 1
+        } else {
+            0
+        };
+    }
     spawn_tab_bar(
         &mut commands,
         tabs,
@@ -76,7 +89,21 @@ pub(crate) fn setup(
         |ev: On<TabSelect>,
          mut trainer: ResMut<NoteTrainer>,
          mut profile: ResMut<harmonicon_app::profile::PlayerProfile>| {
-            if let Some(&kind) = trainer.kinds().get(ev.index)
+            let mut index = ev.index;
+            if trainer.offers_chords() {
+                if index == 1 {
+                    if trainer.remember(&mut profile) {
+                        harmonicon_app::profile::save_profile(&profile);
+                    }
+                    trainer.chord = Some(chords::ChordPractice::default());
+                    trainer.practice.auto_advance = false;
+                    return;
+                }
+                if index > 1 {
+                    index -= 1;
+                }
+            }
+            if let Some(&kind) = trainer.kinds().get(index)
                 && trainer.set_kind(kind, &mut profile)
             {
                 harmonicon_app::profile::save_profile(&profile);
@@ -175,6 +202,7 @@ pub(crate) fn setup(
                     ));
                     if trainer.guitar().is_some() {
                         bend::spawn(card, &loc);
+                        chords::spawn(card, &loc);
                     }
                     card.spawn((
                         Node {
@@ -201,14 +229,14 @@ pub(crate) fn setup(
                             row.spawn_empty().apply_scene(button::small(
                                 &previous,
                                 |_: On<Activate>, mut t: ResMut<NoteTrainer>| {
-                                    t.practice.step_by(-1);
+                                    t.step_by(-1);
                                 },
                             ));
                             row.spawn_empty().apply_scene(button::small(&listen, play_reference));
                             row.spawn_empty().apply_scene(button::small(
                                 &next,
                                 |_: On<Activate>, mut t: ResMut<NoteTrainer>| {
-                                    t.practice.step_by(1);
+                                    t.step_by(1);
                                 },
                             ));
                         },
@@ -231,10 +259,27 @@ pub(crate) fn setup(
                         },
                         flex_grow: 1.0,
                         min_width: Val::Px(0.0),
+                        flex_wrap: FlexWrap::Wrap,
+                        align_items: AlignItems::Center,
+                        column_gap: Val::Px(32.0),
+                        padding: UiRect::horizontal(Val::Px(16.0)),
                         ..default()
                     })
                     .with_children(|score| {
-                        teaching::spawn_staff(score, font, trainer.piano().is_some(), &loc)
+                        if trainer.guitar().is_some() {
+                            chords::spawn_diagram(score);
+                        }
+                        score
+                            .spawn(Node {
+                                width: Val::Percent(100.0),
+                                flex_basis: Val::Px(330.0),
+                                flex_grow: 1.0,
+                                min_width: Val::Px(0.0),
+                                ..default()
+                            })
+                            .with_children(|staff| {
+                                teaching::spawn_staff(staff, font, trainer.piano().is_some(), &loc);
+                            });
                     });
             }
         });
@@ -258,6 +303,7 @@ pub(crate) fn setup(
                     let board = spawn_trainer_neck(strip, guitar, &loc);
                     selection::make_board_selectable(&mut strip.commands(), board);
                     strip.spawn((
+                        chords::BoardHelp,
                         Text::new(loc.msg("trainer-board-help").to_string()),
                         TextFont { font_size: FontSize::Px(15.0), ..default() },
                         TextColor(Color::WHITE),

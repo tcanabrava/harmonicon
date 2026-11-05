@@ -103,6 +103,8 @@ impl Plugin for DevCapturePlugin {
             // deliberately here, in the dev-only module, rather than
             // alongside the widget plumbing.
             .register_type::<bevy::ui_widgets::Activate>()
+            // Radio-based tabs emit a value change rather than Activate.
+            .register_type::<bevy::ui_widgets::ValueChange<Entity>>()
             // An A–B loop is set by dragging on the progress bar — a pointer
             // gesture remote control can't make — so the range is written
             // directly instead, to reach the loop UI for captures.
