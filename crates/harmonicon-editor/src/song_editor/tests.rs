@@ -4389,3 +4389,56 @@ fn instrument_transitions_and_undo_happen_after_view_updates() {
     ));
     app.update();
 }
+
+/// Exercise the scheduled render paths, rather than just the note-face helper:
+/// the scrollbar also rebuilds on placement, even when its track is hidden.
+#[test]
+fn piano_placement_updates_grid_score_and_scrollbar_without_harmonica_access() {
+    use bevy::prelude::*;
+    use harmonicon_platform::localization::Localization;
+    use harmonicon_platform::theme::LoadedTheme;
+    use harmonicon_ui::music_score::{MusicScoreBarMap, MusicScoreMeter, MusicScoreNotes};
+    let mut app = App::new();
+    app.add_plugins((
+        MinimalPlugins,
+        bevy::asset::AssetPlugin::default(),
+        bevy::scene::ScenePlugin,
+    ));
+    app.insert_resource(super::document_picker::fresh(
+        super::instrument_ui::InstrumentKind::Piano.selection(),
+    ))
+    .init_resource::<super::grid_cache::GridCache>()
+    .init_resource::<super::waveform::MusicWaveform>()
+    .init_resource::<Assets<super::material::EditorNoteMaterial>>()
+    .init_resource::<LoadedTheme>()
+    .init_resource::<Localization>()
+    .init_resource::<MusicScoreNotes>()
+    .init_resource::<MusicScoreMeter>()
+    .init_resource::<MusicScoreBarMap>()
+    .add_systems(
+        Update,
+        (
+            super::grid::rebuild_grid,
+            super::music_score_bridge::sync_music_score,
+            super::view_scroll::update_scrollbar_markers,
+        )
+            .chain(),
+    );
+    app.world_mut().spawn(super::ui::GridContent);
+    let track = app.world_mut().spawn((super::ui::GridScrollTrack, Visibility::Hidden)).id();
+    // Visit every row, including both ends of the scrollable keyboard.
+    for row in 1..=88 {
+        {
+            let mut state = app.world_mut().resource_mut::<EditorState>();
+            state.notes.clear();
+            super::piano_note::reveal_row(&mut state, row);
+            super::interaction::select_or_add(&mut state, row, 0);
+        }
+        app.update();
+        let world = app.world_mut();
+        assert_eq!(world.query::<&super::ui::NoteView>().iter(world).count(), 1);
+        assert_eq!(world.query::<&super::ui::GridScrollMarker>().iter(world).count(), 1);
+        assert_eq!(world.resource::<MusicScoreNotes>().0.len(), 1);
+        assert_eq!(world.get::<Children>(track).unwrap().len(), 1);
+    }
+}

@@ -391,20 +391,15 @@ pub(super) fn update_grid_scrollbar(
 pub(super) const SCROLLBAR_BLOW_COLOR: Color = Color::srgba(0.50, 0.75, 1.00, 0.9);
 pub(super) const SCROLLBAR_DRAW_COLOR: Color = Color::srgba(1.00, 0.62, 0.35, 0.9);
 
-/// A note's minimap colour: blow or draw for a harmonica note, its string's
-/// colour for a guitar note.
+/// The minimap shares instrument colours with the grid; only harmonica
+/// markers use their distinct blow/draw palette.
 fn scrollbar_marker_color(note: &super::state::GridNote) -> Color {
     match note.target.position() {
-        Some(harmonicon_core::instrument::PlayPosition::Fret(at)) => {
-            harmonicon_gameplay::gameplay::guitar_visuals::string_color(at.string)
-        }
-        Some(harmonicon_core::instrument::PlayPosition::Fingering(_)) => {
-            super::grid::FLUTE_NOTE_COLOR
-        }
-        _ => match note.dir() {
+        Some(harmonicon_core::instrument::PlayPosition::Hole(_)) => match note.dir() {
             Dir::Blow => SCROLLBAR_BLOW_COLOR,
             Dir::Draw => SCROLLBAR_DRAW_COLOR,
         },
+        _ => super::grid::note_face(note).0,
     }
 }
 
