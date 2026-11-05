@@ -4,7 +4,7 @@
 //! plain file writes.
 //!
 //! Everything here is the bottom of `docs/physical_design_plan.md`'s level
-//! order: music theory (`harmonica`, `instrument`, `chart`, `note_parser`),
+//! order: music theory (`harmonica`, `instrument`, `chart`),
 //! the scoring maths (`scoring`), pitch/MIDI conversion (`midi`), the synth,
 //! and the crash-safe config write (`config_file`). Call sites name this
 //! crate directly (`harmonicon_core::chart`), not a re-export.
@@ -26,7 +26,6 @@ pub mod midi;
 /// and note-number conversion. Re-exported by the game as `song::midi`.
 pub mod midi_file;
 pub mod note_event_codec;
-pub mod note_parser;
 pub mod note_target;
 pub mod note_tracker;
 pub mod note_trainer;

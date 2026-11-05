@@ -6,7 +6,7 @@ mod loader;
 // `harmonicon-core`; re-exported here so `harmonicon_core::chart::…` and
 // friends keep resolving unchanged across the tree.
 pub use harmonicon_core::midi_file as midi;
-pub use harmonicon_core::{chart, harmonica, harmonica_constraints, note_parser};
+pub use harmonicon_core::{chart, harmonica, harmonica_constraints};
 
 use std::path::PathBuf;
 

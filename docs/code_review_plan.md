@@ -254,6 +254,37 @@ Highest data-loss risk in the codebase — prioritise save/load.
 
 Add a `### <crate>` heading here as each review completes.
 
+### 1. `harmonicon-core` — done 2026-11-05
+
+Still Bevy-free (`midly`, `serde`, `serde_json` only).
+
+- **Bug, fixed `9878f171`**: nothing checked a tempo map's order, and
+  `tick_to_seconds`/`seconds_to_tick` subtract neighbouring `u64` ticks.
+  An out-of-order point panicked a debug build. Now
+  `chart_check::timing_problems`, plus saturating arithmetic.
+- **Bug, fixed `9878f171`**: `migrate_chart_json` stamped the current
+  version over a malformed `format_version` before validation, so neither
+  the schema's pattern nor `format_version_supported` could reject one.
+- **Bug, fixed `98c70b29`**: `render_pcm` sized its buffer from the last
+  note with no bound, and `ticks_per_quarter` accepted 0. A corrupt
+  `song/music.mid` could overflow or exhaust memory while loading.
+- **Cleanup, fixed**: `note_parser` was dead (no caller outside its own
+  tests) and could panic on non-UTF-8 input; deleted. `lib.rs` described
+  re-export facades the project rules forbid.
+- **Hazard, open**: `LaneLayout::span` recognises a piano layout by
+  shape (a vertical axis and every label equal to its pitch's note name)
+  rather than by being told. Today only `keyboard_rows` matches; a
+  future vertical pitch-row layout would silently get white-key spacing.
+  A `LaneLayout` kind field would make it explicit.
+- Checked and sound: scoring windows and combo maths, repeat expansion
+  (passes clamped, overlaps dropped), WAV parsing (checked throughout),
+  atomic config writes, every 1-based hole/string lookup
+  (`checked_sub(1)`), pitch arithmetic near the `u8` edges.
+
+Carried into the song session (8): `song/mod.rs` still re-exports
+`chart`, `harmonica`, `harmonica_constraints` and `midi_file` as
+`song::*`, against the no-facades rule.
+
 ### Carried into later sessions
 
 Found while making `cargo clippy --all-targets -- -D warnings` pass again
