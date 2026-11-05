@@ -580,9 +580,6 @@ pause-phrase-section = Sección: { $name } · Cobertura: { $pct }%
 pause-phrase-no-sections = No hay frases en esta canción
 pause-drag-section-hint = Selecciona una sección del mapa o de la partitura.
 pause-notes-update-hint = La cobertura revela el comienzo de la frase y conserva los acordes completos.
-pause-clear-loop = Borrar bucle
-pause-loop-off = Bucle: desactivado
-pause-loop-range = Bucle: {$start}s–{$end}s
 pause-drag-loop-hint = Selecciona una sección y activa Repetir sección.
 
 # Overlay del metrónomo
@@ -1010,7 +1007,6 @@ pause-score-section = { $name } · compases { $first }–{ $last } · { $state }
 
 pause-achievement-not-assessed = Logro · Sin evaluar
 
-pause-repeat-section = Repetir sección · activar/desactivar
 
 pause-repeat-on = Repetir sección: sí
 

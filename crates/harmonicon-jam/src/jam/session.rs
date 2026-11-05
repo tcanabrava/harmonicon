@@ -9,7 +9,6 @@ use bevy::audio::{AudioPlayer, AudioSink, AudioSource, PlaybackSettings, Volume}
 use bevy::prelude::*;
 use bevy::ui_widgets::Activate;
 
-use harmonicon_core::chart::Action;
 use harmonicon_core::harmonica::{Harmonica, Position, detected_harp_key, progression_bars};
 
 use harmonicon_app::app::{EffectiveHarmonica, JamProgression, JamScale, SelectedSong};
@@ -26,9 +25,7 @@ use harmonicon_ui::dialogs::button;
 use harmonicon_gameplay::gameplay::countdown_overlay::spawn_countdown;
 use harmonicon_gameplay::gameplay::harmonica_overlay::spawn_harmonica_overlay;
 use harmonicon_gameplay::gameplay::metronome_overlay::spawn_metronome;
-use harmonicon_gameplay::gameplay::song_progress_overlay::{
-    BAR_HEIGHT, MarkerTint, NoteMarker, hole_lane, spawn_song_progress,
-};
+use harmonicon_gameplay::gameplay::song_progress_overlay::{BAR_HEIGHT, spawn_song_progress};
 use harmonicon_ui::dialogs::twelve_bar_grid::{GridConfig, spawn_12_bar_grid};
 use harmonicon_ui::spectrogram::{OscMaterial, SpectrogramStyle, spawn_spectrogram};
 
@@ -496,44 +493,14 @@ pub fn setup(
     commands.insert_resource(guide);
     commands.insert_resource(JamChordSequence(chords));
 
-    // Song-progress bar, pinned across the top like the scored modes — Jam
-    // Session has no `SongNotes` (nothing is scored), so note markers are
-    // built directly from the chart's own track events instead — one
-    // marker per event (not per item), matching the scored modes' own
-    // per-event `ScheduledNote` granularity, so a chord/split item's
-    // notes each get their own correctly-tinted marker.
-    let hole_count = harp.hole_count();
-    let note_markers: Vec<NoteMarker> = chart
+    // Song-progress bar, pinned across the top. A chart with no music is
+    // timed by the end of its last note.
+    let content_end = chart
         .track
         .iter()
-        .flat_map(|item| {
-            let time = resolve_item_time(item, &chart.timing);
-            item.events.iter().filter_map(move |ev| {
-                let (hole, action) = ev.hole_action()?;
-                Some(NoteMarker {
-                    time,
-                    duration: item.duration,
-                    lane: hole_lane(hole, hole_count),
-                    tint: if matches!(action, Action::Blow) {
-                        MarkerTint::Blow
-                    } else {
-                        MarkerTint::Draw
-                    },
-                })
-            })
-        })
-        .collect();
-    // No phrase sections either — adaptive difficulty is a scored-mode
-    // concept, so Jam Session's bar just shows no phrase strip rectangles.
-    spawn_song_progress(
-        &mut commands,
-        &manifest.waveform,
-        manifest.music_duration_secs,
-        &note_markers,
-        hole_count,
-        &[],
-        &[],
-    );
+        .map(|item| resolve_item_time(item, &chart.timing) + item.duration)
+        .fold(0.0_f64, f64::max);
+    spawn_song_progress(&mut commands, manifest.music_duration_secs, content_end);
 
     // Jam already shows the harp hint on the persistent left panel, so the
     // countdown doesn't repeat it.

@@ -31,8 +31,6 @@ use super::note_feedback::{
 };
 use super::note_ribbon::ribbon_technique;
 use super::note_ribbon_2d::NoteRibbon2dMaterial;
-#[cfg(test)]
-use super::song_progress_overlay::{MarkerTint, NoteMarker};
 use super::technique_cue;
 use super::{
     ActivePitches, ActiveTargets, COUNTDOWN, GameplayRoot, HighwayLanes, HoleCell, HoleState,
@@ -364,13 +362,6 @@ pub fn setup(
         score_anchor(highway_lanes.0.as_ref().map_or(ScrollAxis::Vertical, |l| l.axis)),
     );
 
-    // Retain the timeline duration for loop policy without a second map.
-    commands.insert_resource(super::song_progress_overlay::AudioDuration(
-        song_notes
-            .notes
-            .iter()
-            .fold(manifest.music_duration_secs, |end, note| end.max(note.time + note.duration)),
-    ));
     let staff = panels.notation_staff && display.bravura.is_some();
     if staff && let Some(bravura) = &display.bravura {
         spawn_gameplay_music_score(&mut commands, bravura, piano_roll.is_some());
@@ -391,49 +382,6 @@ pub fn setup(
     let harp_hint = played
         .map(|harp| super::song_info::harp_banner_text(harp, &effective.song_key_for(chart), &loc));
     spawn_countdown(&mut commands, &loc, harp_hint.as_deref(), Some(&song_info));
-}
-
-/// The progress bar's per-hole note markers for `notes`, or none when the
-/// contextual panels leave them out (`hud_panel::contextual_panels`).
-#[cfg(test)]
-pub(super) fn progress_note_markers(
-    notes: &[ScheduledNote],
-    layout: Option<&LaneLayout>,
-    shown: bool,
-) -> Vec<NoteMarker> {
-    let Some(layout) = layout.filter(|_| shown) else {
-        return Vec::new();
-    };
-    // One progress lane per highway lane, stacked as the player sees them:
-    // a vertical highway's lanes run left to right from the lowest hole, so
-    // they turn over (highest on top); a horizontal one's rows already run
-    // top to bottom.
-    let count = layout.lanes.len();
-    notes
-        .iter()
-        .map(|n| {
-            let lane = layout.nearest_lane(&n.position).min(count.saturating_sub(1));
-            let from_top = match layout.axis {
-                ScrollAxis::Vertical => count.saturating_sub(1) - lane,
-                ScrollAxis::Horizontal => lane,
-            };
-            let tint = match n.position {
-                PlayPosition::Fret(at) => {
-                    MarkerTint::Fixed(super::guitar_visuals::string_color(at.string))
-                }
-                PlayPosition::Fingering(_) => MarkerTint::Fixed(super::flute_visuals::FLUTE_COLOR),
-                PlayPosition::Key(_) => MarkerTint::Fixed(super::piano_visuals::PIANO_COLOR),
-                PlayPosition::Hole(_) if note_is_blow(n) => MarkerTint::Blow,
-                PlayPosition::Hole(_) => MarkerTint::Draw,
-            };
-            NoteMarker {
-                time: n.time,
-                duration: n.duration,
-                lane: u8::try_from(from_top).unwrap_or(u8::MAX),
-                tint,
-            }
-        })
-        .collect()
 }
 
 /// One live score pinned to the top of Play. Its section header and
@@ -1429,53 +1377,6 @@ mod visibility_regression_tests {
         assert!(!note_has_left_view(&note, 0.0));
         note.duration = 4.0;
         assert!(!note_has_left_view(&note, 1.0));
-    }
-
-    /// The progress bar stacks lanes as the highway does: a guitar's rows
-    /// top to bottom from string 1, tinted in their string's colour; a
-    /// harp's holes turned over, the highest on top, tinted blow or draw.
-    #[test]
-    fn progress_lanes_follow_the_highway_and_its_colours() {
-        use harmonicon_core::instrument::InstrumentModel;
-        use harmonicon_core::instrument::guitar::StringTechnique;
-        use harmonicon_core::instrument::guitar::{FretAssignment, Guitar, GuitarBody};
-        let guitar = Guitar::standard(GuitarBody::Electric);
-        let on = |string| ScheduledNote {
-            position: PlayPosition::Fret(FretAssignment {
-                string,
-                fret: 3,
-                technique: StringTechnique::Fretted,
-            }),
-            ..super::super::tests::overlap_test_note(0.0)
-        };
-        let layout = InstrumentModel::lane_layout(&guitar);
-        let markers = progress_note_markers(&[on(1), on(6)], Some(&layout), true);
-        assert_eq!(markers.iter().map(|m| m.lane).collect::<Vec<_>>(), [0, 5]);
-        assert_eq!(
-            markers[0].tint,
-            MarkerTint::Fixed(super::super::guitar_visuals::string_color(1))
-        );
-
-        let harp = harmonicon_core::harmonica::richter_harp("C");
-        let hole = |hole, blow: bool| ScheduledNote {
-            position: harmonicon_core::instrument::PlayPosition::Hole(
-                harmonicon_core::pitch_map::HoleAssignment {
-                    hole,
-                    action: if blow {
-                        harmonicon_core::chart::Action::Blow
-                    } else {
-                        harmonicon_core::chart::Action::Draw
-                    },
-                    technique: harmonicon_core::pitch_map::Technique::Natural,
-                },
-            ),
-            ..super::super::tests::overlap_test_note(0.0)
-        };
-        let layout = InstrumentModel::lane_layout(&harp);
-        let markers = progress_note_markers(&[hole(10, true), hole(1, false)], Some(&layout), true);
-        assert_eq!(markers.iter().map(|m| m.lane).collect::<Vec<_>>(), [0, 9]);
-        assert_eq!((markers[0].tint, markers[1].tint), (MarkerTint::Blow, MarkerTint::Draw));
-        assert!(progress_note_markers(&[hole(1, true)], Some(&layout), false).is_empty());
     }
 
     /// The hit line eats a note as it plays: nothing before the attack,

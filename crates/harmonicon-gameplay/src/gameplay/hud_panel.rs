@@ -26,10 +26,8 @@ use harmonicon_platform::localization::Localization;
 pub(super) struct ContextualPanels {
     /// The side panel: title, phrase banner, tab ribbon, metronome.
     pub side_panel: bool,
-    /// The notation staff under the progress bar.
+    /// The notation staff pinned to the top of the screen.
     pub notation_staff: bool,
-    /// Note markers in the progress bar's lanes.
-    pub progress_notes: bool,
     /// The technique legend in the side panel.
     pub technique_legend: bool,
     /// The karaoke strip under the staff (`karaoke`).
@@ -41,7 +39,7 @@ pub(super) struct ContextualPanels {
 /// - **Compact layout** drops everything supplementary — the side panel and
 ///   the staff — and keeps the lane, which is the game.
 /// - **An aural lesson** (ear training) hides everything that would give
-///   the answer away: the staff, and the note markers in the progress bar.
+///   the answer away: the staff.
 /// - **The technique legend** appears only when the chart uses a technique;
 ///   an empty legend is noise.
 /// - **Lyrics** show whenever the chart has them: two lines are worth their
@@ -57,7 +55,6 @@ pub(super) fn contextual_panels(
     ContextualPanels {
         side_panel,
         notation_staff: !compact && !aural,
-        progress_notes: !aural,
         technique_legend: side_panel && uses_techniques,
         lyrics: has_lyrics,
     }
@@ -123,7 +120,7 @@ mod tests {
     #[test]
     fn an_ordinary_run_shows_every_panel_its_chart_calls_for() {
         let panels = contextual_panels(false, false, true, false);
-        assert!(panels.side_panel && panels.notation_staff && panels.progress_notes);
+        assert!(panels.side_panel && panels.notation_staff);
         assert!(panels.technique_legend);
     }
 
@@ -133,14 +130,12 @@ mod tests {
         assert!(!panels.side_panel);
         assert!(!panels.notation_staff);
         assert!(!panels.technique_legend, "the legend lives in the panel");
-        assert!(panels.progress_notes, "the progress bar is not a supplement");
     }
 
     #[test]
     fn an_aural_lesson_hides_everything_that_gives_the_answer_away() {
         let panels = contextual_panels(false, true, true, false);
         assert!(!panels.notation_staff);
-        assert!(!panels.progress_notes);
         assert!(panels.side_panel, "the panel names no notes");
     }
 

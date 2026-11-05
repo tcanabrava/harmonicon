@@ -339,7 +339,7 @@ load-bearing about *this* crate.
   `hud_panel::used_modifiers` lists the chart's techniques for the legend.
   - **Which contextual pieces appear is decided in one place**,
     `hud_panel::contextual_panels`: the side panel, notation staff,
-    progress-bar note markers, technique legend and lyrics, from compact
+    technique legend and lyrics, from compact
     layout, an aural lesson, whether the chart uses techniques and whether
     it has lyrics. Setup reads its answer, and its tests pin each rule. A
     new conditional piece belongs there, not in an `if` in the setup.
@@ -427,46 +427,15 @@ load-bearing about *this* crate.
     keeps its charted position for display and `playable: false`, so it
     isn't judged.
 
-- **The song-progress bar is a per-lane note strip, with the phrase
-  overlay painted over it, and its timescale survives a music-less song**
-  (`gameplay::song_progress_overlay`, shared by Play 2D and Jam
-  Session). The strip below the waveform has one equal lane per highway
-  lane, stacked as the player sees them (`gameplay_2d::
-  progress_note_markers`, off `HighwayLanes`): a harp's highest hole at the
-  *top* and hole 1 at the *bottom* (`hole_lane`; the opposite vertical
-  order from the Song Editor's own scrollbar minimap, which the rest of
-  this design otherwise mirrors), a guitar's strings and a flute's pitch
-  rows in their highway order. A `NoteMarker` carries its lane from the
-  top and a `MarkerTint`: the theme's blow/draw colour (re-synced on a
-  theme or palette change) or a fixed one (a string's, the flute's). One
-  rectangle per note in its lane: left/width from `note_marker_geometry` (proportional
-  to the note's own duration, floored so a very short note doesn't
-  vanish), tinted blue (blow) or orange (draw), the same "note as a
-  proportional colored rect" language `song_editor::interaction::
-  scrollbar_marker` established for the Song Editor's scrollbar minimap.
-  The per-phrase adaptive-
-  difficulty rectangles are painted as a translucent *overlay* on that
-  same strip (spawned first, so the note markers stay legible on top),
-  not a separate row — one load-bearing
-  consequence: a loop-range drag can now only start in the waveform band,
-  since a phrase rect covering part of the note-lanes strip intercepts
-  clicks there (see `spawn_song_progress`'s own comment on the trade-off).
-  Note markers are `NoteMarker{time, duration, hole, is_blow}` — a small
-  type decoupled from any richer one a caller has on hand, since callers
-  differ: Play 2D maps it straight from `ScheduledNote`, but Jam Session has
-  no `SongNotes` at all (nothing is scored there) and instead flattens the
-  chart's own `TrackItem`s to one marker per *event* (matching the scored
-  modes' own per-event granularity, so a chord/split item's notes each get
-  their own marker in their own lane). Separately, `spawn_song_progress`'s
-  `duration_secs` is normally `SongManifest::music_duration_secs`, but a
-  chart with no backing track (`SongManifest::music: None`) has nothing
-  decoded to measure there — `0.0` — even though the chart itself still
-  has a real length; `effective_duration` falls back to the furthest
-  extent of the passed-in note markers/phrase sections in that case, so
-  the bar (playhead sweep, phrase overlay, note lanes) still lays out
-  against something real instead of reading as empty. Only the waveform
-  row itself stays blank in that case — there's genuinely no waveform
-  data without decoded audio.
+- **The song-progress bar is Jam Session's alone, and shows only a
+  playhead and the loop range** (`gameplay::song_progress_overlay`). Play
+  2D doesn't spawn one: its sections and the repeat range live on the
+  paused score (`pause_score`). Note lanes, a waveform and per-phrase
+  mastery rectangles were all drawn on the bar once and removed as noise;
+  don't add them back. Its timescale is `SongManifest::
+  music_duration_secs` (`AudioDuration`, not `SongEnd`, so the playhead
+  follows the music), falling back to the end of the chart's last note
+  for a song with no backing track.
 
 - **The results screen decides nothing; `gameplay::coaching` does.** Every
   judgment on it — the one observation, the timing lean, whether the
@@ -494,9 +463,8 @@ load-bearing about *this* crate.
     frame late) because a clock jump without the matching seek is exactly
     the anchoring violation described above. `SongEnd` is always the
     chart's real end — a loop doesn't make it infinite, `detect_song_end`
-    just waits on `LoopConfig` — so the progress bar keeps its playhead and
-    loop marker while looping, and clearing the loop mid-song still reaches
-    Results.
+    just waits on `LoopConfig` — so clearing the loop mid-song still
+    reaches Results.
 
 - **What a judged note does on the highway is decided in
   `gameplay::note_feedback`.** A note is drawn as a ribbon

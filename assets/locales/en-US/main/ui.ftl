@@ -582,9 +582,6 @@ pause-phrase-section = Section: { $name } · Coverage: { $pct }%
 pause-phrase-no-sections = No phrases in this song
 pause-drag-section-hint = Select a section in the song map or score.
 pause-notes-update-hint = Coverage reveals the beginning of the phrase; complete chord attacks stay together.
-pause-clear-loop = Clear Loop
-pause-loop-off = Loop: off
-pause-loop-range = Loop: {$start}s–{$end}s
 pause-drag-loop-hint = Select a section, then toggle Repeat section.
 
 # Metronome overlay
@@ -1011,7 +1008,6 @@ pause-score-section = { $name } · bars { $first }–{ $last } · { $state } ({ 
 
 pause-achievement-not-assessed = Achievement · Not assessed
 
-pause-repeat-section = Repeat section · toggle
 
 pause-repeat-on = Repeat section: on
 

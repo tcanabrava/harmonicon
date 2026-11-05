@@ -557,9 +557,8 @@ pub struct PracticeRange {
 
 /// A loop range only makes sense once `end_time` is strictly after
 /// `start_time` — the single rule `LoopConfig::active` is recomputed from
-/// whenever a new range is requested (see `song_progress_overlay::
-/// RequestLoopRange`), so a degenerate zero-width drag on the progress bar
-/// cleanly ends up inactive instead of a stale or nonsensical range.
+/// whenever a new range is set (`pause_menu`'s section repeat), so a
+/// zero-length section ends up inactive instead of a nonsensical range.
 pub fn loop_range_valid(start_time: f64, end_time: f64) -> bool {
     end_time > start_time
 }

@@ -191,8 +191,7 @@ or explicitly against `HEAD` — don't review a moving target.
   `results`, `call_response`, `karaoke`.
 - **c. Highways** — `gameplay_2d`, `highway_2d`, `highway_axis`,
   `note_ribbon*`, `bars`, `beat_guides`, `guitar_visuals`,
-  `flute_visuals`, `piano_visuals`, `harmonica_overlay`,
-  `song_waveform_material`. Entity churn per frame, despawn on exit,
+  `flute_visuals`, `piano_visuals`, `harmonica_overlay`. Entity churn per frame, despawn on exit,
   layout at 1920×1080 (the floor).
 - **d. Trainers and chrome** — `note_trainer*`, `bending_trainer/`,
   `hud*`, `pause_menu`, `pause_score`, `song_progress_overlay`,
@@ -283,7 +282,8 @@ Still Bevy-free (`midly`, `serde`, `serde_json` only).
 
 Carried into the song session (8): `song/mod.rs` still re-exports
 `chart`, `harmonica`, `harmonica_constraints` and `midi_file` as
-`song::*`, against the no-facades rule.
+`song::*`, against the no-facades rule. `SongManifest::waveform` is
+computed at every song load and no longer read by anything.
 
 ### Carried into later sessions
 
@@ -291,15 +291,6 @@ Found while making `cargo clippy --all-targets -- -D warnings` pass again
 before the review began (main was failing it in gameplay, editor and
 lessons):
 
-- **gameplay (d), Hazard/Cleanup**: `05127afa` removed the progress bar's
-  waveform, note markers, mastery bars and drag-to-loop, but left
-  `song_progress_overlay.rs` describing them. The module `//!` header and
-  the crate `CLAUDE.md` still describe the old bar. `note_marker_geometry`,
-  `phrase_bar_height_px` and `cursor_to_time` are now `#[cfg(test)]`, so their
-  tests cover code that never runs. `spawn_song_progress` keeps
-  `_waveform`/`_lane_count`/`_learned` parameters, and
-  `SongWaveformMaterialPlugin` is still registered. Decide what the bar is
-  now, then delete the rest.
 - **gameplay (a), possible Bug**: `pause_menu::resume_section_repeat`
   rewinds on `paused.is_changed()`. That is also true on the system's
   first run, so a song started with an active `LoopConfig` (Practice missed
@@ -313,5 +304,3 @@ lessons):
   dropped (a `for next in [false]` loop); `NeckRegion(bool)`/
   `NeckLabel(bool)` and `update_neck_overview`'s `next_span` branches
   still carry the dead half.
-- **gameplay (d), Docs**: `karaoke::strip_top` says the strip starts
-  under the progress bar, but it only offsets by the staff.

@@ -59,8 +59,8 @@ struct KaraokeUnsung;
 #[derive(Component, Default, Clone)]
 struct KaraokeNext;
 
-/// Where the strip starts: under the song-progress bar, and under the staff
-/// too when one is drawn.
+/// Where the strip starts: under the staff when one is drawn, otherwise at
+/// the top of the screen.
 pub(super) fn strip_top(staff: bool) -> f32 {
     if staff { harmonicon_ui::music_score::PANEL_HEIGHT } else { 0.0 }
 }

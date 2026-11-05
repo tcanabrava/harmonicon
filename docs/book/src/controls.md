@@ -83,11 +83,10 @@ columns: transport actions on the left, practice aids on the right.
 - **Resume**, **Restart**, **Quit Song** (left column)
 - **Wait for Note** — freeze the highway/music at the next unhit note
 - **Practice Speed** — a slider, 50%–100%
-- **A–B Loop** — drag on the song-progress bar to set a loop range;
-  **Clear Loop** removes it
-- **Adaptive Difficulty** toggle; override a phrase by clicking its
-  rectangle on the progress bar's bottom strip, then dragging the
-  **Learned** slider
+- **Sections** — click one above the paused score to select it
+- **Repeat section** — loop the selected section; toggle again to stop
+- **Phrase coverage** toggle, and a slider for how much of the selected
+  section is revealed
 
 See [Playing a Song](playing-a-song.md#pausing-and-quitting) for what each
 of these actually does.

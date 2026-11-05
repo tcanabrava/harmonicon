@@ -173,9 +173,9 @@ status:
   easy to reintroduce if this synth is ever touched without knowing why
   the phase-accumulator form was chosen.
 - **`waveform.rs`/`wav.rs`** — OGG/WAV peak-amplitude pre-analysis (via
-  `rodio`, decode-only) and WAV encode, used at asset-load time to give
-  the song-progress bar a waveform to draw immediately rather than
-  decoding audio on the main thread mid-setup, and to turn synthesized
+  `rodio`, decode-only) and WAV encode, used at asset-load time to
+  measure a song's real duration (and its `SongManifest::waveform`)
+  off the main thread, and to turn synthesized
   PCM back into a playable `AudioSource` (the generated Jam Session bass
   line, MIDI-track backing stems, MIDI-import backing tracks).
 

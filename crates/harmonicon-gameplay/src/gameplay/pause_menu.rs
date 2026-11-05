@@ -221,11 +221,9 @@ pub(super) fn update_loop_label(
 // ── Adaptive difficulty controls ──────────────────────────────────────────────
 
 /// Which of `AdaptiveDifficulty::sections` the pause menu's phrase selector
-/// is currently showing/editing — set by clicking a section's rectangle on
-/// the song-progress overlay's phrase strip while paused (see
-/// `song_progress_overlay::on_phrase_rect_click`), not from within the pause
-/// menu itself. Not reset between restarts (like `WaitForNoteMode`/
-/// `PracticeSpeed`) — picking up where you left off is more useful than
+/// is currently showing/editing — set by clicking a section above the
+/// paused score (`pause_score::select_zone`). Not reset between restarts
+/// (like `WaitForNoteMode`/`PracticeSpeed`) — picking up where you left off is more useful than
 /// always snapping back to the first phrase.
 #[derive(Resource, Default)]
 pub struct SelectedPhraseIndex(pub usize);
@@ -468,8 +466,8 @@ fn phrase_learned_slider_scene(value: f32) -> impl Scene {
 /// Keeps the phrase-learned slider's fill/value and readout in step with
 /// the selected phrase's learned fraction — needed both when
 /// `AdaptiveDifficulty` changes (dragging the slider, or any other source)
-/// and when `SelectedPhraseIndex` changes (clicking a different section on
-/// the progress-bar overlay), since either can change what this slider
+/// and when `SelectedPhraseIndex` changes (clicking a different section
+/// above the paused score), since either can change what this slider
 /// should show. Not gated on `Paused`, same reasoning as
 /// `update_wait_mode_label`.
 pub(super) fn update_phrase_learned_slider(
