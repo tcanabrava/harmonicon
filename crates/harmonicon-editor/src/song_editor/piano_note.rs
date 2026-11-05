@@ -146,6 +146,17 @@ mod tests {
         state
     }
 
+    #[test]
+    fn every_keyboard_key_can_be_drawn_after_placement() {
+        for row in 1..=88 {
+            let mut state = piano_state();
+            place(&mut state, row, 0, 12);
+            let note = state.notes.first().expect("key placed");
+            let (_, label) = super::super::grid::note_face(note);
+            assert_eq!(label, harmonicon_core::midi::midi_to_note(i32::from(row_note(row))));
+        }
+    }
+
     /// Row 1 is C8, so middle C is row 49; two keys at once are a chord,
     /// the same key twice is refused.
     #[test]

@@ -714,7 +714,13 @@ pub(super) fn note_face(note: &GridNote) -> (Color, String) {
                 ),
             },
         ),
-        _ => (pitch_color(note.technique()), note.dir().arrow().to_string()),
+        Some(PlayPosition::Key(key)) => {
+            (Color::srgb(0.28, 0.52, 0.78), harmonicon_core::midi::midi_to_note(i32::from(key)))
+        }
+        Some(PlayPosition::Hole(_)) => {
+            (pitch_color(note.technique()), note.dir().arrow().to_string())
+        }
+        None => (Color::srgb(0.5, 0.5, 0.5), String::new()),
     }
 }
 

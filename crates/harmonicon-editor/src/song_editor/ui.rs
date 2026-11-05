@@ -514,10 +514,7 @@ pub(super) fn sync_hole_column(
     };
     // A piano's window onto its keyboard: the keys of its first and last
     // rows, drawn as the keyboard rather than as labels.
-    let keyboard = super::piano_note::is_piano(&state).then(|| {
-        let top = super::piano_note::row_note(state.row_offset + 1);
-        (top + 1 - hole_count, top)
-    });
+    let keyboard = pitch_keyboard(&state);
     let texts: Vec<String> = rows.iter().map(|r| r.text.clone()).collect();
     if last.as_ref().is_some_and(|(e, t)| *e == entity && *t == texts)
         && !theme.is_changed()
@@ -911,4 +908,46 @@ fn spawn_fixed_chrome(
             Node { flex_direction: FlexDirection::Column, ..default() },
         ));
     });
+}
+
+/// Pitch rows share a keyboard; flute key/fingering rows keep their own labels.
+fn pitch_keyboard(state: &EditorState) -> Option<(u8, u8)> {
+    use harmonicon_core::instrument::Instrument;
+    match state.effective_instrument() {
+        Instrument::Piano(_) => {
+            let top = super::piano_note::row_note(state.row_offset + 1);
+            Some((top + 1 - state.display_rows(), top))
+        }
+        Instrument::Flute(flute) if state.flute_fingering_view().is_none() => {
+            Some((flute.lowest(), super::note_model::FLUTE_TOP_NOTE))
+        }
+        _ => None,
+    }
+}
+
+#[cfg(test)]
+mod pitch_keyboard_tests {
+    use super::*;
+    #[test]
+    fn flute_keyboard_matches_the_instruments_pitch_range() {
+        for foot in [
+            harmonicon_core::instrument::flute::FootJoint::C,
+            harmonicon_core::instrument::flute::FootJoint::B,
+        ] {
+            let flute = harmonicon_core::instrument::flute::Flute { foot };
+            let mut state = EditorState {
+                instrument: super::super::state::InstrumentSelection::Configured {
+                    instrument: flute.into(),
+                    harmonica_origin: None,
+                },
+                ..default()
+            };
+            assert_eq!(
+                pitch_keyboard(&state),
+                Some((flute.lowest(), super::super::note_model::FLUTE_TOP_NOTE))
+            );
+            state.flute_view = super::super::state::FluteView::Fingering;
+            assert_eq!(pitch_keyboard(&state), None);
+        }
+    }
 }
