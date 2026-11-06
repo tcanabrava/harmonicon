@@ -419,6 +419,24 @@ without a pass, and nothing reads `SongManifest::waveform`.
   an exit flush, the cfg guards against `build.rs`, scoped translation
   loading per instrument.
 
+### 8. `harmonicon-song` — done 2026-11-06
+
+- **Cleanup, fixed `533b9ae6`**: `song/mod.rs` re-exported core's
+  `chart`, `harmonica`, `harmonica_constraints` and `midi_file` (as
+  `song::midi`), against the no-facades rule. Three call sites still used
+  it; about forty docs named the facade paths. All now name
+  `harmonicon_core` directly.
+- **Efficiency, fixed `a659313f`**: every song load decoded its
+  `music.ogg` twice to build `SongManifest::waveform`, which nothing has
+  read since the progress bar stopped drawing one. The field is gone; the
+  loader measures the duration only (stated length, or one counting
+  pass), checked against a full count on the songs pack's real music.
+- Checked and sound: the loader's validate → migrate → check → expand
+  order (with the new timing check from core), optional sibling assets
+  checked before `load()` so a missing one can't hang `SongLoading`, the
+  score loader's track choice, lesson graph cycle refusal and unit
+  gating.
+
 ### Carried into later sessions
 
 Found while making `cargo clippy --all-targets -- -D warnings` pass again
