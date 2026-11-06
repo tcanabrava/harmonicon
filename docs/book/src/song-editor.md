@@ -130,7 +130,10 @@ The screen has three parts:
   tab, with a **notation staff** below it showing the same notes as sheet
   music. The staff follows the grid as you scroll (and the playhead while
   playing), and the notes you select are drawn in gold on it too, so you
-  can see where the selection sits in the music.
+  can see where the selection sits in the music. The staff uses the song’s
+  key signature and spells accidentals accordingly. Guitar and bass notes
+  appear an octave above their sounding pitches, with an octave-below clef
+  indication; previews still play the sounding pitch.
 - The song's metadata (tempo, key, position, title, background music,
   and the lesson fields) under the **Details** tab.
 

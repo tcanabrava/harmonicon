@@ -5,7 +5,8 @@
 use bevy::prelude::*;
 
 use harmonicon_ui::music_score::{
-    MeterMap, MusicScoreNotes, MusicScorePlayhead, NotationNote, parse_time_signature,
+    MeterMap, MusicScoreKeySignature, MusicScoreNotes, MusicScorePlayhead, NotationNote,
+    parse_time_signature, project_score,
 };
 use harmonicon_ui::music_score::{MusicScoreBarMap, MusicScoreMeter};
 
@@ -52,6 +53,7 @@ pub(super) fn sync_music_score(
     mut notes: ResMut<MusicScoreNotes>,
     mut meter: ResMut<MusicScoreMeter>,
     mut bar_map: ResMut<MusicScoreBarMap>,
+    signature: Option<ResMut<MusicScoreKeySignature>>,
 ) {
     let editor_meter = parse_time_signature(&state.time_signature);
     if *meter != editor_meter {
@@ -77,6 +79,10 @@ pub(super) fn sync_music_score(
     // them in time order (accidentals carry through a bar, beams join
     // neighbours). Stable, so a note's own tied segments stay in order.
     staff.sort_by(|a, b| a.start_beat.total_cmp(&b.start_beat));
+    let written_key = project_score(&mut staff, instrument.notation(), &state.key);
+    if let Some(mut signature) = signature {
+        signature.set_if_neq(written_key);
+    }
     notes.0 = staff;
 }
 

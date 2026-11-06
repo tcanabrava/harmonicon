@@ -142,5 +142,16 @@ Each independently reviewable part receives a commit and relevant validation.
 - Shared wind controls, masks, stable fingering variants and register-interval
   rules added. Flute adapts its existing data without changing foot-joint range
   or fingerings. Core suite: 439 tests passed; core Clippy passed.
-- Step 4 continues with score projection, spelling and key-signature rendering.
-  Steps 5–7 remain planned.
+- Step 4 score projection is wired into gameplay, the editor and both trainers.
+  Notes use written spelling and the written key signature; playback and
+  assessment retain sounding pitches. Key-aware accidentals reset on the actual
+  bar grid, including pickups and meter changes. Authored gameplay spellings
+  survive repeat expansion and bar-line ties when they match the sounding target.
+- Live score review checked low/high bass notation and a six-sharp editor key.
+  The high bass fallback retains its octave-below indication. Accidental widths
+  were measured from the bundled font rather than approximated.
+- Step 4 validation: editor 466 tests, gameplay 460 tests and UI 193 tests
+  passed, including enharmonic staff placement, key cancellation/reset,
+  meter-change resets and the authored-spelling bridge. Relevant Clippy checks
+  passed with warnings denied, and the dev build passed.
+- Steps 5–7 remain planned.

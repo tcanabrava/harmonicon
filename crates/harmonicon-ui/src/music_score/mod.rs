@@ -59,7 +59,7 @@ mod key_signature;
 pub mod full_score;
 mod staff_window;
 use staff_window::spawn_staff_window;
-pub use projection::{MusicScoreKeySignature, project_notes, note_spelling, note_staff_step};
+pub use projection::{MusicScoreKeySignature, project_notes, project_score, note_spelling, note_staff_step};
 
 mod meter_map;
 pub use meter_map::{BarPosition, MeterMap, MeterSegment};

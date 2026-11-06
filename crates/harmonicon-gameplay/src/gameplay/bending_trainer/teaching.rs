@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: MIT
 //! A focused reading of the selected hole: breath, natural pitch and target.
 use super::*;
-use harmonicon_ui::music_score::{BravuraFont, MusicScoreNotes, NotationNote};
+use harmonicon_ui::music_score::{
+    BravuraFont, MusicScoreKeySignature, MusicScoreNotes, NotationNote, project_score,
+};
 
 #[derive(Component)]
 pub(crate) struct ScoreSlot;
@@ -38,8 +40,13 @@ pub(crate) fn sync_teaching_score(
     font: Option<Res<BravuraFont>>,
     slots: Query<(Entity, Option<&Children>), With<ScoreSlot>>,
     mut notes: ResMut<MusicScoreNotes>,
+    signature: Option<ResMut<MusicScoreKeySignature>>,
 ) {
-    let next = notation(key.harp(), *target);
+    let mut next = notation(key.harp(), *target);
+    let written_key = project_score(&mut next, Default::default(), "C");
+    if let Some(mut signature) = signature {
+        signature.set_if_neq(written_key);
+    }
     if notes.0 != next {
         notes.0 = next;
     }

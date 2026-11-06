@@ -33,11 +33,12 @@ pub(super) fn spawn_note_glyphs(
     // Which accidental (if any) is decided over the whole song by
     // `notation::accidentals`, since it depends on what the bar has already
     // said — not on this note alone.
+    // Widths in staff spaces, measured from the bundled Bravura outlines.
     if let Some((mark, width_sp)) = match accidental {
         Accidental::Sharp => Some((glyph::ACCIDENTAL_SHARP, ACCIDENTAL_SHARP_WIDTH_SP)),
-        Accidental::Flat => Some((glyph::ACCIDENTAL_FLAT, 0.5)),
-        Accidental::DoubleSharp => Some((glyph::ACCIDENTAL_DOUBLE_SHARP, 1.0)),
-        Accidental::DoubleFlat => Some((glyph::ACCIDENTAL_DOUBLE_FLAT, 1.0)),
+        Accidental::Flat => Some((glyph::ACCIDENTAL_FLAT, 0.904)),
+        Accidental::DoubleSharp => Some((glyph::ACCIDENTAL_DOUBLE_SHARP, 0.988)),
+        Accidental::DoubleFlat => Some((glyph::ACCIDENTAL_DOUBLE_FLAT, 1.644)),
         Accidental::Natural => Some((glyph::ACCIDENTAL_NATURAL, ACCIDENTAL_NATURAL_WIDTH_SP)),
         Accidental::None => None,
     } {

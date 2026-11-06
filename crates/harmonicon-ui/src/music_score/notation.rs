@@ -51,9 +51,9 @@ pub(super) mod glyph {
 /// beats before handing notes over (see each call site: `song_editor`'s
 /// ticks are already tempo-independent multiples of a beat; gameplay's
 /// `ScheduledNote::time` in seconds goes through `harmonicon_core::chart::
-/// seconds_to_tick` first). `midi` is the actual sounded pitch (bends/
-/// overblow/overdraw/slide already resolved) — the same identity every
-/// other pitch comparison in the codebase uses.
+/// seconds_to_tick` first). `midi` is the written semitone coordinate after score projection.
+/// Producers resolve sounding targets first, then project once at the view
+/// boundary. Never use projected score notes for assessment or synthesis.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct NotationNote {
     pub start_beat: f64,
@@ -320,10 +320,25 @@ pub fn accidentals(notes: &[NotationNote], clef: Clef, beats_per_bar: f64) -> Ve
     accidentals_with_key(notes, clef, beats_per_bar, harmonicon_core::notation::KeySignature::default())
 }
 pub fn accidentals_with_key(notes: &[NotationNote], clef: Clef, beats_per_bar: f64, signature: harmonicon_core::notation::KeySignature) -> Vec<Accidental> {
+    accidentals_by_bar(notes, clef, signature, |note| {
+        if beats_per_bar > 0.0 { (note.start_beat / beats_per_bar).floor() as i64 } else { 0 }
+    })
+}
+
+/// Use the actual bar grid, including pickups and time-signature changes.
+pub fn accidentals_in_bars(notes: &[NotationNote], clef: Clef, bars: &super::MusicScoreBarMap, signature: harmonicon_core::notation::KeySignature) -> Vec<Accidental> {
+    let phase = bars.meter.segments()[0].phase_ticks as f64;
+    accidentals_by_bar(notes, clef, signature, |note| {
+        let tick = (note.start_beat * f64::from(bars.quarter_ticks) - phase).round().max(0.0) as u64;
+        bars.meter.position(tick).bar as i64
+    })
+}
+
+fn accidentals_by_bar(notes: &[NotationNote], clef: Clef, signature: harmonicon_core::notation::KeySignature, mut bar_of: impl FnMut(&NotationNote) -> i64) -> Vec<Accidental> {
     let mut altered = std::collections::HashMap::<i32, i8>::new();
     let mut current_bar = None;
     notes.iter().map(|note| {
-        let bar = if beats_per_bar > 0.0 { (note.start_beat / beats_per_bar).floor() as i64 } else { 0 };
+        let bar = bar_of(note);
         if current_bar != Some(bar) { altered.clear(); current_bar = Some(bar); }
         let pitch = super::note_spelling(note);
         let step = super::note_staff_step(note, clef);

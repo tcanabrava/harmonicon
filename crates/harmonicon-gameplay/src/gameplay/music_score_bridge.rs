@@ -15,8 +15,8 @@ use harmonicon_core::chart::HarpChart;
 use harmonicon_core::chart::seconds_to_tick;
 use harmonicon_song::song::SongManifest;
 use harmonicon_ui::music_score::{
-    MeterMap, MusicScoreBarMap, MusicScoreMeter, MusicScoreNotes, MusicScorePlayhead,
-    MusicScoreSections, MusicScoreSelection, ScoreSection,
+    MeterMap, MusicScoreBarMap, MusicScoreKeySignature, MusicScoreMeter, MusicScoreNotes,
+    MusicScorePlayhead, MusicScoreSections, MusicScoreSelection, ScoreSection, project_score,
 };
 
 use super::bars::pickup_lead_ticks;
@@ -75,6 +75,7 @@ fn sync_music_score_notes(
     mut meter: ResMut<MusicScoreMeter>,
     mut bar_map: ResMut<MusicScoreBarMap>,
     highlight: Res<StaffHighlight>,
+    signature: Option<ResMut<MusicScoreKeySignature>>,
 ) {
     let Some(manifest) = manifests.get(&selected.0) else {
         return;
@@ -118,6 +119,51 @@ fn sync_music_score_notes(
         &bar_map,
         highlight.0,
     );
+    preserve_authored_spelling(&mut score_notes.0, chart);
+    if let Some(instrument) = chart.instrument() {
+        let written_key = project_score(&mut score_notes.0, instrument.notation(), &chart.song.key);
+        if let Some(mut signature) = signature {
+            signature.set_if_neq(written_key);
+        }
+    }
+}
+
+/// Keep the author's enharmonic spelling when it names the actual acoustic
+/// target. A bent harmonica event may name its unbent reed instead, and must
+/// fall back to the key-aware spelling of the resolved pitch.
+fn preserve_authored_spelling(
+    notes: &mut [harmonicon_ui::music_score::NotationNote],
+    chart: &HarpChart,
+) {
+    use harmonicon_core::notation::SpelledPitch;
+    let mut spellings = std::collections::BTreeMap::new();
+    for item in &chart.track {
+        let tick = item.tick.unwrap_or_else(|| {
+            seconds_to_tick(
+                item.time.unwrap_or_default(),
+                chart.timing.resolution,
+                &chart.timing.tempo_map,
+            )
+        });
+        for event in &item.events {
+            let Some(spelling) = event.note.as_deref().and_then(SpelledPitch::parse) else {
+                continue;
+            };
+            if let Some(pitch) =
+                chart.event_pitch(event).filter(|&pitch| Some(pitch) == spelling.midi())
+            {
+                spellings.insert((pitch, tick), spelling);
+            }
+        }
+    }
+    for note in notes {
+        let tick = (note.start_beat * f64::from(chart.timing.resolution)).round() as u64;
+        let tick = tick.saturating_sub(pickup_lead_ticks(chart));
+        note.spelling = spellings
+            .range((note.midi, 0)..=(note.midi, tick))
+            .next_back()
+            .map(|(_, &spelling)| spelling);
+    }
 }
 
 /// Keeps [`MusicScorePlayhead`] following the same [`GameplayClock`] every
@@ -198,5 +244,15 @@ mod tests {
         let bars = bar_map_for_chart(&played);
         assert_eq!(bars.beats(0.0, 10.0), vec![2.0, 4.0, 6.0, 8.0, 10.0]);
         assert_eq!(bars.split_note(3360, 4320, 60, false)[1].start_beat, 8.0);
+
+        // An authored enharmonic spelling survives both repeat expansion and
+        // the tied segment that starts after the original event's onset.
+        let mut played = played;
+        for item in &mut played.track {
+            item.events[0].note = Some("Bb4".into());
+        }
+        let mut notes = bars.split_note(2880, 4320, 70, false);
+        preserve_authored_spelling(&mut notes, &played);
+        assert!(notes.iter().all(|note| note.spelling.unwrap().name() == "Bb4"));
     }
 }

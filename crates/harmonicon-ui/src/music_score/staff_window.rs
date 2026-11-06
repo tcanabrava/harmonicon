@@ -50,7 +50,7 @@ pub(super) fn spawn_staff_window(
     // an accidental's effect on the rest of its bar has to be known even
     // when the note that established it has already scrolled off.
     let stems = stem_roles(notes, clef);
-    let marks = accidentals_with_key(notes, clef, meter.beats_per_bar(), *signature);
+    let marks = accidentals_in_bars(notes, clef, bar_map, *signature);
 
     commands.entity(layer).with_children(|parent| {
         // Bar lines first, so a notehead always paints over one rather than

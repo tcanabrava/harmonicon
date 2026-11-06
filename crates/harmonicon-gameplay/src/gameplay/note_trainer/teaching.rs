@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: MIT
 //! The trainer's notation and instrument guides, driven by its current drill.
 use super::*;
-use harmonicon_ui::music_score::{BravuraFont, MusicScoreNotes, NotationNote};
+use harmonicon_ui::music_score::{
+    BravuraFont, MusicScoreKeySignature, MusicScoreNotes, NotationNote, project_score,
+};
 
 pub(super) fn notation(drill: Option<&Drill>) -> Vec<NotationNote> {
     let Some(drill) = drill else { return Vec::new() };
@@ -9,7 +11,8 @@ pub(super) fn notation(drill: Option<&Drill>) -> Vec<NotationNote> {
 }
 
 pub(crate) fn pitch_notation(start: Option<f32>, target: f32) -> Vec<NotationNote> {
-    let note = |midi: f32, beat, highlighted| NotationNote { spelling: None, 
+    let note = |midi: f32, beat, highlighted| NotationNote {
+        spelling: None,
         start_beat: beat,
         duration_beats: 1.0,
         midi: midi.round() as u8,
@@ -68,13 +71,18 @@ pub(crate) fn spawn_staff(
         });
 }
 
-pub(crate) fn sync_score(trainer: Res<NoteTrainer>, mut notes: ResMut<MusicScoreNotes>) {
-    let next = if let (Some(chord), Some(guitar)) = (&trainer.chord, trainer.guitar()) {
+pub(crate) fn sync_score(
+    trainer: Res<NoteTrainer>,
+    mut notes: ResMut<MusicScoreNotes>,
+    signature: Option<ResMut<MusicScoreKeySignature>>,
+) {
+    let mut next = if let (Some(chord), Some(guitar)) = (&trainer.chord, trainer.guitar()) {
         chord
             .shape()
             .pitches(guitar)
             .into_iter()
-            .map(|midi| NotationNote { spelling: None, 
+            .map(|midi| NotationNote {
+                spelling: None,
                 start_beat: 0.0,
                 duration_beats: 1.0,
                 midi,
@@ -85,6 +93,10 @@ pub(crate) fn sync_score(trainer: Res<NoteTrainer>, mut notes: ResMut<MusicScore
     } else {
         notation(trainer.practice.drill())
     };
+    let written_key = project_score(&mut next, trainer.instrument.notation(), "C");
+    if let Some(mut signature) = signature {
+        signature.set_if_neq(written_key);
+    }
     if notes.0 != next {
         notes.0 = next;
     }
