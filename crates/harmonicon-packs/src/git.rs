@@ -17,7 +17,7 @@ use gix::remote::Direction;
 use gix::remote::fetch::Shallow;
 
 use crate::pack::{EngineSupport, Incompatible, PackError, PackKind, PackManifest};
-use crate::repo::{InstalledRepo, RepoSpec};
+use crate::repo::{InstalledRepo, RepoSpec, SpecError};
 
 /// A pack's whole checkout may not exceed this. Content is charts, small
 /// images and audio; anything larger is a mistake or hostile.
@@ -43,6 +43,8 @@ pub enum SyncError {
     Symlink(PathBuf),
     #[error("the repository is larger than {} MB", MAX_PACK_BYTES / (1024 * 1024))]
     TooLarge,
+    #[error(transparent)]
+    Spec(#[from] SpecError),
     #[error(transparent)]
     Io(#[from] std::io::Error),
 }
@@ -120,6 +122,7 @@ pub fn install(
     let RepoSpec::Remote { url, git_ref } = spec else {
         return Err(SyncError::LocalSpec);
     };
+    let dest = spec.checkout_dir(packs_root)?;
     let slug = spec.slug();
     std::fs::create_dir_all(packs_root)?;
     let staging = packs_root.join(format!(".staging-{slug}"));
@@ -129,7 +132,7 @@ pub fn install(
         clone_shallow(url, git_ref.as_deref(), &staging, should_interrupt).and_then(|commit| {
             let manifest = validate_checkout(&staging, kind, engine)?;
             if kind == PackKind::Songs {
-                crate::retained_songs::preserve_removed(&packs_root.join(&slug), &staging)?;
+                crate::retained_songs::preserve_removed(&dest, &staging)?;
                 // Validate the combined copy before touching the installed pack.
                 validate_checkout(&staging, kind, engine)?;
             }
@@ -143,7 +146,7 @@ pub fn install(
         }
     };
 
-    swap_into_place(&staging, &packs_root.join(&slug))?;
+    swap_into_place(&staging, &dest)?;
     Ok((
         InstalledRepo {
             url: url.clone(),
@@ -515,6 +518,16 @@ mod tests {
         };
         let err = install_into(&spec, root.path()).unwrap_err();
         assert!(matches!(err, SyncError::NoManifest), "{err}");
+    }
+
+    #[test]
+    fn an_address_naming_nothing_is_never_installed() {
+        let root = tempfile::tempdir().unwrap();
+        std::fs::create_dir_all(root.path().join("other-pack")).unwrap();
+        let spec = RepoSpec::Remote { url: "https://".into(), git_ref: None };
+        let err = install_into(&spec, root.path()).unwrap_err();
+        assert!(matches!(err, SyncError::Spec(_)), "{err}");
+        assert!(root.path().join("other-pack").is_dir());
     }
 
     #[test]

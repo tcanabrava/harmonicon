@@ -277,8 +277,11 @@ pub fn uninstall(spec: &RepoSpec) -> Result<(), String> {
         return Ok(());
     }
     let packs_dir = crate::paths::packs_dir().ok_or("no writable data directory")?;
+    // Never `packs_dir.join(slug)` directly: an empty slug is `packs_dir`
+    // itself, and this would delete every pack.
+    let checkout = spec.checkout_dir(&packs_dir).map_err(|e| e.to_string())?;
     let slug = spec.slug();
-    match std::fs::remove_dir_all(packs_dir.join(&slug)) {
+    match std::fs::remove_dir_all(checkout) {
         Err(e) if e.kind() != std::io::ErrorKind::NotFound => return Err(e.to_string()),
         _ => {}
     }

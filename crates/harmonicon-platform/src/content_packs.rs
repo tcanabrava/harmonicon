@@ -189,7 +189,13 @@ pub fn evaluate(
 ) -> PackEntry {
     let slug = spec.slug();
     let root = match spec {
-        RepoSpec::Remote { .. } => packs_dir.join(&slug),
+        RepoSpec::Remote { .. } => match spec.checkout_dir(packs_dir) {
+            Ok(dir) => dir,
+            Err(e) => {
+                let status = PackStatus::Unusable(e.to_string());
+                return PackEntry { kind, spec: spec.clone(), slug, root: PathBuf::new(), status };
+            }
+        },
         RepoSpec::Local { path } => path.clone(),
     };
     let status = match spec {
@@ -491,6 +497,23 @@ mod tests {
         );
         assert_eq!(entry.status, PackStatus::NotInstalled);
         assert_eq!(entry.root, packs_dir.path().join(entry.slug.clone()));
+    }
+
+    #[test]
+    fn an_address_naming_nothing_is_unusable_and_never_the_packs_dir() {
+        // "https://" slugs to "", which joined to the packs directory is the
+        // packs directory: as a pack root it would read every pack as one.
+        let packs_dir = tempfile::tempdir().unwrap();
+        let entry = evaluate(
+            PackKind::Songs,
+            &remote("https://"),
+            packs_dir.path(),
+            &Installed::default(),
+            &engine(),
+        );
+        assert!(matches!(entry.status, PackStatus::Unusable(_)), "{:?}", entry.status);
+        assert_ne!(entry.root, packs_dir.path());
+        assert!(parse_repo_input("https://", &[]).is_err());
     }
 
     #[test]

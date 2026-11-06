@@ -29,12 +29,15 @@ pub enum RepoSpec {
 pub enum SpecError {
     #[error("{0:?} is not a repository address Harmonicon can use (https, ssh or file)")]
     UnsupportedUrl(String),
+    #[error("{0:?} names no repository")]
+    NoName(String),
 }
 
 impl RepoSpec {
     /// Refuses addresses whose scheme could reach something other than a git
     /// remote (`ext::` runs commands in stock git; plain `http` is sent in
-    /// the clear).
+    /// the clear), and one with nothing after its scheme to name a
+    /// directory by (`https://`) — see [`Self::checkout_dir`].
     pub fn validate(&self) -> Result<(), SpecError> {
         match self {
             RepoSpec::Local { .. } => Ok(()),
@@ -42,9 +45,34 @@ impl RepoSpec {
                 let ok =
                     ["https://", "ssh://", "file://"].iter().any(|scheme| url.starts_with(scheme))
                         || is_scp_like(url);
-                if ok { Ok(()) } else { Err(SpecError::UnsupportedUrl(url.clone())) }
+                if !ok {
+                    Err(SpecError::UnsupportedUrl(url.clone()))
+                } else if slug_of(url).is_empty() {
+                    Err(SpecError::NoName(url.clone()))
+                } else {
+                    Ok(())
+                }
             }
         }
+    }
+
+    /// Where this repository's checkout lives under `packs_root`, or an
+    /// error for an address whose [`slug`](Self::slug) is empty.
+    ///
+    /// **Every path built from a slug must come through here.** An empty
+    /// slug joins to `packs_root` itself, so installing would treat the
+    /// whole packs directory as this pack's checkout and uninstalling would
+    /// delete every pack. [`validate`](Self::validate) refuses such an
+    /// address when one is typed, but a spec can also arrive from a
+    /// hand-edited config file.
+    pub fn checkout_dir(&self, packs_root: &Path) -> Result<PathBuf, SpecError> {
+        // A local slug always starts `local-`; only a remote's can be empty.
+        if let RepoSpec::Remote { url, .. } = self
+            && slug_of(url).is_empty()
+        {
+            return Err(SpecError::NoName(url.clone()));
+        }
+        Ok(packs_root.join(self.slug()))
     }
 
     /// The directory name this repository installs under. Derived from the
@@ -154,6 +182,24 @@ mod tests {
             let s = remote(hostile).slug();
             assert!(!s.contains('/') && !s.starts_with('.'), "{s}");
         }
+    }
+
+    #[test]
+    fn an_address_naming_nothing_gets_no_directory() {
+        // Each slugs to "", which joined to the packs root *is* the packs
+        // root: uninstalling one would delete every pack.
+        let root = Path::new("/packs");
+        for empty in ["https://", "https://...", "https://---/", "file:///"] {
+            let spec = remote(empty);
+            assert!(matches!(spec.validate(), Err(SpecError::NoName(_))), "{empty}");
+            assert!(spec.checkout_dir(root).is_err(), "{empty}");
+            let with_ref = RepoSpec::Remote { url: empty.into(), git_ref: Some("v1".into()) };
+            assert!(with_ref.checkout_dir(root).is_err(), "{empty} with a ref");
+        }
+        let fine = remote("https://h/a/b");
+        assert_eq!(fine.checkout_dir(root).unwrap(), root.join(fine.slug()));
+        let local = RepoSpec::Local { path: "...".into() };
+        assert_ne!(local.checkout_dir(root).unwrap(), root);
     }
 
     #[test]
