@@ -55,7 +55,7 @@ fn cursor_beat(normalized: Option<Vec2>, width: f32, spacing: f32) -> Option<f64
     // Bevy's node coordinates are centred: -0.5 is the left edge,
     // +0.5 the right edge. Convert to a left-based score coordinate.
     let x = (normalized?.x + 0.5) * width;
-    Some(((x - music_score::score_beat_x(0.0, spacing)) / spacing.max(1.0)).max(0.0) as f64)
+    Some(((x - music_score::full_score::score_beat_x(0.0, spacing)) / spacing.max(1.0)).max(0.0) as f64)
 }
 
 #[derive(bevy::ecs::system::SystemParam)]
@@ -113,7 +113,7 @@ pub(super) fn update_pause_score(
         .map(|section| time_beat(section.end_time, chart))
         .chain(notes.0.iter().map(|n| n.start_beat + n.duration_beats))
         .fold(1.0, f64::max);
-    let width = music_score::score_beat_x(end, spacing.0) + 80.0;
+    let width = music_score::full_score::score_beat_x(end, spacing.0) + 80.0;
     let grand =
         matches!(chart.instrument(), Some(harmonicon_core::instrument::Instrument::Piano(_)));
     let score_height = music_score::PANEL_HEIGHT * if grand { 2.0 } else { 1.0 };
@@ -181,11 +181,11 @@ pub(super) fn update_pause_score(
                             ))
                             .with_children(|band| {
                                 for (index, section) in adaptive.sections.iter().enumerate() {
-                                    let left = music_score::score_beat_x(
+                                    let left = music_score::full_score::score_beat_x(
                                         time_beat(section.start_time, chart),
                                         spacing.0,
                                     );
-                                    let right = music_score::score_beat_x(
+                                    let right = music_score::full_score::score_beat_x(
                                         time_beat(section.end_time, chart),
                                         spacing.0,
                                     );
@@ -222,7 +222,7 @@ pub(super) fn update_pause_score(
                                     });
                                 }
                             });
-                        let score = music_score::spawn_full_score(content, &bravura, grand, end);
+                        let score = music_score::full_score::spawn_full_score(content, &bravura, grand, end);
                         if let Some(instrument) = chart.instrument() {
                             music_score::apply_instrument_clef(content, score, instrument.kind());
                         }
@@ -278,7 +278,7 @@ pub(super) fn update_pause_score(
         *was_paused = false;
         return;
     }
-    let x = music_score::score_beat_x(playhead.0, spacing.0);
+    let x = music_score::full_score::score_beat_x(playhead.0, spacing.0);
     for mut node in &mut positions.p0() {
         node.width = Val::Px(width);
     }
@@ -327,9 +327,9 @@ pub(super) fn update_pause_score(
     for mut node in &mut positions.p2() {
         node.display = if range.is_some() { Display::Flex } else { Display::None };
         if let Some((a, b)) = range {
-            let left = music_score::score_beat_x(a, spacing.0);
+            let left = music_score::full_score::score_beat_x(a, spacing.0);
             node.left = Val::Px(left);
-            node.width = Val::Px(music_score::score_beat_x(b, spacing.0) - left);
+            node.width = Val::Px(music_score::full_score::score_beat_x(b, spacing.0) - left);
         }
     }
     let current_width = viewports
@@ -369,7 +369,7 @@ mod tests {
     fn selection_band_uses_the_same_beat_origin_as_notation() {
         let width = 1000.0;
         let spacing = 40.0;
-        let x = music_score::score_beat_x(4.0, spacing);
+        let x = music_score::full_score::score_beat_x(4.0, spacing);
         assert!(
             (cursor_beat(Some(Vec2::new(x / width - 0.5, 0.0)), width, spacing).unwrap() - 4.0)
                 .abs()
@@ -383,7 +383,7 @@ mod tests {
         let spacing = 40.0;
         let width = 2000.0;
         for beat in [2.0, 8.0, 20.0, 32.0, 44.0] {
-            let x = music_score::score_beat_x(beat, spacing);
+            let x = music_score::full_score::score_beat_x(beat, spacing);
             let normalized = Vec2::new(x / width - 0.5, 0.0);
             let actual = cursor_beat(Some(normalized), width, spacing).unwrap();
             assert!((actual - beat).abs() < 0.001, "beat {beat} became {actual}");
@@ -391,7 +391,9 @@ mod tests {
         // Scrolling changes the point's screen coordinate, not its
         // normalized position within the full score content.
         let scroll = 700.0;
-        let screen_x = 156.0;
+        // Beat 20's screen position at that scroll, from the score's own
+        // geometry rather than a copy of its left margin.
+        let screen_x = music_score::full_score::score_beat_x(20.0, spacing) - scroll;
         let normalized = Vec2::new((scroll + screen_x) / width - 0.5, 0.0);
         assert!((cursor_beat(Some(normalized), width, spacing).unwrap() - 20.0).abs() < 0.001);
     }
