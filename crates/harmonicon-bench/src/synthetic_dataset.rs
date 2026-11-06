@@ -7,7 +7,7 @@
 //! Driven by the `gen_synthetic_dataset` binary
 //! (`src/bin/gen_synthetic_dataset.rs`).
 //!
-//! This is a stand-in for the real thing, not a replacement: `Harmonica
+//! This is a stand-in for the real thing, not a replacement: `Harmonicon
 //! Note Detection Roadmap.md`'s "Immediate Next Step" calls for *recorded*
 //! coverage of every note/bend/chord/octave, and a synthesized reed is far
 //! cleaner than a real one (no room, no mic coloration, no embouchure

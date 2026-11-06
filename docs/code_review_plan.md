@@ -360,6 +360,14 @@ lock); this crate adapts its model. Findings:
   sanitizing, symlink refusal, staged swap with rollback, compatibility
   rules (pre-releases match their release), corrupt `installed.json`.
 
+### 5. `harmonicon-bench` — done 2026-11-06
+
+Light pass, as planned. Datasets are deterministic (the core synth's
+noise is a fixed-seed LCG) and `GAP_SECS` is held above twice the timing
+tolerance by a compile-time assert. Only a docs fix: two references to
+`Harmonicon Note Detection Roadmap.md` misspelled it as "Harmonica…",
+and one called it not checked in.
+
 ### Carried into later sessions
 
 Found while making `cargo clippy --all-targets -- -D warnings` pass again

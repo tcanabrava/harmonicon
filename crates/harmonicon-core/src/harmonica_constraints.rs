@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 
 //! Post-detection harmonica-constraint filtering — the "Harmonica
-//! Constraint Solver" stage from `Harmonica Note Detection Roadmap.md`
-//! (repo root, not checked in): a harmonica's reed plate only responds to
+//! Constraint Solver" stage from `Harmonicon Note Detection Roadmap.md`
+//! (repo root): a harmonica's reed plate only responds to
 //! one wind direction at a time, so a raw detector's simultaneous
 //! candidate pitch set (e.g. `PitchAlgorithm::Nmf`'s activations) can
 //! still contain a physically impossible mix — a pitch only reachable by
