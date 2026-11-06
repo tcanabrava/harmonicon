@@ -59,7 +59,7 @@ pub enum GameplayMode {
 }
 
 /// The 12-bar variant Jam Session's grid/hole-map/(for a generated jam)
-/// backing audio all follow — see `song::harmonica::Progression`. Only ever
+/// backing audio all follow — see `harmonicon_core::harmonica::Progression`. Only ever
 /// anything but `Standard` for a "Generate Jam" session (`menu::
 /// jam_generate` sets it explicitly on Start); the real-song "Jam Session"
 /// button resets it to `Standard` so a previous generated jam's pick can't
@@ -69,7 +69,7 @@ pub enum GameplayMode {
 pub struct JamProgression(pub Progression);
 
 /// The scale Jam Session's live hole-map feedback (`jam::session::
-/// JamHoleGuide`) judges played notes against — see `song::chart::Scale`.
+/// JamHoleGuide`) judges played notes against — see `harmonicon_core::chart::Scale`.
 /// Defaults to `FirstPosition` (the blues hexatonic). Set explicitly by
 /// "Generate Jam" (`menu::jam_generate`) and by a jam-based lesson's
 /// `scale` manifest field (`menu::pages::lesson_reader::parse_scale`); the

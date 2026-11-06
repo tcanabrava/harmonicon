@@ -50,7 +50,7 @@ load-bearing about *this* crate.
   their matching core constructors; `bending_profile` round-trips the
   diatonic tuning and `harmonica.holes` round-trips the chromatic size.
   The actual MIDI-file *parsing* (tempo map, note on/off pairing, track
-  names) is pure, shared code in `song::midi`, kept separate from any
+  names) is pure, shared code in `harmonicon_core::midi_file`, kept separate from any
   pitch-to-harp resolution: picking a `.mid`/`.midi` file lists its tracks in a
   dynamically-rebuilt `dialogs::combobox` (rebuilt only on a fresh file
   load — `MidiFileLoaded` — not on every track pick, so selecting doesn't
@@ -556,7 +556,7 @@ load-bearing about *this* crate.
   an integer tick on a 4-ticks-per-beat grid at all, which is why this
   needed a resolution change rather than a snapping tweak. This is
   forward-only: a chart's own `timing.resolution` is self-describing and
-  every tick/time conversion (`song::chart::tick_to_seconds`/
+  every tick/time conversion (`harmonicon_core::chart::tick_to_seconds`/
   `seconds_to_tick`) already takes a chart's resolution as an explicit
   parameter rather than hardcoding the constant, so existing bundled
   charts (still at `resolution: 4`) load and play unchanged — only new
@@ -849,11 +849,11 @@ load-bearing about *this* crate.
 - **The Song Editor supports a real variable tempo map**, not just one
   flat BPM: `EditorState::tempo_changes: Vec<(usize, f32)>` (tick, BPM)
   plus the fixed BPM-field-derived point at tick 0, combined via
-  `state::build_tempo_map` into a `song::chart::TempoPoint` list — the
+  `state::build_tempo_map` into a `harmonicon_core::chart::TempoPoint` list — the
   same type gameplay's own chart-driven tempo map already uses, so
   editor and engine share one tick↔seconds representation
   (`tick_to_seconds`, and its new inverse `seconds_to_tick`, both in
-  `song::chart`). A Tempo timeline tool
+  `harmonicon_core::chart`). A Tempo timeline tool
   (`TimelineTool::Tempo`, alongside Select/Erase/Remove in the same
   mod-panel row) turns a click on the beat ruler into
   `state::toggle_tempo_point`: click near an existing point removes it,

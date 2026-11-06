@@ -793,7 +793,7 @@ fn wah_cycles_through_rates_and_caps_at_none() {
 
 #[test]
 fn overblow_only_on_holes_with_a_reed_to_overblow() {
-    // `song::harmonica::hole_notes` only defines an overblow reed for
+    // `harmonicon_core::harmonica::hole_notes` only defines an overblow reed for
     // 1/4/5/6 — `state::overblow_ok` must agree exactly, or a note tagged
     // `Overblow` on some other hole (holes 2/3 included: this codebase's
     // harp model, unlike some looser "any of 1-6" conventions, doesn't
@@ -1107,7 +1107,7 @@ fn note_freq_maps_holes_bends_and_key() {
     // G sits 7 semitones above C, but a real G Richter harp is a "low"
     // harp — its hole-1 blow is pitched *down* to G3 (a fourth below C4),
     // not up to G4 (a fifth above), so the octave-folded key offset is
-    // -5, not +7. See `song::harmonica::key_offset`.
+    // -5, not +7. See `harmonicon_core::harmonica::key_offset`.
     let g_harp = build_harp("G", HarmonicaKind::Diatonic);
     let g = note_freq(&note(1, Dir::Blow, HarpTechnique::Normal), &g_harp).unwrap();
     assert!(
@@ -1124,7 +1124,7 @@ fn note_freq_resolves_overblow_and_overdraw_from_the_correct_reed() {
     // Overblow note left at its default `Dir::Blow`. Overblow (holes
     // 1/4/5/6) always sounds a semitone above the *draw* reed, and
     // Overdraw (holes 7-10) a semitone above the *blow* reed, regardless
-    // of the note's own `dir` — see `song::harmonica::hole_notes`.
+    // of the note's own `dir` — see `harmonicon_core::harmonica::hole_notes`.
     let harp = build_harp("C", HarmonicaKind::Diatonic);
 
     // Hole 1: blow C4, draw D4 → overblow is D#4 (draw reed + 1), not
@@ -1257,7 +1257,7 @@ fn serialize_harpchart_is_valid_json_with_required_fields() {
     assert_eq!(chord["events"].as_array().unwrap().len(), 2);
 
     // Hole-2 blow is E4 on a C harp; key "G" is a low harp (see
-    // `song::harmonica::key_offset`), transposing it down a fourth to B3.
+    // `harmonicon_core::harmonica::key_offset`), transposing it down a fourth to B3.
     let single = &track[0];
     assert_eq!(single["events"][0]["note"], "B3");
 }

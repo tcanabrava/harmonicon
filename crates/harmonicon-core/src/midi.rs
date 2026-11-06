@@ -3,7 +3,7 @@
 /// The 12 chromatic pitch classes, always sharp-spelled — the one source of
 /// truth every note-name lookup/cycle in the crate should share instead of
 /// re-declaring its own copy (`note_to_midi`/`midi_to_note` below,
-/// `song::harmonica::semitone`'s transposition table, `audio_system::
+/// `harmonicon_core::harmonica::semitone`'s transposition table, `audio_system::
 /// pitch_detect`'s detected-pitch display, and the key pickers in
 /// `gameplay::bending_trainer`/`menu::jam_generate`).
 pub const NOTE_NAMES: [&str; 12] =

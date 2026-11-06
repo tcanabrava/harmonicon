@@ -267,7 +267,7 @@ mod tests {
         }
     }
 
-    // Richter C harp reference (see song::harmonica::{C_BLOW, C_DRAW}):
+    // Richter C harp reference (see harmonicon_core::harmonica::{C_BLOW, C_DRAW}):
     // hole 1: blow C4=60, draw D4=62, bend C#4=61 (draw-family), overblow D#4=63 (blow-family)
     // hole 2: blow E4=64, draw G4=67
     // hole 3: blow G4=67 (same pitch as hole 2's draw — an ordinary Richter overlap)

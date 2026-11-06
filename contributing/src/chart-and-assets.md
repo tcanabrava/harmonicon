@@ -11,12 +11,12 @@ and still load correctly.
 
 ## The chart format: `.harpchart`
 
-A chart is a JSON file (`song::chart::HarpChart`), validated at load
+A chart is a JSON file (`harmonicon_core::chart::HarpChart`), validated at load
 time against `assets/song_schema.dtd.json` via the `jsonschema` crate.
 Its top-level shape:
 
 - **`metadata`** — including `format_version`, checked (not just
-  descriptive) against `song::chart::CURRENT_FORMAT_VERSION`; a chart
+  descriptive) against `harmonicon_core::chart::CURRENT_FORMAT_VERSION`; a chart
   declaring a *newer* version than the running build understands is
   rejected with a clear "this chart needs a newer Harmonicon" message
   rather than failing confusingly downstream against a schema it wasn't
@@ -55,7 +55,7 @@ future removal the same way instead of repeating that gap.
 
 ### Migrating old charts on load
 
-`song::chart::migrate_chart_json` runs on the raw `serde_json::Value`
+`harmonicon_core::chart::migrate_chart_json` runs on the raw `serde_json::Value`
 **before** schema validation — migrating after would be too late, since a
 chart that fails validation never reaches typed deserialization at all.
 It walks an ordered list of `Migration { target_version, apply }` steps
@@ -212,7 +212,7 @@ bundled tree regardless of where the *song* itself came from.
 
 `midly`-based MIDI parsing appears in two places in the codebase with
 deliberately different responsibilities, both built on the same
-low-level, pure parsing module (`song::midi` — track names, tempo maps,
+low-level, pure parsing module (`harmonicon_core::midi_file` — track names, tempo maps,
 note on/off pairing, no pitch-to-harp resolution or chart-building logic
 at all):
 
@@ -228,6 +228,6 @@ at all):
   [Jam Session](jam-session-architecture.md) for how those stems become
   independently mutable playback.
 
-Both share `song::midi`'s parsing primitives, but neither depends on the
+Both share `harmonicon_core::midi_file`'s parsing primitives, but neither depends on the
 other — one produces chart *notes*, the other produces chart *audio*,
-and `song::midi` itself stays agnostic of which a given caller is doing.
+and `harmonicon_core::midi_file` itself stays agnostic of which a given caller is doing.

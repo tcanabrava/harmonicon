@@ -2,7 +2,7 @@
 
 //! A circle-of-fifths diagram: the 12 keys arranged so each neighbor is a
 //! perfect fifth away, with a reference harmonica key and its available
-//! `song::harmonica::Position`s highlighted — making visible the
+//! `harmonicon_core::harmonica::Position`s highlighted — making visible the
 //! relationship already driving `Position::interval_below_jam_key` (2nd
 //! position is one step clockwise around the circle from the harp's own
 //! key, 3rd is two steps, and so on). First used by the circle-of-fifths
@@ -51,7 +51,7 @@ pub fn circle_point(index: usize, total: usize, radius_frac: f32) -> (f32, f32) 
 /// Spawns a circle-of-fifths diagram highlighting `harp_key` (the
 /// reference harmonica's own key, placed at 12 o'clock) and, one step
 /// clockwise per `interval_below_jam_key` step, each of `positions` — pass
-/// `song::harmonica::Position::all()` for the full set. The diagram never
+/// `harmonicon_core::harmonica::Position::all()` for the full set. The diagram never
 /// hardcodes which positions exist: it reads each one's own
 /// `interval_below_jam_key` generically, so extending that enum needs no
 /// changes here.

@@ -7,7 +7,7 @@
 //! with at asset-load time — rather than duplicating decode logic.
 //!
 //! Placed against `EditorState`'s variable tempo map (`state::
-//! build_tempo_map`) via `song::chart::seconds_to_tick`/`tick_to_seconds`,
+//! build_tempo_map`) via `harmonicon_core::chart::seconds_to_tick`/`tick_to_seconds`,
 //! so a tempo-change point shifts the waveform's alignment exactly like it
 //! shifts note ticks on save/load.
 
@@ -90,7 +90,7 @@ impl MusicWaveform {
 /// The grid-space pixel x/width for waveform bucket `i` of `bucket_count`
 /// (evenly spanning `duration_secs`), against `tempo_map` — pure so
 /// "waveform time" to "grid pixel space" is directly testable without a
-/// loaded chart. Each bucket's start/end time is placed via `song::chart::
+/// loaded chart. Each bucket's start/end time is placed via `harmonicon_core::chart::
 /// seconds_to_tick`, so a tempo-change point shifts alignment exactly
 /// like it shifts note ticks.
 pub(super) fn waveform_bar_geometry(

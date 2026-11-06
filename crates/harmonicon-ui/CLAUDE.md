@@ -63,7 +63,7 @@ load-bearing about *this* crate.
     chart's tempo map or an editor's own tick resolution, so each of the
     three call sites converts its own time representation first: gameplay
     (`gameplay::music_score_bridge`) goes `ScheduledNote::time` (seconds)
-    through `song::chart::seconds_to_tick`; the Song Editor
+    through `harmonicon_core::chart::seconds_to_tick`; the Song Editor
     (`song_editor::music_score_bridge`) just divides its own
     already-tempo-independent `GridNote::tick` by `TICKS_PER_BEAT`.
     `highlighted` draws a note's own marks (head, stem, flag, dot,
@@ -127,7 +127,7 @@ load-bearing about *this* crate.
     SMuFL codepoints into that system.
   - **This surfaced a real, unrelated harp-model bug while testing**: the
     Song Editor's own `state::overblow_ok` allowed Overblow on holes 1–6,
-    but `song::harmonica::hole_notes` only defines a real overblow reed
+    but `harmonicon_core::harmonica::hole_notes` only defines a real overblow reed
     for 1/4/5/6 — holes 2/3 fell through the gap (the editor accepted the
     click, but no pitch existed anywhere downstream: scoring, playback,
     or this staff). Fixed `overblow_ok` to match `hole_notes` exactly.

@@ -83,15 +83,15 @@ pub(crate) fn note_class(note: &str) -> &str {
 }
 
 /// The four note classes of `quality`'s chord rooted on `chord_root` (root,
-/// 3rd, 5th, 7th — see `song::harmonica::chord_intervals`).
+/// 3rd, 5th, 7th — see `harmonicon_core::harmonica::chord_intervals`).
 fn chord_tone_classes(chord_root: &str, quality: ChordQuality) -> HashSet<String> {
     chord_intervals(quality).iter().map(|&n| semitone(chord_root, n)).collect()
 }
 
 /// Build the per-hole render data and the live-feedback lookup from the harp
-/// layout, the song key, its `progression` (see `song::harmonica::
+/// layout, the song key, its `progression` (see `harmonicon_core::harmonica::
 /// Progression` — `Standard` for a real-song jam, player-selected for a
-/// generated one), its `scale` (see `song::chart::Scale` — the caller
+/// generated one), its `scale` (see `harmonicon_core::chart::Scale` — the caller
 /// resolves the chart-vs-`JamScale` precedence; this function just applies
 /// whichever one it's given), and its tempo (needed to track which bar —
 /// and thus which chord — is currently sounding).

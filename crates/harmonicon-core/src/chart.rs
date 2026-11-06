@@ -528,10 +528,10 @@ pub enum BendingProfile {
     RichterStandard,
     CountryTuned,
     /// Standard Richter with hole 3's blow note raised a whole step — see
-    /// `song::harmonica::paddy_richter_harp`.
+    /// `harmonicon_core::harmonica::paddy_richter_harp`.
     PaddyRichter,
     /// Tonic minor triad on blow, natural-minor scale degrees on draw — see
-    /// `song::harmonica::natural_minor_harp`.
+    /// `harmonicon_core::harmonica::natural_minor_harp`.
     NaturalMinor,
 }
 
@@ -539,13 +539,13 @@ pub enum BendingProfile {
 /// note_in_scale`) — an explicit, chart-author-selectable choice instead of
 /// always assuming blues. `FirstPosition`/`SecondPosition`/`ThirdPosition`
 /// keep the blues-scale *shape* used everywhere else (Jam Session's hole
-/// map, `song::harmonica::blues_scale_classes`) but root it away from the
+/// map, `harmonicon_core::harmonica::blues_scale_classes`) but root it away from the
 /// harp's own key by the same semitone offsets `Position::harp_key` uses
 /// (0/7/2), applied upward from the harp key instead of downward from a
 /// separate jam key. `Major`/`MinorPentatonic`/`Country` are alternative
 /// *shapes*, always rooted on the harp's own key, for melodies that aren't
 /// blues-vocabulary at all. The interval math (`classes`/`label`/
-/// `from_label`) lives in an `impl Scale` block in `song::harmonica`,
+/// `from_label`) lives in an `impl Scale` block in `harmonicon_core::harmonica`,
 /// alongside `Position` and `blues_scale_classes`, which it reuses.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]

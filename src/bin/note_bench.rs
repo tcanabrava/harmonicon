@@ -36,7 +36,7 @@ use harmonicon_bench::note_bench::{
 };
 use harmonicon_core::wav::decode_wav_pcm16;
 use harmonicon_dsp::{PITCH_RANGE_MARGIN_SEMITONES, PitchAlgorithm, PitchRange};
-use harmonicon_song::song::chart::HarpChart;
+use harmonicon_core::chart::HarpChart;
 use std::path::{Path, PathBuf};
 
 fn main() {

@@ -140,7 +140,7 @@ fn unparsable_profile_entries_are_dropped_not_fatal() {
 // `key_offset` is now `harmonicon_core::harmonica::key_offset` — its
 // octave-folding behaviour is tested there, not duplicated here.
 // `richter_harp`'s own reference layout (C/D/G hole-1 pitches) is tested
-// once, centrally, in `song::harmonica::tests` — not duplicated here; this
+// once, centrally, in `harmonicon_core::harmonica::tests` — not duplicated here; this
 // module's own tests below only care that bending-trainer logic built atop
 // `richter_harp` (target resolution, valid targets, hints) behaves
 // correctly, not that `richter_harp` itself is correct.

@@ -25,7 +25,7 @@ load-bearing about *this* crate.
     old charts on a fresh install; `chart::migrate_chart_json` (below)
     fixes that one retroactively.
   - **Old charts self-heal on load, they aren't rewritten on disk.**
-    `song::chart::migrate_chart_json` runs on the raw JSON `Value` *before*
+    `harmonicon_core::chart::migrate_chart_json` runs on the raw JSON `Value` *before*
     schema validation (a chart that fails validation never reaches typed
     deserialization, so migrating after would be too late) — a small
     ordered list of `Migration { target_version, apply }` steps, each
@@ -47,7 +47,7 @@ load-bearing about *this* crate.
     `.harpchart` file on disk (a re-save through the Song Editor would,
     naturally, since it serializes current in-memory state).
   - `metadata.format_version` is actively checked, not just descriptive:
-    `song::chart::CURRENT_FORMAT_VERSION` is the newest version this
+    `harmonicon_core::chart::CURRENT_FORMAT_VERSION` is the newest version this
     build's loader understands, and `song::loader` rejects (with a clear
     `SongLoadError::Validation` message, via the pure
     `chart::format_version_supported`) any chart declaring a *newer*
@@ -91,7 +91,7 @@ load-bearing about *this* crate.
     lanes/overlays/editor everywhere (never hardcode 10), and
     `Modifier::Slide` is onset-validated like overblow/overdraw. BendingTrainer is
     diatonic-only by design.
-  - `Song::feel: Option<song::chart::Feel>` (`Straight`/`Shuffle`) declares
+  - `Song::feel: Option<harmonicon_core::chart::Feel>` (`Straight`/`Shuffle`) declares
     the metronome subdivision a chart is written for; `None` (the common
     case — most charts don't set it) leaves the player's current metronome
     feel choice untouched rather than forcing straight.

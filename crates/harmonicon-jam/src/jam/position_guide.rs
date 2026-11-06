@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 
 //! A live circle-of-fifths "position compass" for Jam Session: shows the
-//! equipped harp's own key and which `song::harmonica::Position` its
+//! equipped harp's own key and which `harmonicon_core::harmonica::Position` its
 //! currently-active `Scale` corresponds to (see `dialogs::circle_of_fifths`
 //! for the diagram itself). Two uses share this one widget:
 //!
@@ -11,7 +11,7 @@
 //! - **A playable lesson mechanic**, opted into per-lesson via
 //!   `LessonManifest::position_cycle`: [`cycle_position`] periodically walks
 //!   `JamScale` through `First`/`Second`/`Third` position (the three
-//!   `song::chart::Scale` variants with a matching `Position` — blues-
+//!   `harmonicon_core::chart::Scale` variants with a matching `Position` — blues-
 //!   hexatonic pitch classes rooted at the jam key +0/+7/+2 semitones, i.e.
 //!   the practical, *stay-on-one-harp* meaning of "switching position"), and
 //!   [`on_position_called`] both re-highlights the compass and patches
@@ -169,7 +169,7 @@ fn spawn_position_caption(
 
 /// Spawns the live position compass in Jam Session, as a child of `parent`.
 /// A no-op when `harp_key` can't be determined (nothing meaningful to show —
-/// same fallback spirit as `song::harmonica::harp_banner`). When `position`
+/// same fallback spirit as `harmonicon_core::harmonica::harp_banner`). When `position`
 /// is `None` (a hand-authored chart that never declared one), the container
 /// still spawns — tagged so a later `position_cycle` lesson can fill it in —
 /// just with nothing inside it yet.

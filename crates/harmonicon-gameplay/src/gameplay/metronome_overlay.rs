@@ -13,7 +13,8 @@ use bevy::{
 use harmonicon_app::app::{AppState, SelectedSong};
 use harmonicon_audio::AudioSettings;
 use harmonicon_platform::localization::{Localization, LocalizationExt};
-use harmonicon_song::song::{SongManifest, chart::Feel};
+use harmonicon_core::chart::Feel;
+use harmonicon_song::song::SongManifest;
 pub use harmonicon_ui::dialogs::metronome::{
     MetronomeFeel, click_for_tick, is_downbeat, tick_index,
 };

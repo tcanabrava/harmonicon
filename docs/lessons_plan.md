@@ -170,7 +170,7 @@ scale-based jam lessons no longer require a manual manifest edit.
 One lesson, `circle-of-fifths` (`04_scales/06_circle_of_fifths`) —
 instructional only, no chart, no pass criteria (Mark-as-Done). Makes
 visible a relationship the engine already runs on but never showed: a
-harmonica position (`song::harmonica::Position`) *is* a step count around
+harmonica position (`harmonicon_core::harmonica::Position`) *is* a step count around
 the circle of fifths — `interval_below_jam_key`'s existing 0/7/2 values
 for 1st/2nd/3rd are exactly 0/1/2 fifths, just expressed in semitones.
 
@@ -193,7 +193,7 @@ Two new pieces, both generic (not lesson-specific):
   own body text does exactly that) rather than embedding one. This is the
   first lesson with real embedded visual content.
 
-Alongside it, `song::harmonica::Position` grew three more variants —
+Alongside it, `harmonicon_core::harmonica::Position` grew three more variants —
 `Fourth`/`Fifth`/`Twelfth`, the next most commonly taught blues/jazz
 positions beyond 1st–3rd (confirmed formula: position *N* sits
 `((N-1) * 7) mod 12` semitones below the jam key, `Twelfth` being one step
@@ -215,7 +215,7 @@ it.
 - **`jam::position_guide`** — a live "position compass" (reusing
   `dialogs::circle_of_fifths` as-is) always spawned by `jam::session::setup`
   next to the harmonica bend diagram, showing the equipped harp's own key
-  (detected from its hole-1 blow note — `song::harmonica::detected_harp_key`,
+  (detected from its hole-1 blow note — `harmonicon_core::harmonica::detected_harp_key`,
   factored out of `harp_banner` so both share it) and whichever `Position`
   the loaded chart declares.
 - **`LessonManifest::position_cycle`** (a new schema-enforced boolean, seeded
@@ -246,7 +246,7 @@ needed zero further engine changes, only content:
 | Lesson (id, folder) | Scoreable? | Mechanism | Prereq | Pass |
 |---|---|---|---|---|
 | **Swing eighths** (`swing-eighths`, `01_swing_eighths`) — swung-eighth drills at a tighter timing window than `shuffle-feel`, alternating a 4-hole and a 5-hole blow/draw pair | **Scored** | `feel: shuffle` + tighter per-chart windows (100/220/380ms vs. `shuffle-feel`'s 150/350/550), zero engine work | `shuffle-feel` (Unit 2) | accuracy ≥ 0.6 |
-| **ii-V-I chord tones** (`ii-v-i-chord-tones`, `02_ii_v_i_chord_tones`) — the Dm7-G7-Cmaj7 turnaround in C, each chord arpeggiated low to high | **Scored** | Plain chart, notes computed from `song::harmonica::ii_v_i_chords("C", false)`; reuses `deep-bends`'s whole-step draw bends for F/A | `swing-eighths`, `deep-bends` (Unit 1) | accuracy ≥ 0.6 |
+| **ii-V-I chord tones** (`ii-v-i-chord-tones`, `02_ii_v_i_chord_tones`) — the Dm7-G7-Cmaj7 turnaround in C, each chord arpeggiated low to high | **Scored** | Plain chart, notes computed from `harmonicon_core::harmonica::ii_v_i_chords("C", false)`; reuses `deep-bends`'s whole-step draw bends for F/A | `swing-eighths`, `deep-bends` (Unit 1) | accuracy ≥ 0.6 |
 | **The jazz blues form** (`jazz-blues-form`, `03_jazz_blues_form`) — open jam over the full jazz-blues progression (a real ii-V-I turnaround in the last few bars) | **Scored via proxy** | `PassCriteria::ChordToneAdherence` + existing `progression: "jazz-blues"` field — the same mechanism `minor-blues-improv`/`quick-change-improv` already use, just a different `Progression` value | `ii-v-i-chord-tones`, `chord-tone-improv` (Unit 3) | chord-tone fraction ≥ 0.4 |
 | **Chromatic slide basics** (`chromatic-slide-basics`, `04_chromatic_slide_basics`) — a full ascending/descending chromatic scale on a 12-hole chromatic harp, computed directly from the chromatic layout tables (not transcribed) | **Scored** | `Modifier::Slide` onset scoring, already built; first bundled chromatic lesson content | `swing-eighths` | technique `slide` ≥ 0.5 |
 

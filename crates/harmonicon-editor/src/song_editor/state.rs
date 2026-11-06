@@ -556,7 +556,7 @@ impl EditorState {
     /// The full tempo map (sorted, always starting at tick 0), built from
     /// the song's opening tempo (`tempo`) and any [`EditorState::
     /// tempo_changes`] — the representation every tick↔real-time
-    /// conversion in the editor reads, via `song::chart::
+    /// conversion in the editor reads, via `harmonicon_core::chart::
     /// tick_to_seconds`/`seconds_to_tick`. See [`build_tempo_map`].
     pub(super) fn tempo_map(&self) -> Vec<harmonicon_core::chart::TempoPoint> {
         build_tempo_map(&self.tempo, &self.tempo_changes)
@@ -883,7 +883,7 @@ pub(super) const WAH_HZ_STEP: f32 = 1.0;
 
 pub(super) use harmonicon_core::pitch_map::max_bend;
 
-/// Matches `song::harmonica::hole_notes`'s `over` field exactly — holes
+/// Matches `harmonicon_core::harmonica::hole_notes`'s `over` field exactly — holes
 /// 1/4/5/6 only, or the pitch resolves to nothing downstream.
 pub(super) use harmonicon_core::pitch_map::overblow_ok;
 
@@ -891,7 +891,7 @@ pub(super) use harmonicon_core::pitch_map::overdraw_ok;
 
 /// The breath direction `pitch` physically requires, if any — `Overblow`
 /// only exists while *blowing*, `Overdraw` only while *drawing*, regardless
-/// of which reed the resulting pitch sits near (`song::harmonica::
+/// of which reed the resulting pitch sits near (`harmonicon_core::harmonica::
 /// hole_notes`: overblow sounds a semitone above the *draw* reed, overdraw
 /// above the *blow* reed — the technique name is about breath action, not
 /// reed). `Slide` has no such constraint, and a `Bend`'s breath depends on
@@ -1071,7 +1071,7 @@ pub(super) fn note_rect(note: &GridNote, row: usize, rows: u8) -> (f32, f32, f32
 /// song's opening tempo (`tempo`, the `Field::Tempo` text value) and any
 /// additional tempo-change points (`tempo_changes`, added via the
 /// timeline's Tempo tool) — the representation every tick↔real-time
-/// conversion in the editor reads, via `song::chart::
+/// conversion in the editor reads, via `harmonicon_core::chart::
 /// tick_to_seconds`/`seconds_to_tick`. Ticks are the editor's own tick unit
 /// (`TICKS_PER_BEAT` per beat), which is exactly the `resolution` the
 /// editor writes to a saved chart's `timing.resolution`

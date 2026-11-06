@@ -47,7 +47,7 @@ pub(super) mod glyph {
 /// tick resolution; every caller converts its own time representation into
 /// beats before handing notes over (see each call site: `song_editor`'s
 /// ticks are already tempo-independent multiples of a beat; gameplay's
-/// `ScheduledNote::time` in seconds goes through `song::chart::
+/// `ScheduledNote::time` in seconds goes through `harmonicon_core::chart::
 /// seconds_to_tick` first). `midi` is the actual sounded pitch (bends/
 /// overblow/overdraw/slide already resolved) — the same identity every
 /// other pitch comparison in the codebase uses.

@@ -4,7 +4,8 @@ use bevy::prelude::*;
 
 use harmonicon_app::app::{AppState, GameplayMode, JamProgression, SelectedSong};
 use harmonicon_platform::theme::LoadedTheme;
-use harmonicon_song::song::{SongManifest, harmonica::Progression};
+use harmonicon_core::harmonica::Progression;
+use harmonicon_song::song::SongManifest;
 use harmonicon_ui::dialogs::twelve_bar_grid::{BarCell, bar_bg};
 pub use harmonicon_ui::dialogs::twelve_bar_grid::{GridConfig, spawn_12_bar_grid};
 

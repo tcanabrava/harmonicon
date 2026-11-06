@@ -317,7 +317,7 @@ recording/practice status).
 ## Where MIDI enters: import, not runtime backing
 
 The Song Editor's `midi_import.rs` is the *authoring*-side use of MIDI
-files, distinct from — but built on the same underlying `song::midi`
+files, distinct from — but built on the same underlying `harmonicon_core::midi_file`
 parsing primitives as — the *runtime* MIDI-backing feature described in
 [Jam Session](jam-session-architecture.md). Picking a MIDI file lists
 its tracks in a combobox; picking a track quantizes its notes onto the

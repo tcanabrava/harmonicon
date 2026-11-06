@@ -111,7 +111,7 @@ pub(super) fn note_midi(
 /// Ticks-to-seconds for `state.tempo` — the flat nominal-BPM conversion
 /// Play/Practice/Record all need before turning tick positions into real
 /// time. Deliberately not the real multi-point tempo map (`state::
-/// EditorState::tempo_map`/`song::chart::tick_to_seconds`) — audio synthesis
+/// EditorState::tempo_map`/`harmonicon_core::chart::tick_to_seconds`) — audio synthesis
 /// stays on one constant tempo (see `CLAUDE.md`).
 pub(super) fn secs_per_tick(state: &EditorState) -> f32 {
     let bpm = state.tempo.trim().parse::<f32>().unwrap_or(120.0).max(1.0);

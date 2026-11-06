@@ -103,7 +103,7 @@ mod tests {
     fn audition_wav_is_none_for_an_unproducible_note() {
         let harp = richter_harp("C");
         // Neither overblow nor overdraw exists on hole 2 — the blow/draw
-        // gap there is too narrow (`song::harmonica::hole_notes`'s `over`
+        // gap there is too narrow (`harmonicon_core::harmonica::hole_notes`'s `over`
         // is `None` for any hole outside 1/4/5/6/7–10) — so this checks
         // `audition_wav` defends itself against an unproducible note
         // rather than assuming a caller only ever passes it a valid one.

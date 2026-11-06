@@ -49,7 +49,7 @@ pub const SAMPLE_RATE: u32 = 44_100;
 /// shuffle feel is a triplet subdivision, not a straight-16th grid). This
 /// only changes what resolution the editor writes into *new* saves; a
 /// chart's own `timing.resolution` field is self-describing and every
-/// tick/time conversion (`song::chart::tick_to_seconds`/`seconds_to_tick`)
+/// tick/time conversion (`harmonicon_core::chart::tick_to_seconds`/`seconds_to_tick`)
 /// already takes it as an explicit parameter, so existing bundled charts
 /// (still at `resolution: 4`) need no migration.
 pub const TICKS_PER_BEAT: usize = 12;

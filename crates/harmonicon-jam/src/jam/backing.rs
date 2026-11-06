@@ -156,7 +156,7 @@ pub struct JamGenre(pub Genre);
 /// to whatever chord root is sounding: root, root, 5th, 5th, flat-7th,
 /// flat-7th, 5th, flat-7th — 8 slots per bar. Quality-agnostic like every
 /// pattern below: root/5th/flat-7th are shared between a dominant-7th and
-/// minor-7th chord (`song::harmonica::chord_intervals`) — only the 3rd
+/// minor-7th chord (`harmonicon_core::harmonica::chord_intervals`) — only the 3rd
 /// differs, and none of these patterns ever play one.
 const BLUES_PATTERN: [Option<i32>; 8] =
     [Some(0), Some(0), Some(7), Some(7), Some(10), Some(10), Some(7), Some(10)];

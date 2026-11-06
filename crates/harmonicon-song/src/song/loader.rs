@@ -9,9 +9,9 @@ use bevy::{
 };
 use thiserror::Error;
 
-use super::{
-    BackingStemAudio, SongManifest, TrackChart,
-    chart::{CURRENT_FORMAT_VERSION, HarpChart, format_version_supported, migrate_chart_json},
+use super::{BackingStemAudio, SongManifest, TrackChart};
+use harmonicon_core::chart::{
+    CURRENT_FORMAT_VERSION, HarpChart, format_version_supported, migrate_chart_json,
 };
 use harmonicon_audio::waveform::{WAVEFORM_BUCKETS, bucket_peaks};
 use harmonicon_core::synth::SAMPLE_RATE;
