@@ -154,4 +154,15 @@ Each independently reviewable part receives a commit and relevant validation.
   passed, including enharmonic staff placement, key cancellation/reset,
   meter-change resets and the authored-spelling bridge. Relevant Clippy checks
   passed with warnings denied, and the dev build passed.
-- Steps 5–7 remain planned.
+- Step 5 model foundation: a Boehm soprano clarinet fingering chart for B♭
+  and A setups, explicitly limited to written E3–C6. Common left/right little-
+  finger alternatives have stable indices; controls represent finger contacts,
+  including separate thumb-hole and register-key controls.
+- Clarinet basic fingerings were checked against the Woodwind Fingering Guide’s
+  [chalumeau](https://www.wfg.woodwind.org/clarinet/cl_bas_1.html) and
+  [clarion](https://www.wfg.woodwind.org/clarinet/cl_bas_2.html) tables. Its register
+  rule is a twelfth, not the flute’s octave; throat B♭ is excluded from that drill.
+- Core validation: 445 tests passed and core Clippy passed with warnings denied.
+  Clarinet chart/setup selection, editor, trainer and gameplay integration are
+  still pending; clarinet is not yet offered as a selectable instrument.
+- Steps 6–7 remain planned.

@@ -21,6 +21,7 @@
 
 pub mod bass;
 pub mod cavaquinho;
+pub mod clarinet;
 pub mod flute;
 pub mod fretted_strings;
 pub mod guitar;
