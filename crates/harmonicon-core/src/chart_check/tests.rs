@@ -146,3 +146,18 @@ fn a_meter_map_must_run_forward() {
     );
     assert!(timing_problems(&backwards)[0].starts_with("timing.time_signature_map[1]"));
 }
+
+#[test]
+fn scoring_windows_must_nest() {
+    let windows = |perfect, good, miss| Scoring {
+        perfect_window_ms: perfect,
+        good_window_ms: good,
+        miss_window_ms: miss,
+        combo: None,
+        style_bonus: None,
+    };
+    assert!(scoring_problems(&windows(50, 100, 130)).is_empty());
+    assert!(scoring_problems(&windows(100, 100, 100)).is_empty(), "equal is allowed");
+    assert_eq!(scoring_problems(&windows(150, 100, 130)).len(), 1, "perfect wider than good");
+    assert_eq!(scoring_problems(&windows(50, 100, 80)).len(), 1, "miss inside good");
+}

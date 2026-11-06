@@ -300,9 +300,19 @@ pub(super) fn serialize_harpchart_notes(state: &EditorState, notes: &[GridNote])
     let positive_ms = |value: &str, fallback: u64| {
         value.trim().parse::<u64>().ok().filter(|value| *value > 0).unwrap_or(fallback)
     };
-    scoring["perfect_window_ms"] = json!(positive_ms(&state.perfect_window_ms, 60));
-    scoring["good_window_ms"] = json!(positive_ms(&state.good_window_ms, 120));
-    scoring["miss_window_ms"] = json!(positive_ms(&state.miss_window_ms, 220));
+    // Sorted, so the windows always nest perfect <= good <= miss: the loader
+    // refuses a chart whose windows don't (`chart_check::scoring_problems`),
+    // and an author typing one field at a time passes through orders that
+    // don't — the same reason the loop's end is ordered after its start.
+    let mut windows = [
+        positive_ms(&state.perfect_window_ms, 60),
+        positive_ms(&state.good_window_ms, 120),
+        positive_ms(&state.miss_window_ms, 220),
+    ];
+    windows.sort_unstable();
+    scoring["perfect_window_ms"] = json!(windows[0]);
+    scoring["good_window_ms"] = json!(windows[1]);
+    scoring["miss_window_ms"] = json!(windows[2]);
     let bounded = |value: &str, fallback: f64, minimum: f64| {
         value
             .trim()

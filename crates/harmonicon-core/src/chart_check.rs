@@ -1,26 +1,45 @@
 // SPDX-License-Identifier: MIT
 
 //! The rules a chart must follow that the schema can't state: its tempo and
-//! meter maps run in tick order, and its events fit the instrument it names
+//! meter maps run in tick order, its scoring windows nest, and its events
+//! fit the instrument it names
 //! (a harmonica chart's events name holes and a guitar chart's name strings
 //! and frets, and each instrument's techniques only make sense on it).
 //!
 //! Messages are for a chart author reading `validate-pack` output, not for
 //! a player, so they are plain English rather than localized.
 
-use crate::chart::{FretPosition, HarpChart, Modifier, NoteEvent, Timing};
+use crate::chart::{FretPosition, HarpChart, Modifier, NoteEvent, Scoring, Timing};
 use crate::instrument::flute::{FingeringAssignment, Flute};
 use crate::instrument::guitar::{FretAssignment, Guitar, StringTechnique};
 use crate::instrument::{Instrument, InstrumentModel, PlayPosition};
 use crate::midi::note_to_midi;
 
-/// Every rule `chart` breaks that its schema can't catch: [`timing_problems`]
-/// and [`instrument_problems`]. Empty for a sound chart. What a loader or
-/// validator should run.
+/// Every rule `chart` breaks that its schema can't catch:
+/// [`timing_problems`], [`scoring_problems`] and [`instrument_problems`].
+/// Empty for a sound chart. What a loader or validator should run.
 pub fn chart_problems(chart: &HarpChart) -> Vec<String> {
     let mut problems = timing_problems(&chart.timing);
+    problems.extend(scoring_problems(&chart.scoring));
     problems.extend(instrument_problems(chart));
     problems
+}
+
+/// Whether the judging windows nest: perfect within good within miss, the
+/// order `scoring::classify_note` tests them in. Out of order, a band of
+/// timings becomes unhittable (a miss window inside the good one marks a
+/// note missed while it still reads as on time) or a grade unreachable (a
+/// perfect window wider than the good one awards nothing but Perfect).
+pub fn scoring_problems(scoring: &Scoring) -> Vec<String> {
+    let (perfect, good, miss) =
+        (scoring.perfect_window_ms, scoring.good_window_ms, scoring.miss_window_ms);
+    if perfect <= good && good <= miss {
+        return Vec::new();
+    }
+    vec![format!(
+        "scoring windows must nest perfect <= good <= miss, but are {perfect}, {good} and \
+         {miss} ms"
+    )]
 }
 
 /// Where `timing`'s maps break the order every tick↔seconds conversion

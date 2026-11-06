@@ -1822,6 +1822,27 @@ fn non_grid_chart_settings_survive_load_and_save() {
 }
 
 #[test]
+fn typed_scoring_windows_are_saved_nested() {
+    // An author typing one field at a time passes through out-of-order
+    // values; the loader refuses windows that don't nest, so the editor
+    // must never write them.
+    let state = EditorState {
+        perfect_window_ms: "200".into(),
+        good_window_ms: "100".into(),
+        miss_window_ms: "150".into(),
+        ..EditorState::default()
+    };
+    let saved: serde_json::Value =
+        serde_json::from_str(&serialize_harpchart(&state)).expect("saved chart JSON");
+    assert_eq!(saved["scoring"]["perfect_window_ms"], 100);
+    assert_eq!(saved["scoring"]["good_window_ms"], 150);
+    assert_eq!(saved["scoring"]["miss_window_ms"], 200);
+    let scoring: harmonicon_core::chart::Scoring =
+        serde_json::from_value(saved["scoring"].clone()).expect("scoring block");
+    assert!(harmonicon_core::chart_check::scoring_problems(&scoring).is_empty());
+}
+
+#[test]
 fn chart_author_survives_when_it_differs_from_the_artist() {
     let mut source: serde_json::Value =
         serde_json::from_str(&serialize_harpchart(&EditorState::default())).unwrap();
