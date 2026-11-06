@@ -9,7 +9,6 @@ publish = false
 harmonicon-core = { path = "../harmonicon-core", version = "*" }
 harmonicon-platform = { path = "../harmonicon-platform", version = "*" }
 harmonicon-song = { path = "../harmonicon-song", version = "*" }
-figment = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 bevy = { workspace = true }

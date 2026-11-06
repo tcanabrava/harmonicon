@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: MIT
 
 //! Cross-session player progress: per-song best score/accuracy and total
-//! play time, persisted to `<config>/harmonicon/profile.json` — the same
-//! figment/serde pattern as `settings.rs`, but for progress data rather than
+//! play time, persisted to `<config>/harmonicon/profile.json` — read the same
+//! way as `settings.json` (`paths::load_json_over_defaults`), but for progress
+//! data rather than
 //! preferences. Unlike settings (which debounce a save on every UI change),
 //! profile writes are event-driven — one write per results-screen visit —
 //! so there's no debounce/dirty-flag machinery here, just a direct save
@@ -11,10 +12,6 @@
 //! otherwise saved mid-song.
 
 use bevy::prelude::*;
-use figment::{
-    Figment,
-    providers::{Format, Json, Serialized},
-};
 use serde::{Deserialize, Deserializer, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -408,22 +405,22 @@ pub struct FirstRun(pub bool);
 /// unskippable one that repeats forever is worse than none.
 ///
 /// Deliberately a file-existence check rather than "is `PlayerProfile`
-/// empty": `load_profile` merges through figment, which silently treats a
+/// empty": `load_profile` reads over the defaults, which silently treats a
 /// missing file the same as an empty one, and a player who has genuinely
 /// played nothing yet shouldn't be re-onboarded on their second launch.
 fn is_first_run() -> bool {
     profile_path().is_some_and(|path| !path.exists())
 }
 
+/// The player's records over the defaults. One field that no longer parses
+/// costs only that field, and the original file is kept beside it
+/// (`harmonicon_platform::paths::load_json_over_defaults`): the profile is
+/// saved again on exit, so a wholesale fallback to defaults would have
+/// erased every score, lesson pass and streak on the next quit.
 fn load_profile() -> PlayerProfile {
-    let mut figment = Figment::from(Serialized::defaults(PlayerProfile::default()));
-    if let Some(path) = profile_path() {
-        figment = figment.merge(Json::file(path));
-    }
-    figment.extract().unwrap_or_else(|err| {
-        warn!("Could not read profile ({err}); using defaults");
-        PlayerProfile::default()
-    })
+    profile_path()
+        .map(|path| harmonicon_platform::paths::load_json_over_defaults(&path))
+        .unwrap_or_default()
 }
 
 pub fn save_profile(profile: &PlayerProfile) {
@@ -806,6 +803,19 @@ mod training_tests {
             serde_json::from_str(r#"{"passed": true, "best_accuracy": 0.9, "attempts": 3}"#)
                 .unwrap();
         assert_eq!(old.review_due_day(), Some(0));
+    }
+
+    #[test]
+    fn one_unreadable_field_keeps_the_rest_of_the_records() {
+        // `lessons` holds a value no build can read; the scores beside it
+        // must survive rather than the whole profile resetting.
+        let (profile, dropped) = harmonicon_platform::paths::json_over_defaults::<PlayerProfile>(
+            r#"{"total_play_secs":120.0,"songs":{"a":{"best_score":42}},"lessons":"corrupt"}"#,
+        );
+        assert_eq!(profile.total_play_secs, 120.0);
+        assert_eq!(profile.songs["a"].best_score, 42);
+        assert!(profile.lessons.is_empty());
+        assert_eq!(dropped, vec!["lessons".to_string()]);
     }
 
     #[test]

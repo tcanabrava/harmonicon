@@ -10,10 +10,6 @@
 use bevy::ecs::system::SystemParam;
 use bevy::prelude::*;
 use bevy::window::{MonitorSelection, PrimaryWindow, WindowMode};
-use figment::{
-    Figment,
-    providers::{Format, Json, Serialized},
-};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
@@ -297,73 +293,16 @@ fn settings_path() -> Option<PathBuf> {
     super::paths::config_file("settings.json")
 }
 
-/// Defaults overlaid with whatever the file provides (missing file → defaults).
-///
-/// **One bad field costs that field, not the file.** The loaded values are
-/// saved back a moment after startup, so falling back to defaults wholesale
-/// would erase every preference, calibration and content source the moment
-/// one field stopped parsing — which a downgrade does (an older build
-/// meeting a `pitch_algorithm` a newer one wrote), as does a hand-edit typo.
-/// What can't be read is left out ([`settings_from_json`]), and the original
-/// file is copied aside first so nothing is lost even then.
+/// Defaults overlaid with whatever the file provides; see
+/// [`super::paths::load_json_over_defaults`] for why one bad field costs only
+/// that field.
 fn load_settings() -> Settings {
-    let Some(path) = settings_path() else {
-        return Settings::default();
-    };
-    let text = match std::fs::read_to_string(&path) {
-        Ok(text) => text,
-        Err(err) if err.kind() == std::io::ErrorKind::NotFound => return Settings::default(),
-        Err(err) => {
-            warn!("Could not read settings ({err}); using defaults");
-            return Settings::default();
-        }
-    };
-    let (settings, dropped) = settings_from_json(&text);
-    if !dropped.is_empty() {
-        let backup = path.with_extension("json.unreadable");
-        match std::fs::copy(&path, &backup) {
-            Ok(_) => warn!(
-                "Settings could not read {}; using defaults for those. The original file was \
-                 kept as {}",
-                dropped.join(", "),
-                backup.display()
-            ),
-            Err(err) => warn!(
-                "Settings could not read {}; using defaults for those (and could not keep a \
-                 copy: {err})",
-                dropped.join(", ")
-            ),
-        }
-    }
-    settings
+    settings_path().map(|path| super::paths::load_json_over_defaults(&path)).unwrap_or_default()
 }
 
-/// `text` (a `settings.json`) over the defaults, and the top-level fields
-/// that had to be left out, sorted. The whole file is tried first; only if
-/// that fails is it layered in one field at a time, keeping each that still
-/// extracts. Text that isn't a JSON object at all yields the defaults and
-/// `"(the whole file)"`.
+#[cfg(test)]
 fn settings_from_json(text: &str) -> (Settings, Vec<String>) {
-    let defaults = || Figment::from(Serialized::defaults(Settings::default()));
-    if let Ok(settings) = defaults().merge(Json::string(text)).extract() {
-        return (settings, Vec::new());
-    }
-    let Ok(serde_json::Value::Object(fields)) = serde_json::from_str(text) else {
-        return (Settings::default(), vec!["(the whole file)".to_string()]);
-    };
-    let mut figment = defaults();
-    let mut dropped = Vec::new();
-    for (key, value) in fields {
-        let one = serde_json::Value::Object([(key.clone(), value)].into_iter().collect());
-        let candidate = figment.clone().merge(Json::string(&one.to_string()));
-        if candidate.extract::<Settings>().is_ok() {
-            figment = candidate;
-        } else {
-            dropped.push(key);
-        }
-    }
-    dropped.sort();
-    (figment.extract().unwrap_or_default(), dropped)
+    super::paths::json_over_defaults(text)
 }
 
 fn save_settings(settings: &Settings) {
@@ -606,6 +545,10 @@ fn apply_fullscreen(
 
 #[cfg(test)]
 mod tests {
+    use figment::{
+        Figment,
+        providers::{Format, Json, Serialized},
+    };
     use super::*;
     use crate::localization::{Localization, LocalizationExt};
 
