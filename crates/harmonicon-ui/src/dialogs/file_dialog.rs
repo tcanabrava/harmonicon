@@ -18,6 +18,7 @@ use std::path::PathBuf;
 use bevy::input::ButtonState;
 use bevy::input::keyboard::KeyboardInput;
 use bevy::input_focus::tab_navigation::{TabGroup, TabIndex};
+use bevy::input_focus::{AutoFocus, InputFocus};
 use bevy::prelude::*;
 use bevy::ui_widgets::Activate;
 use bevy::ui_widgets::Button as WidgetButton;
@@ -211,6 +212,11 @@ fn handle_open(
                 BackgroundColor({PANEL_BG})
                 FileDialogList
                 ScrollArea
+                // Focus has to start inside the dialog, or Tab walks the page
+                // behind it (a modal TabGroup only keeps focus already in
+                // it). The list, not a button: a focused button activates on
+                // Space and Enter, which here are typed into the filename.
+                AutoFocus
                 --
                 Node {
                     display: {save_row_display},
@@ -425,6 +431,8 @@ fn sync_save_filename(
 /// **Save mode**: printable keys type into the filename field; Backspace removes
 /// the last character; Enter confirms; Esc cancels.
 fn dialog_keys(
+    focus: Res<InputFocus>,
+    buttons: Query<(), With<WidgetButton>>,
     mut keyboard: ResMut<ButtonInput<KeyCode>>,
     mut key_events: MessageReader<KeyboardInput>,
     mut dialog: ResMut<FileDialog>,
@@ -450,6 +458,10 @@ fn dialog_keys(
                 None,
             }
             let mut act = Act::None;
+            // A focused button handles Enter and Space itself (Activate);
+            // also acting on them here would close the dialog twice in one
+            // frame, or type a space while pressing the button.
+            let button_focused = focus.get().is_some_and(|e| buttons.contains(e));
 
             for ev in key_events.read() {
                 if ev.state != ButtonState::Pressed {
@@ -463,11 +475,13 @@ fn dialog_keys(
                             }
                         }
                     }
-                    bevy::input::keyboard::Key::Space => dialog.save_filename.push(' '),
+                    bevy::input::keyboard::Key::Space if !button_focused => {
+                        dialog.save_filename.push(' ');
+                    }
                     bevy::input::keyboard::Key::Backspace => {
                         dialog.save_filename.pop();
                     }
-                    bevy::input::keyboard::Key::Enter => {
+                    bevy::input::keyboard::Key::Enter if !button_focused => {
                         act = Act::Confirm;
                         break;
                     }
@@ -665,6 +679,47 @@ mod tests {
         assert!(dialog.pending_overwrite.is_none());
         assert_eq!(dialog.save_filename, "chart.harpchart");
         assert_eq!(world.query::<&Visibility>().single(&world).unwrap(), &Visibility::Inherited);
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    fn press(world: &mut World, key: bevy::input::keyboard::Key, key_code: KeyCode) {
+        world.write_message(KeyboardInput {
+            key_code,
+            logical_key: key,
+            state: ButtonState::Pressed,
+            text: None,
+            repeat: false,
+            window: Entity::PLACEHOLDER,
+        });
+    }
+
+    #[test]
+    fn a_focused_button_takes_enter_and_space_from_the_filename_field() {
+        use bevy::ecs::system::RunSystemOnce;
+        use bevy::input::keyboard::Key;
+        let (mut world, dir) = save_world("keys", false);
+        world.init_resource::<ButtonInput<KeyCode>>();
+        world.init_resource::<Messages<KeyboardInput>>();
+        world.init_resource::<Messages<RefreshFileList>>();
+        let button = world.spawn(WidgetButton).id();
+        world.insert_resource(InputFocus::from_entity(button));
+
+        // The button's own Activate handles these; acting on them here too
+        // would save (and close) a second time, or type into the name.
+        press(&mut world, Key::Space, KeyCode::Space);
+        press(&mut world, Key::Enter, KeyCode::Enter);
+        world.run_system_once(dialog_keys).unwrap();
+        assert!(world.resource::<Messages<FileChosen>>().is_empty());
+        assert_eq!(world.resource::<FileDialog>().save_filename, "chart.harpchart");
+
+        // With focus off the buttons, the field has them back.
+        world.insert_resource(InputFocus::default());
+        press(&mut world, Key::Space, KeyCode::Space);
+        world.run_system_once(dialog_keys).unwrap();
+        assert_eq!(world.resource::<FileDialog>().save_filename, "chart.harpchart ");
+        press(&mut world, Key::Enter, KeyCode::Enter);
+        world.run_system_once(dialog_keys).unwrap();
+        assert_eq!(world.resource::<Messages<FileChosen>>().len(), 1);
         std::fs::remove_dir_all(dir).unwrap();
     }
 
