@@ -47,9 +47,11 @@ fn translation_files(root: &Path, skip_curricula: bool) -> Vec<(LanguageIdentifi
             let path = entry.path();
             let is_dir = entry.file_type().is_ok_and(|t| t.is_dir());
             if is_dir && !entry.file_name().to_string_lossy().starts_with('.') {
-                if !skip_curricula
-                    || InstrumentKind::from_slug(&entry.file_name().to_string_lossy()).is_none()
-                {
+                // Curricula sit only at the pack's top level; deeper down a
+                // folder named `flute` is just a unit or lesson called that.
+                let is_curriculum = dir == root
+                    && InstrumentKind::from_slug(&entry.file_name().to_string_lossy()).is_some();
+                if !(skip_curricula && is_curriculum) {
                     stack.push(path);
                 }
             } else if !is_dir
@@ -208,6 +210,17 @@ mod tests {
         );
         assert_eq!(lookup(&harp, "en-US", "harp-only").as_deref(), Some("Harmonica"));
         assert!(lookup(&harp, "en-US", "flute-only").is_none());
+    }
+
+    #[test]
+    fn only_a_top_level_folder_is_taken_for_a_curriculum() {
+        // A legacy harmonica pack whose lesson folder happens to be "piano".
+        let pack = tempfile::tempdir().unwrap();
+        write(pack.path(), "02_styles/piano/locales/en-US.ftl", "piano-style = Piano\n");
+        write(pack.path(), "flute/locales/en-US.ftl", "flute-only = Flute\n");
+        let bundles = load_translation_scopes([(pack.path(), true)]);
+        assert_eq!(lookup(&bundles, "en-US", "piano-style").as_deref(), Some("Piano"));
+        assert!(lookup(&bundles, "en-US", "flute-only").is_none());
     }
 
     #[test]

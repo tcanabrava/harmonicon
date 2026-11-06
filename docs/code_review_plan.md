@@ -383,6 +383,42 @@ whole file **twice** (a frame count, then the peaks) at every song load.
 Gameplay only needs the duration, which the decoder can often report
 without a pass, and nothing reads `SongManifest::waveform`.
 
+### 7. `harmonicon-platform` — done 2026-11-06
+
+- **Bug, fixed `34af0da4`**: `load_settings` fell back to defaults on
+  any extraction error, and the Startup load marks every setting changed,
+  so the defaults were saved over `settings.json` half a second later.
+  One field that stopped parsing (a downgrade meeting a newer
+  `pitch_algorithm`, a hand-edit typo) erased calibration, content
+  sources and every preference. Now only the unreadable fields fall back,
+  and the original is kept as `settings.json.unreadable`.
+- **Bug, fixed `cc768186`**: removing a pack while it downloaded left the
+  finished download installed and recorded, an orphan nothing listed.
+  Removal cancels it, and a result for an unconfigured source is
+  discarded.
+- **Bug, fixed `8108f03e`**: a selected theme that failed to load (its
+  external folder deleted) left every menu without backgrounds, art or
+  sounds. It now falls back to the bundled `default`.
+- **Bug, fixed**: pack translations skipped any folder named after an
+  instrument at *any* depth when walking for curricula, so a legacy
+  pack's lesson folder called `piano` lost its text. Only the top level
+  is a curriculum.
+- **Hazard, open**: three native paths read `assets/` relative to the
+  working directory (`scan_ui_themes`, `scan_theme_dir`,
+  `theme_source_prefix`), while Bevy reads from beside the executable.
+  Every launcher (flatpak, macOS, the Windows shortcut) `cd`s into the
+  install folder to compensate; a binary started from anywhere else
+  finds no bundled themes. Resolving against
+  `FileAssetReader::get_base_path()` would remove the need, but wants a
+  packaged run to verify.
+- **Cleanup, open**: `LocalizationExt::msg` warns on *every* call for a
+  missing key, and several callers run per frame, so one missing key
+  floods the log. Warning once per key needs a set behind a lock; small.
+- Checked and sound: `packs://` path confinement (only normal components,
+  first must be a registered pack), debounced atomic settings saves with
+  an exit flush, the cfg guards against `build.rs`, scoped translation
+  loading per instrument.
+
 ### Carried into later sessions
 
 Found while making `cargo clippy --all-targets -- -D warnings` pass again
