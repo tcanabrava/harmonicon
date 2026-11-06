@@ -400,7 +400,13 @@ skills in `.claude/skills/`, loaded on demand rather than living here:
   flipped negative while closed (see `dialogs::combobox::
   set_combobox_open`) so Tab can't reach something invisible — bevy's own
   tab-gathering walks the ECS tree by `TabIndex`/`Children` alone, with no
-  `Display`/`Visibility` check. A collapsible panel should just be a
+  `Display`/`Visibility` check. **A modal group only confines focus that is
+  already inside it**: with focus elsewhere, Tab cycles the *non*-modal
+  groups behind it. `keyboard_nav::focus_into_open_modal` therefore moves
+  focus into any modal on screen (not `Display::None`, visible, laid out)
+  while focus is outside it, so a new modal needs nothing extra. Put
+  `AutoFocus` on a specific child only to choose *where* focus lands, as
+  the confirm dialog does with No. A collapsible panel should just be a
   `dialogs::drawer::Drawer`, which does that reversibly: each descendant
   gets its *own* `TabIndex` back on open, so a closed dropdown inside stays
   unreachable. `dialogs::keyboard_nav::KeyboardNavPlugin`
