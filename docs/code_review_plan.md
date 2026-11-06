@@ -437,6 +437,21 @@ without a pass, and nothing reads `SongManifest::waveform`.
   score loader's track choice, lesson graph cycle refusal and unit
   gating.
 
+### 9. `harmonicon-app` — done 2026-11-06
+
+- **Bug, fixed `46327449`**: the profile had the same whole-file fallback
+  as settings, and `flush_profile_on_exit` saves on quit, so one
+  unreadable field meant launching and quitting once erased every score,
+  lesson pass, drill record and the streak. Both files now read through
+  `paths::load_json_over_defaults`.
+- **Hazard, open**: recovery is per *top-level* field. One unreadable
+  entry inside `songs` or `lessons` still drops that whole map; the
+  `.unreadable` copy keeps it, but restoring it is manual. Per-entry
+  recovery for the maps would need a `Deserialize` that skips bad
+  entries (a `#[serde(deserialize_with)]` over each map).
+- Checked and sound: streak date maths (missed day, lapse, clock set
+  back), `FirstRun` sampled before anything can save, the state enums.
+
 ### Carried into later sessions
 
 Found while making `cargo clippy --all-targets -- -D warnings` pass again
