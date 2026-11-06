@@ -974,28 +974,27 @@ fn on_repeat_section(
     }
 }
 
+/// On resuming from the pause menu with Repeat section on, starts the
+/// section over. Only a real resume, paused then unpaused, counts: song
+/// setup also writes `Paused(false)`, and a song can start with a loop
+/// already active (a practice range, a chart's repeating section), which
+/// must not skip the countdown. Getting into such a range at song start is
+/// `start_at_practice_range`'s job, once the music it has to seek exists.
 pub(super) fn resume_section_repeat(
     paused: Res<Paused>,
     loops: Res<LoopConfig>,
+    mut was_paused: Local<bool>,
     mut clock: ResMut<super::GameplayClock>,
     mut notes: ResMut<super::SongNotes>,
     sinks: Query<&AudioSink, With<MusicPlayer>>,
 ) {
-    if !paused.is_changed() || paused.0 || !loops.active {
+    let resumed = *was_paused && !paused.0;
+    *was_paused = paused.0;
+    if !resumed || !loops.active {
         return;
     }
     clock.rewind_to(loops.start_time, sinks.single().ok());
-    let (start, end) = super::loop_reset_range(&notes.notes, loops.start_time, loops.end_time);
-    for note in &mut notes.notes[start..end] {
-        note.hit = false;
-        note.missed = false;
-        note.held = 0.0;
-        note.sustain_scored = false;
-        note.pitch_samples.clear();
-        note.amp_samples.clear();
-        note.miss_evidence = None;
-    }
-    notes.cursor = start;
+    super::clock::replay_loop_range(&mut notes, loops.start_time, loops.end_time);
 }
 
 #[cfg(test)]
@@ -1036,6 +1035,30 @@ mod tests {
             NextState::Pending(s) => Some(s.clone()),
             _ => None,
         }
+    }
+
+    #[test]
+    fn a_song_starting_with_a_loop_is_not_rewound_into_it() {
+        // Song setup writes `Paused(false)` and may make a loop active (a
+        // results-screen practice range, a chart's repeating section). That
+        // is not a resume: the countdown must play out, and the jump into
+        // the range is `start_at_practice_range`'s, once the music exists.
+        let mut world = World::new();
+        world.insert_resource(Paused(false));
+        world.insert_resource(LoopConfig { active: true, start_time: 30.0, end_time: 40.0 });
+        world.insert_resource(super::super::GameplayClock::new(-3.0));
+        world.insert_resource(super::super::SongNotes::default());
+        let mut schedule = Schedule::default();
+        schedule.add_systems(resume_section_repeat);
+        schedule.run(&mut world);
+        assert_eq!(world.resource::<super::super::GameplayClock>().get(), -3.0);
+
+        // A real resume, paused then unpaused, does jump to the range.
+        world.resource_mut::<Paused>().0 = true;
+        schedule.run(&mut world);
+        world.resource_mut::<Paused>().0 = false;
+        schedule.run(&mut world);
+        assert_eq!(world.resource::<super::super::GameplayClock>().get(), 30.0);
     }
 
     #[test]

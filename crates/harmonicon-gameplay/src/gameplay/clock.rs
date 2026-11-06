@@ -244,10 +244,18 @@ pub(crate) fn handle_loop_boundary(
     // clock forward again — see the doc comment on `GameplayClock`.
     clock.rewind_to(loop_cfg.start_time, sinks.single().ok());
 
+    replay_loop_range(&mut song_notes, loop_cfg.start_time, loop_cfg.end_time);
+}
+
+/// Makes the notes in `start_time..end_time` playable again for another
+/// pass, as a loop wrap or a section-repeat resume needs: every field the
+/// judge writes while scoring a note is cleared, and the scoring cursor
+/// steps back to them. One function so a new score field can't be reset by
+/// one caller and left stale by the other.
+pub(super) fn replay_loop_range(song_notes: &mut SongNotes, start_time: f64, end_time: f64) {
     // `notes` is sorted by `time`, so the reset range is one contiguous
     // slice — binary search it instead of scanning the whole song.
-    let (start_idx, end_idx) =
-        loop_reset_range(&song_notes.notes, loop_cfg.start_time, loop_cfg.end_time);
+    let (start_idx, end_idx) = loop_reset_range(&song_notes.notes, start_time, end_time);
     for note in &mut song_notes.notes[start_idx..end_idx] {
         note.hit = false;
         note.missed = false;
