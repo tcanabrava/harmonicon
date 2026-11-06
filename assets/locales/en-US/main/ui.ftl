@@ -1103,3 +1103,5 @@ lesson-instrument-title = Lessons · Choose your instrument
 lesson-instrument-help = Choose what you play. Only that instrument’s lesson paths will be loaded.
 lesson-instrument-empty = No lessons are installed for this instrument yet. Choose another instrument, or add a lesson pack in Options → Lessons & songs.
 lesson-tree-instrument-title = {$instrument} · Lesson paths
+
+song-instrument-all = All instruments

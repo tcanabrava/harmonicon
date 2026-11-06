@@ -31,7 +31,9 @@ use harmonicon_ui::dialogs::button::{BaseButtonColor, CHOICE_SELECTED};
 use harmonicon_ui::dialogs::confirm_dialog::{ConfirmChosen, DialogId, OpenConfirmDialog};
 use harmonicon_ui::dialogs::text_input::spawn_text_input;
 
+mod instrument_filter;
 mod personal;
+pub(crate) use instrument_filter::refresh_instrument_filter;
 
 use personal::{
     PersonalRating, PersonalStat, mastery_label, personal_stat_cell, preferences, rating_cell,
@@ -62,6 +64,7 @@ pub(crate) enum SongSort {
 pub(crate) struct SongPickerState {
     query: String,
     mastery_filter: u8,
+    instrument_filter: Option<String>,
     sort: SongSort,
     selected: Option<String>,
     descending: bool,
@@ -197,7 +200,7 @@ pub(crate) fn setup_artist_list(
 ) {
     state.harmonica_only = *mode == GameplayMode::JamSession;
     let state = &*state;
-    let (content, header, _) =
+    let (content, header, root) =
         spawn_menu_root_plain(&mut commands, &loc.msg("select-song"), None, &theme, "SongPicker");
     commands.entity(content).insert(Node {
         width: Val::Percent(90.0),
@@ -220,6 +223,31 @@ pub(crate) fn setup_artist_list(
                 row_gap: {Val::Px(8.0)},
             }
         })
+        .id();
+    // Own the combobox's sibling backdrop separately so rebuilding its options
+    // also removes an open click catcher. Sized against the full page root.
+    let filter_overlay = commands
+        .spawn((
+            Node {
+                position_type: PositionType::Absolute,
+                width: Val::Percent(100.0),
+                height: Val::Percent(100.0),
+                left: Val::Px(0.0),
+                top: Val::Px(0.0),
+                ..default()
+            },
+            bevy::picking::Pickable::IGNORE,
+        ))
+        .id();
+    commands.entity(root).add_child(filter_overlay);
+    let instrument_filter = commands
+        .spawn((
+            instrument_filter::InstrumentFilterHost {
+                backdrop: filter_overlay,
+                choices: Vec::new(),
+            },
+            Node { width: Val::Percent(100.0), flex_shrink: 0.0, ..default() },
+        ))
         .id();
     let search_row = spawn_search_row(&mut commands, &loc, &state.query);
     let empty = commands
@@ -292,9 +320,16 @@ pub(crate) fn setup_artist_list(
             TextColor({Color::srgb(0.65, 0.70, 0.80)})
         })
         .id();
-    commands
-        .entity(content)
-        .add_children(&[updates, search_row, empty, sort_row, list_frame, preview, hints]);
+    commands.entity(content).add_children(&[
+        updates,
+        instrument_filter,
+        search_row,
+        empty,
+        sort_row,
+        list_frame,
+        preview,
+        hints,
+    ]);
     spawn_back_button(
         &mut commands,
         header,
@@ -690,6 +725,10 @@ fn collect_songs(
         })
         .filter(|song| !state.harmonica_only || song.instrument == "harmonica")
         .filter(|song| {
+            state.harmonica_only
+                || state.instrument_filter.as_ref().is_none_or(|kind| kind == &song.instrument)
+        })
+        .filter(|song| {
             let accuracy = preferences(profile, &song.asset_path)
                 .last_accuracy
                 .map(|a| (a * 100.0).round() as u8);
@@ -755,18 +794,24 @@ fn instrument_label(
     mine: &harmonicon_platform::settings::MyInstruments,
     loc: &Localization,
 ) -> String {
-    let name = String::from(loc.msg(match song.instrument.as_str() {
-        "guitar" => "song-instrument-guitar",
-        "flute" => "song-instrument-flute",
-        "piano" => "song-instrument-piano",
-        _ => "song-instrument-harmonica",
-    }));
+    let name = instrument_name(&song.instrument, loc);
     match song.part.as_ref().and_then(|part| reach_percent(part, mine)) {
         Some(percent) => String::from(loc.msg_args(
             "song-instrument-reach",
             &[("instrument", name), ("percent", percent.to_string())],
         )),
         None => name,
+    }
+}
+
+/// Identity labels are shared by song rows and the catalog filter.
+fn instrument_name(kind: &str, loc: &Localization) -> String {
+    match kind {
+        "harmonica" | "guitar" | "piano" | "flute" => {
+            loc.msg(&format!("song-instrument-{kind}")).to_string()
+        }
+        // Preserve future identities rather than calling them harmonicas.
+        _ => kind.to_owned(),
     }
 }
 
@@ -941,7 +986,7 @@ pub(crate) fn refresh_song_picker(
     inputs: Query<&EditableText, With<SongPickerSearch>>,
     roots: Query<Entity, With<SongPickerRows>>,
     mut state: ResMut<SongPickerState>,
-    mut rendered: Local<Option<(String, SongSort, bool, u8)>>,
+    mut rendered: Local<Option<(String, SongSort, bool, u8, Option<String>)>>,
     focus: Res<InputFocus>,
     song_rows: Query<(Entity, &SongRow)>,
     loc: Res<Localization>,
@@ -974,14 +1019,26 @@ pub(crate) fn refresh_song_picker(
         && !profile.is_changed()
         && !rescanned
         && rendered.as_ref()
-            == Some(&(state.query.clone(), state.sort, state.descending, state.mastery_filter))
+            == Some(&(
+                state.query.clone(),
+                state.sort,
+                state.descending,
+                state.mastery_filter,
+                state.instrument_filter.clone(),
+            ))
     {
         return;
     }
-    let sort_changed = rendered.as_ref().is_none_or(|(_, sort, descending, _)| {
+    let sort_changed = rendered.as_ref().is_none_or(|(_, sort, descending, _, _)| {
         *sort != state.sort || *descending != state.descending
     });
-    *rendered = Some((state.query.clone(), state.sort, state.descending, state.mastery_filter));
+    *rendered = Some((
+        state.query.clone(),
+        state.sort,
+        state.descending,
+        state.mastery_filter,
+        state.instrument_filter.clone(),
+    ));
     let visible = collect_songs(&songs, &state, &profile);
     if !visible.iter().any(|song| Some(&song.asset_path) == state.selected.as_ref()) {
         state.selected = visible.first().map(|song| song.asset_path.clone());
@@ -1053,11 +1110,22 @@ pub(crate) fn navigate_song_picker(
     mut focus_visible: ResMut<InputFocusVisible>,
     rows: Query<(Entity, &SongRow, &ComputedNode)>,
     inputs: Query<(), With<EditableText>>,
+    parents: Query<&ChildOf>,
+    instrument_controls: Query<(), With<instrument_filter::InstrumentFilterHost>>,
     mut areas: Query<(&ComputedNode, &mut ScrollPosition), With<SongPickerRows>>,
     mut state: ResMut<SongPickerState>,
 ) {
     if focus.get().is_some_and(|entity| inputs.contains(entity)) {
         return;
+    }
+    // A dropdown owns its navigation keys; keep the list shortcuts available
+    // after rating a song or using the other catalog controls.
+    let mut ancestor = focus.get();
+    while let Some(entity) = ancestor {
+        if instrument_controls.contains(entity) {
+            return;
+        }
+        ancestor = parents.get(entity).ok().map(ChildOf::parent);
     }
     let navigating = [KeyCode::ArrowDown, KeyCode::ArrowUp, KeyCode::Home, KeyCode::End]
         .iter()
@@ -1784,6 +1852,23 @@ mod tests {
         app.world_mut().resource_mut::<ButtonInput<KeyCode>>().press(KeyCode::ArrowUp);
         app.update();
         assert_eq!(app.world().resource::<InputFocus>().get(), Some(rows[1]));
+    }
+
+    #[test]
+    fn picker_navigation_does_not_steal_focus_from_the_instrument_control() {
+        let (mut app, _) = navigation_app();
+        let control = app.world_mut().spawn(WidgetButton).id();
+        let backdrop = app.world_mut().spawn_empty().id();
+        let host = app
+            .world_mut()
+            .spawn(instrument_filter::InstrumentFilterHost { backdrop, choices: vec![] })
+            .id();
+        app.world_mut().entity_mut(host).add_child(control);
+        app.world_mut().resource_mut::<InputFocus>().set(control, FocusCause::Navigated);
+        app.world_mut().resource_mut::<ButtonInput<KeyCode>>().press(KeyCode::ArrowDown);
+        app.update();
+        assert_eq!(app.world().resource::<InputFocus>().get(), Some(control));
+        assert!(app.world().resource::<SongPickerState>().selected.is_none());
     }
 
     #[test]

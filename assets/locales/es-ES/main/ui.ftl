@@ -1102,3 +1102,5 @@ lesson-instrument-title = Lecciones · Elige tu instrumento
 lesson-instrument-help = Elige el instrumento que tocas. Solo se cargarán sus rutas de aprendizaje.
 lesson-instrument-empty = Todavía no hay lecciones instaladas para este instrumento. Elige otro o añade un paquete en Opciones → Lecciones y canciones.
 lesson-tree-instrument-title = {$instrument} · Rutas de aprendizaje
+
+song-instrument-all = Todos los instrumentos

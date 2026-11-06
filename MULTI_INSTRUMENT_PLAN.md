@@ -99,5 +99,8 @@ Each independently reviewable part receives a commit and relevant validation.
 
 ## Progress
 
-- Plan recorded; implementation starts with the catalog filter, then shared
-  fretted-string foundations. Later phases remain tracked above.
+- Plan recorded.
+- Step 0 complete: catalog-derived instrument combobox, localized All instruments,
+  composed filtering, catalog-change recovery and dropdown keyboard isolation.
+  Menu suite: 80 tests passed.
+- Steps 1–7 remain planned; no new instrument identity is enabled yet.

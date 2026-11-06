@@ -80,6 +80,7 @@ impl Plugin for MenuPlugin {
                     pages::artist_list::handle_song_delete,
                     pages::artist_list::refresh_song_updates,
                     pages::artist_list::focus_picker_search,
+                    pages::artist_list::refresh_instrument_filter,
                     pages::artist_list::refresh_song_picker,
                     pages::artist_list::navigate_song_picker,
                     pages::artist_list::update_picker_feedback,
