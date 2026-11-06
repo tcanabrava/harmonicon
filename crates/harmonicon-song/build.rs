@@ -77,7 +77,7 @@ fn generate_bundled_lesson_manifest() {
 /// implementations can't drift.
 fn scan_lessons_for_manifest(root: &Path) -> Vec<(String, String, std::path::PathBuf)> {
     let mut found = scan_unscoped_lessons(root);
-    for kind in ["harmonica", "guitar", "bass", "piano", "flute"] {
+    for kind in ["harmonica", "guitar", "bass", "cavaquinho", "piano", "flute"] {
         found.extend(
             scan_unscoped_lessons(&root.join(kind))
                 .into_iter()

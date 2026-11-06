@@ -370,6 +370,7 @@ pub(super) fn populate_from_lesson_manifest(manifest: &LessonManifest, state: &m
                 Family::Harmonica => EditorKind::Harmonica,
                 Family::Guitar => EditorKind::Guitar,
                 Family::Bass => EditorKind::Bass,
+                Family::Cavaquinho => EditorKind::Cavaquinho,
                 Family::Piano => EditorKind::Piano,
                 Family::Flute => EditorKind::Flute,
             }

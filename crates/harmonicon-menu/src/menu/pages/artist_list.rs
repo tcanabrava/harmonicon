@@ -807,7 +807,7 @@ fn instrument_label(
 /// Identity labels are shared by song rows and the catalog filter.
 fn instrument_name(kind: &str, loc: &Localization) -> String {
     match kind {
-        "harmonica" | "guitar" | "bass" | "piano" | "flute" => {
+        "harmonica" | "guitar" | "bass" | "cavaquinho" | "piano" | "flute" => {
             loc.msg(&format!("song-instrument-{kind}")).to_string()
         }
         // Preserve future identities rather than calling them harmonicas.

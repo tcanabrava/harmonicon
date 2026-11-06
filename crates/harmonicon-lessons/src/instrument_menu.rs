@@ -16,6 +16,7 @@ pub(crate) fn instrument_key(kind: InstrumentKind) -> &'static str {
         InstrumentKind::Harmonica => "song-instrument-harmonica",
         InstrumentKind::Guitar => "song-instrument-guitar",
         InstrumentKind::Bass => "song-instrument-bass",
+        InstrumentKind::Cavaquinho => "song-instrument-cavaquinho",
         InstrumentKind::Piano => "song-instrument-piano",
         InstrumentKind::Flute => "song-instrument-flute",
     }

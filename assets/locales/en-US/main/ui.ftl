@@ -1123,3 +1123,19 @@ instrument-check-chart-bass-capo = Written for a bass in {$tuning}, capo at fret
 gameplay-bass-neck = Bass fretboard · markers show fret numbers · 0 open · play the marked string
 
 instrument-check-cost-bass-frets = {$count} note(s) move to other frets on your bass
+
+song-instrument-cavaquinho = Cavaquinho
+editor-instrument-cavaquinho = Cavaquinho
+editor-cavaquinho-setup = Cavaquinho setup
+note-trainer-cavaquinho = Cavaquinho
+note-trainer-cavaquinho-title = Note Trainer — Cavaquinho
+options-cavaquinho-tuning = Cavaquinho tuning
+guitar-tuning-cavaquinho-brazilian = Brazilian · D5 B4 G4 D4
+guitar-tuning-cavaquinho-natural = Brazilian natural · E5 B4 G4 D4
+guitar-tuning-cavaquinho-mandolin = Violin / mandolin · E5 A4 D4 G3
+instrument-check-title-cavaquinho = Your cavaquinho
+instrument-check-intro-cavaquinho = Select your tuning tradition, or follow the written part. Notes keep their sounding pitches and move to playable frets. Use the Song Editor for a custom tuning.
+instrument-check-chart-cavaquinho = Written for a cavaquinho in {$tuning}.
+instrument-check-chart-cavaquinho-capo = Written for a cavaquinho in {$tuning}, capo at fret {$fret}.
+instrument-check-cost-cavaquinho-frets = {$count} note(s) move to other frets on your cavaquinho
+gameplay-cavaquinho-neck = Cavaquinho fretboard · markers show fret numbers · 0 open · play the marked string

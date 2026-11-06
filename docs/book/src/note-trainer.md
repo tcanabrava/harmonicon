@@ -144,3 +144,22 @@ audition audio use the sounding pitch. Standard four-, five- and six-string tuni
 are available under **Options → My instruments → Bass tuning**. This tuning
 is saved separately from Guitar's and is used when opening the bass trainer.
 Use a clean microphone or pickup input and mute unused strings.
+
+## Cavaquinho
+
+Cavaquinho shares the clickable fretboard, note selector and position exercises.
+Its default setup is the **Brazilian traditional** tuning, with sounding pitches
+D4–G4–B4–D5 from string 4 to string 1. The preset labels list string 1 first,
+matching the editor and tablature. **Brazilian natural** and **Violin / mandolin**
+are separate presets under **Options → My instruments → Cavaquinho tuning**.
+These names describe particular traditions, not a universal cavaquinho tuning.
+Other tunings can be authored per string in the Song Editor.
+
+In Brazilian traditional tuning with no capo, **Chords** offers G, C, D and Em
+shapes on four strings. The small chord diagram suggests finger numbers; the
+large fretboard marks fret numbers. Shapes are offered only for the tuning they
+were defined for. Chord assessment requires a polyphonic detector; the microphone
+checks pitches, not the fingering, strumming gesture or number of physical strings.
+
+The open-string frequencies follow [UFERSA's acoustics study, table 6](https://mnpef.ufersa.edu.br/wp-content/uploads/sites/94/2021/03/Disserta%C3%A7%C3%A3o-Final.pdf).
+The named tuning variants follow [Musixe's teaching chart](https://static.musixe.com/wp-content/uploads/2021/05/15110318/Aula-1-Cavaquinho-Apresentacao-PDF.pdf).

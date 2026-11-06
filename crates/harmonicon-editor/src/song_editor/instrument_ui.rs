@@ -19,22 +19,23 @@ pub(super) enum InstrumentKind {
     Harmonica,
     Guitar,
     Bass,
+    Cavaquinho,
     Piano,
     Flute,
 }
 impl InstrumentKind {
-    pub const ALL: [Self; 5] =
-        [Self::Harmonica, Self::Guitar, Self::Bass, Self::Piano, Self::Flute];
+    pub const ALL: [Self; 6] =
+        [Self::Harmonica, Self::Guitar, Self::Bass, Self::Cavaquinho, Self::Piano, Self::Flute];
     pub fn of(instrument: &Instrument) -> Self {
         match instrument {
             Instrument::Harmonica(_) => Self::Harmonica,
-            Instrument::Fretted(guitar) => {
-                if guitar.kind == harmonicon_core::instrument::fretted_strings::FrettedKind::Bass {
-                    Self::Bass
-                } else {
-                    Self::Guitar
+            Instrument::Fretted(guitar) => match guitar.kind {
+                harmonicon_core::instrument::fretted_strings::FrettedKind::Guitar => Self::Guitar,
+                harmonicon_core::instrument::fretted_strings::FrettedKind::Bass => Self::Bass,
+                harmonicon_core::instrument::fretted_strings::FrettedKind::Cavaquinho => {
+                    Self::Cavaquinho
                 }
-            }
+            },
             Instrument::Piano(_) => Self::Piano,
             Instrument::Flute(_) => Self::Flute,
         }
@@ -44,6 +45,7 @@ impl InstrumentKind {
             Self::Harmonica => "editor-instrument-harmonica",
             Self::Guitar => "editor-instrument-guitar",
             Self::Bass => "editor-instrument-bass",
+            Self::Cavaquinho => "editor-instrument-cavaquinho",
             Self::Piano => "editor-instrument-piano",
             Self::Flute => "editor-instrument-flute",
         }
@@ -55,6 +57,7 @@ impl InstrumentKind {
             }
             Self::Guitar => Guitar::standard(GuitarBody::Electric).into(),
             Self::Bass => Guitar::bass().into(),
+            Self::Cavaquinho => Guitar::cavaquinho().into(),
             Self::Piano => Piano::grand().into(),
             Self::Flute => Flute::default().into(),
         };

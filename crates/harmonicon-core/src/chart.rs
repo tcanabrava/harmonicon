@@ -49,6 +49,12 @@ pub struct Metadata {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "lowercase")]
 pub enum ChartInstrument {
+    Cavaquinho {
+        strings: Vec<String>,
+        frets: u8,
+        #[serde(default, skip_serializing_if = "is_zero")]
+        capo: u8,
+    },
     Bass {
         strings: Vec<String>,
         frets: u8,
@@ -88,6 +94,21 @@ fn is_zero(value: &u8) -> bool {
 impl ChartInstrument {
     /// How a chart writes `guitar`: its open strings by note name.
     pub fn from_guitar(guitar: &Guitar) -> Self {
+        Self::from_fretted(guitar)
+    }
+
+    pub fn from_fretted(guitar: &Guitar) -> Self {
+        if guitar.kind == crate::instrument::fretted_strings::FrettedKind::Cavaquinho {
+            return Self::Cavaquinho {
+                strings: guitar
+                    .strings
+                    .iter()
+                    .map(|&m| crate::midi::midi_to_note(i32::from(m)))
+                    .collect(),
+                frets: guitar.frets,
+                capo: guitar.capo,
+            };
+        }
         if guitar.kind == crate::instrument::fretted_strings::FrettedKind::Bass {
             return Self::Bass {
                 strings: guitar
@@ -125,6 +146,22 @@ impl ChartInstrument {
     /// no real note.
     pub fn to_instrument(&self) -> Option<Instrument> {
         match self {
+            Self::Cavaquinho { strings, frets, capo } => {
+                let strings = strings
+                    .iter()
+                    .map(|s| u8::try_from(note_to_midi(s)?).ok())
+                    .collect::<Option<Vec<u8>>>()?;
+                Some(
+                    Guitar {
+                        kind: crate::instrument::fretted_strings::FrettedKind::Cavaquinho,
+                        strings,
+                        frets: *frets,
+                        capo: *capo,
+                        body: GuitarBody::Acoustic,
+                    }
+                    .into(),
+                )
+            }
             Self::Bass { strings, frets, capo } => {
                 let strings = strings
                     .iter()
@@ -205,7 +242,7 @@ impl HarpChart {
 /// spec than this build supports up front, with a clear error, instead of
 /// failing on some confusing downstream `additionalProperties` schema
 /// rejection or (worse) silently misreading a field whose meaning changed.
-pub const CURRENT_FORMAT_VERSION: &str = "1.11.0";
+pub const CURRENT_FORMAT_VERSION: &str = "1.12.0";
 
 /// Parses a `"MAJOR.MINOR.PATCH"` version string into a comparable tuple.
 /// `None` for anything that isn't exactly three dot-separated integers.

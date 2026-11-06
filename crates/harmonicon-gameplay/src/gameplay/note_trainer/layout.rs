@@ -44,6 +44,10 @@ pub(crate) fn setup(
             "note-trainer-flute-title"
         } else if trainer.piano().is_some() {
             "note-trainer-piano-title"
+        } else if trainer.instrument.kind()
+            == harmonicon_core::instrument::InstrumentKind::Cavaquinho
+        {
+            "note-trainer-cavaquinho-title"
         } else if trainer.instrument.kind() == harmonicon_core::instrument::InstrumentKind::Bass {
             "note-trainer-bass-title"
         } else {
@@ -97,7 +101,9 @@ pub(crate) fn setup(
                     if trainer.remember(&mut profile) {
                         harmonicon_app::profile::save_profile(&profile);
                     }
-                    trainer.chord = Some(chords::ChordPractice::default());
+                    let shapes =
+                        trainer.guitar().and_then(chords::shapes_for).unwrap_or(chords::SHAPES);
+                    trainer.chord = Some(chords::ChordPractice::new(shapes));
                     trainer.practice.auto_advance = false;
                     return;
                 }
@@ -280,8 +286,8 @@ pub(crate) fn setup(
                         ..default()
                     })
                     .with_children(|score| {
-                        if trainer.offers_chords() {
-                            chords::spawn_diagram(score);
+                        if let Some(setup) = trainer.guitar().filter(|_| trainer.offers_chords()) {
+                            chords::spawn_diagram(score, setup);
                         }
                         score
                             .spawn(Node {

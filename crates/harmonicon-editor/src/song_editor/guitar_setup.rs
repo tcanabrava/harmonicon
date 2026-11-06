@@ -46,7 +46,9 @@ pub(super) fn sync_tuning(
     }
     let Some(guitar) = guitar else { return };
     let label = tuning_label(&guitar, &loc);
-    if let Some(children) = children.filter(|_| *last_kind == Some(guitar.kind) && !loc.is_changed()) {
+    if let Some(children) =
+        children.filter(|_| *last_kind == Some(guitar.kind) && !loc.is_changed())
+    {
         for child in children {
             if let Ok(mut value) = values.get_mut(*child)
                 && value.0 != label
@@ -66,13 +68,7 @@ pub(super) fn sync_tuning(
             &mut commands,
             slot,
             root,
-            &loc.msg(
-                if guitar.kind == harmonicon_core::instrument::fretted_strings::FrettedKind::Bass {
-                    "options-bass-tuning"
-                } else {
-                    "options-guitar-tuning"
-                },
-            ),
+            &loc.msg(&format!("options-{}-tuning", guitar.kind.instrument_kind().slug())),
             &options,
             &label,
             |ev: On<ComboboxSelect>,
@@ -195,16 +191,8 @@ pub(super) fn sync(
     commands.entity(host).with_children(|p| {
         p.spawn((
             Text::new(
-                loc.msg(
-                    if guitar.kind
-                        == harmonicon_core::instrument::fretted_strings::FrettedKind::Bass
-                    {
-                        "editor-bass-setup"
-                    } else {
-                        "editor-guitar-setup"
-                    },
-                )
-                .to_string(),
+                loc.msg(&format!("editor-{}-setup", guitar.kind.instrument_kind().slug()))
+                    .to_string(),
             ),
             TextColor(colors.label),
         ));
@@ -420,6 +408,36 @@ mod bass_editor_tests {
         assert_eq!(
             reopened.notes[0].target.sounding_pitch(&reopened.effective_instrument()),
             Some(26.0)
+        );
+    }
+}
+
+#[cfg(test)]
+mod cavaquinho_editor_tests {
+    use super::*;
+    #[test]
+    fn cavaquinho_uses_the_shared_editor_without_becoming_a_guitar() {
+        let mut state = super::super::document_picker::fresh(
+            super::super::instrument_ui::InstrumentKind::Cavaquinho.selection(),
+        );
+        assert_eq!(state.row_count(), 4);
+        super::super::guitar_note::place(&mut state, 4, 0, 12);
+        assert_eq!(state.notes[0].target.sounding_pitch(&state.effective_instrument()), Some(62.0));
+        let json = super::super::harpchart::serialize_harpchart(&state);
+        super::super::harpchart::validated_harpchart(&json).unwrap();
+        let value: serde_json::Value = serde_json::from_str(&json).unwrap();
+        assert_eq!(value["instrument"]["type"], "cavaquinho");
+        assert_eq!(value["instrument"]["strings"][0], "D5");
+        let mut reopened = EditorState::default();
+        super::super::harpchart::load_harpchart(
+            &value,
+            &mut reopened,
+            &mut super::super::state::Scroll::default(),
+        );
+        assert_eq!(reopened.effective_instrument(), state.effective_instrument());
+        assert_eq!(
+            reopened.notes[0].target.sounding_pitch(&reopened.effective_instrument()),
+            Some(62.0)
         );
     }
 }

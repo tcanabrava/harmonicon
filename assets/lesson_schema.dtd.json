@@ -14,7 +14,7 @@
   "properties": {
     "instrument": {
       "type": "string",
-      "enum": ["harmonica", "guitar", "bass", "piano", "flute"],
+      "enum": ["harmonica", "guitar", "bass", "cavaquinho", "piano", "flute"],
       "default": "harmonica",
       "description": "Instrument family. Legacy manifests without this field are harmonica lessons."
     },
@@ -352,7 +352,7 @@
     }
   },
   "allOf": [{
-    "if": {"properties": {"instrument": {"enum": ["guitar", "bass", "piano", "flute"]}}, "required": ["instrument"]},
+    "if": {"properties": {"instrument": {"enum": ["guitar", "bass", "cavaquinho", "piano", "flute"]}}, "required": ["instrument"]},
     "then": {"not": {"required": ["training"]}}
   }]
 }

@@ -139,8 +139,21 @@ impl Guitar {
         self.neck().top_fret()
     }
 
+    pub fn supports_technique(&self, technique: StringTechnique) -> bool {
+        use super::fretted_strings::FrettedKind;
+        matches!(
+            (self.kind, technique),
+            (_, StringTechnique::Fretted)
+                | (FrettedKind::Guitar, _)
+                | (FrettedKind::Bass, StringTechnique::Harmonic)
+        )
+    }
+
     /// The pitch `assignment` sounds, or `None` if this guitar can't play it.
     pub fn pitch_of(&self, a: &FretAssignment) -> Option<u8> {
+        if !self.supports_technique(a.technique) {
+            return None;
+        }
         let open = self.open_pitch(a.string)?;
         if a.fret > self.top_fret() {
             return None;
@@ -191,7 +204,8 @@ impl Guitar {
     /// hand. Bass does not inherit the guitar's four-fret chord reach.
     pub fn hand_span_frets(&self) -> u8 {
         match self.kind {
-            super::fretted_strings::FrettedKind::Guitar => HAND_SPAN_FRETS,
+            super::fretted_strings::FrettedKind::Guitar
+            | super::fretted_strings::FrettedKind::Cavaquinho => HAND_SPAN_FRETS,
             super::fretted_strings::FrettedKind::Bass => 3,
         }
     }

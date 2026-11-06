@@ -125,4 +125,16 @@ Each independently reviewable part receives a commit and relevant validation.
   gameplay, and the editor including changing to the five-string preset.
 - Bass charts use song format 1.11.0; bass lesson manifests require lesson format
   3. Older charts/curricula remain supported; no bass curriculum is bundled yet.
-- Next: step 3, cavaquinho. Steps 4–7 remain planned.
+- Step 3 complete: cavaquinho identity, named Brazilian traditional/natural
+  and violin/mandolin tuning presets, independent saved setup, shared editor,
+  trainer, catalog and curriculum selection. Starter G/C/D/Em chord shapes use
+  four-string diagrams and are offered only in their declared tuning.
+- Fretted tuning metadata now accepts arbitrary string counts; shared saved
+  tuning accessors and preset lookup prevent instrument-specific UI duplication.
+  Technique support is queried from the model instead of inheriting guitar tools.
+- Cavaquinho validation: 1,753 relevant library tests passed; workspace Clippy,
+  dev build and documentation build passed. Live four-string chord selection and
+  editor setup checked. Sounding tuning octaves verified against cited teaching
+  references. Song format 1.12.0 / lesson format 4; older content remains supported.
+- Next: step 4, explicit notation/transposition and shared wind-fingering metadata.
+  Steps 5–7 remain planned.

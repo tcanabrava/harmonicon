@@ -599,3 +599,16 @@ Bass charts use song format **1.11.0**. Bass lesson manifests require lesson
 format **3**; existing curricula using format 2 remain supported. Selecting
 Bass in Lessons loads only its namespace and shows an empty state when no
 bass curriculum is installed.
+
+## Cavaquinho documents
+
+Choose **Cavaquinho** for a four-string document in the named Brazilian
+traditional tuning. **Details → Cavaquinho setup** offers named presets and
+individual string pitches, including octaves. The editor preserves the distinct
+`cavaquinho` identity on save and load. Notes and positions use the shared fretted
+editor; unsupported guitar technique controls remain hidden. Custom tunings stay
+with the document and can be played as written.
+
+Cavaquinho charts use song format **1.12.0**; cavaquinho lesson manifests require
+lesson format **4**. Selecting Cavaquinho in Lessons reads only its namespace and
+shows an empty state when no curriculum is installed.

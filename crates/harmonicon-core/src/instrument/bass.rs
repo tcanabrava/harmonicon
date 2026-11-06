@@ -23,17 +23,6 @@ impl FrettedInstrument {
             body: GuitarBody::Electric,
         }
     }
-
-    pub fn tuning_presets(&self) -> &'static [Tuning] {
-        match self.kind {
-            FrettedKind::Guitar => super::guitar::TUNINGS,
-            FrettedKind::Bass => TUNINGS,
-        }
-    }
-
-    pub fn named_tuning(&self) -> Option<&'static Tuning> {
-        self.tuning_presets().iter().find(|preset| preset.strings == self.strings)
-    }
 }
 
 #[cfg(test)]

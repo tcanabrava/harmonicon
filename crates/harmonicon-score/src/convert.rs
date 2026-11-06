@@ -241,7 +241,7 @@ pub fn to_chart(
     match instrument {
         Instrument::Harmonica(harp) => chart.harmonica = Some(harp.clone()),
         Instrument::Fretted(guitar) => {
-            chart.instrument_spec = Some(ChartInstrument::from_guitar(guitar));
+            chart.instrument_spec = Some(ChartInstrument::from_fretted(guitar));
         }
         Instrument::Flute(flute) => {
             chart.instrument_spec = Some(ChartInstrument::from_flute(flute));

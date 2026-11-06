@@ -1122,3 +1122,19 @@ instrument-check-chart-bass-capo = Escrito para un bajo en {$tuning}, con cejill
 gameplay-bass-neck = Diapasón del bajo · los marcadores indican trastes · 0 al aire · toca la cuerda marcada
 
 instrument-check-cost-bass-frets = {$count} nota(s) pasan a otros trastes del bajo
+
+song-instrument-cavaquinho = Cavaquinho
+editor-instrument-cavaquinho = Cavaquinho
+editor-cavaquinho-setup = Configuración del cavaquinho
+note-trainer-cavaquinho = Cavaquinho
+note-trainer-cavaquinho-title = Entrenador de notas — Cavaquinho
+options-cavaquinho-tuning = Afinación del cavaquinho
+guitar-tuning-cavaquinho-brazilian = Brasileña · D5 B4 G4 D4
+guitar-tuning-cavaquinho-natural = Brasileña natural · E5 B4 G4 D4
+guitar-tuning-cavaquinho-mandolin = Violín / mandolina · E5 A4 D4 G3
+instrument-check-title-cavaquinho = Tu cavaquinho
+instrument-check-intro-cavaquinho = Elige tu tradición de afinación o sigue la partitura. Las notas conservan su sonido y pasan a trastes disponibles. Usa el editor para una afinación personalizada.
+instrument-check-chart-cavaquinho = Escrito para cavaquinho en {$tuning}.
+instrument-check-chart-cavaquinho-capo = Escrito para cavaquinho en {$tuning}, con cejilla en el traste {$fret}.
+instrument-check-cost-cavaquinho-frets = {$count} nota(s) pasan a otros trastes del cavaquinho
+gameplay-cavaquinho-neck = Diapasón del cavaquinho · los marcadores indican trastes · 0 al aire · toca la cuerda marcada

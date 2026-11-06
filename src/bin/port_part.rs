@@ -220,7 +220,7 @@ fn port(source: &Path, target: Target) -> Result<(PathBuf, usize, usize, i32), S
     let kept = items.len();
 
     let spec = match &instrument {
-        Instrument::Fretted(guitar) => ChartInstrument::from_guitar(guitar),
+        Instrument::Fretted(guitar) => ChartInstrument::from_fretted(guitar),
         Instrument::Flute(flute) => ChartInstrument::from_flute(flute),
         Instrument::Piano(piano) => ChartInstrument::from_piano(piano),
         Instrument::Harmonica(_) => unreachable!("the target is a guitar, flute or piano"),

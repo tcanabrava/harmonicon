@@ -274,11 +274,7 @@ impl NoteTrainer {
     }
 
     fn offers_chords(&self) -> bool {
-        self.guitar().is_some_and(|g| {
-            g.kind == harmonicon_core::instrument::fretted_strings::FrettedKind::Guitar
-                && g.strings == harmonicon_core::instrument::guitar::STANDARD_TUNING
-                && g.capo == 0
-        })
+        self.guitar().and_then(chords::shapes_for).is_some()
     }
 
     fn step_by(&mut self, delta: isize) {

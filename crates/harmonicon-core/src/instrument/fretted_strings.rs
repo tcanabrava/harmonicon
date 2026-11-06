@@ -12,6 +12,7 @@
 pub enum FrettedKind {
     Guitar,
     Bass,
+    Cavaquinho,
 }
 
 impl FrettedKind {
@@ -19,6 +20,16 @@ impl FrettedKind {
         match self {
             Self::Guitar => super::InstrumentKind::Guitar,
             Self::Bass => super::InstrumentKind::Bass,
+            Self::Cavaquinho => super::InstrumentKind::Cavaquinho,
+        }
+    }
+    pub const ALL: [Self; 3] = [Self::Guitar, Self::Bass, Self::Cavaquinho];
+
+    pub fn default_setup(self) -> FrettedInstrument {
+        match self {
+            Self::Guitar => FrettedInstrument::standard(super::guitar::GuitarBody::Electric),
+            Self::Bass => FrettedInstrument::bass(),
+            Self::Cavaquinho => FrettedInstrument::cavaquinho(),
         }
     }
 }
@@ -32,6 +43,20 @@ pub struct FrettedInstrument {
     pub frets: u8,
     pub capo: u8,
     pub body: super::guitar::GuitarBody,
+}
+
+impl FrettedInstrument {
+    pub fn tuning_presets(&self) -> &'static [super::guitar::Tuning] {
+        match self.kind {
+            FrettedKind::Guitar => super::guitar::TUNINGS,
+            FrettedKind::Bass => super::bass::TUNINGS,
+            FrettedKind::Cavaquinho => super::cavaquinho::TUNINGS,
+        }
+    }
+
+    pub fn named_tuning(&self) -> Option<&'static super::guitar::Tuning> {
+        self.tuning_presets().iter().find(|preset| preset.strings == self.strings)
+    }
 }
 
 #[derive(Clone, Copy, Debug)]

@@ -181,12 +181,63 @@ pub struct MyInstruments {
     /// Bass tuning is independent of the guitar, using the bass preset ids.
     pub bass_tuning: Option<String>,
     pub bass_capo: Option<u8>,
+    pub cavaquinho_tuning: Option<String>,
+    pub cavaquinho_capo: Option<u8>,
     /// The fret the guitar's capo sits on, `Some(0)` for none.
     pub guitar_capo: Option<u8>,
     /// The flute's foot joint.
     pub flute_foot: Option<harmonicon_core::instrument::flute::FootJoint>,
     /// How Play 2D draws a flute part, switched from its pause menu.
     pub flute_view: FluteView,
+}
+
+impl MyInstruments {
+    pub fn fretted_tuning(
+        &self,
+        kind: harmonicon_core::instrument::fretted_strings::FrettedKind,
+    ) -> Option<&str> {
+        use harmonicon_core::instrument::fretted_strings::FrettedKind;
+        match kind {
+            FrettedKind::Guitar => self.guitar_tuning.as_deref(),
+            FrettedKind::Bass => self.bass_tuning.as_deref(),
+            FrettedKind::Cavaquinho => self.cavaquinho_tuning.as_deref(),
+        }
+    }
+    pub fn set_fretted_tuning(
+        &mut self,
+        kind: harmonicon_core::instrument::fretted_strings::FrettedKind,
+        value: Option<String>,
+    ) {
+        use harmonicon_core::instrument::fretted_strings::FrettedKind;
+        *match kind {
+            FrettedKind::Guitar => &mut self.guitar_tuning,
+            FrettedKind::Bass => &mut self.bass_tuning,
+            FrettedKind::Cavaquinho => &mut self.cavaquinho_tuning,
+        } = value;
+    }
+    pub fn fretted_capo(
+        &self,
+        kind: harmonicon_core::instrument::fretted_strings::FrettedKind,
+    ) -> Option<u8> {
+        use harmonicon_core::instrument::fretted_strings::FrettedKind;
+        match kind {
+            FrettedKind::Guitar => self.guitar_capo,
+            FrettedKind::Bass => self.bass_capo,
+            FrettedKind::Cavaquinho => self.cavaquinho_capo,
+        }
+    }
+    pub fn set_fretted_capo(
+        &mut self,
+        kind: harmonicon_core::instrument::fretted_strings::FrettedKind,
+        value: Option<u8>,
+    ) {
+        use harmonicon_core::instrument::fretted_strings::FrettedKind;
+        *match kind {
+            FrettedKind::Guitar => &mut self.guitar_capo,
+            FrettedKind::Bass => &mut self.bass_capo,
+            FrettedKind::Cavaquinho => &mut self.cavaquinho_capo,
+        } = value;
+    }
 }
 
 /// How a flute part is drawn: as its fingerings on the flute's keys, or as
@@ -616,6 +667,8 @@ mod tests {
     #[test]
     fn my_instruments_round_trip_through_the_settings_file() {
         let mine = MyInstruments {
+            cavaquinho_tuning: Some("cavaquinho-natural".into()),
+            cavaquinho_capo: Some(0),
             bass_tuning: Some("bass-five".into()),
             bass_capo: Some(0),
             guitar_tuning: Some("drop-d".into()),

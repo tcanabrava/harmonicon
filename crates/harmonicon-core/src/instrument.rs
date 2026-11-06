@@ -20,6 +20,7 @@
 //! [`InstrumentModel::pitch_of`]'s answer.
 
 pub mod bass;
+pub mod cavaquinho;
 pub mod flute;
 pub mod fretted_strings;
 pub mod guitar;
@@ -54,18 +55,20 @@ pub enum InstrumentKind {
     Harmonica,
     Guitar,
     Bass,
+    Cavaquinho,
     Piano,
     Flute,
 }
 
 impl InstrumentKind {
-    pub const ALL: [Self; 5] =
-        [Self::Harmonica, Self::Guitar, Self::Bass, Self::Piano, Self::Flute];
+    pub const ALL: [Self; 6] =
+        [Self::Harmonica, Self::Guitar, Self::Bass, Self::Cavaquinho, Self::Piano, Self::Flute];
     pub const fn slug(self) -> &'static str {
         match self {
             Self::Harmonica => "harmonica",
             Self::Guitar => "guitar",
             Self::Bass => "bass",
+            Self::Cavaquinho => "cavaquinho",
             Self::Piano => "piano",
             Self::Flute => "flute",
         }
@@ -576,6 +579,9 @@ impl InstrumentModel for FrettedInstrument {
                 TechniqueKind::Register,
                 TechniqueKind::Position,
             ],
+            fretted_strings::FrettedKind::Cavaquinho => {
+                &[TechniqueKind::Target, TechniqueKind::Position]
+            }
             fretted_strings::FrettedKind::Bass => {
                 &[TechniqueKind::Target, TechniqueKind::Register, TechniqueKind::Position]
             }

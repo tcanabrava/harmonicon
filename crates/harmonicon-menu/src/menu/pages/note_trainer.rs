@@ -9,7 +9,6 @@ use bevy::ui_widgets::Activate;
 
 use harmonicon_app::app::AppState;
 use harmonicon_core::instrument::flute::Flute;
-use harmonicon_core::instrument::guitar::{Guitar, GuitarBody};
 use harmonicon_gameplay::gameplay::note_trainer::NoteTrainer;
 use harmonicon_platform::localization::{Localization, LocalizationExt};
 use harmonicon_platform::theme::LoadedTheme;
@@ -32,38 +31,28 @@ pub(crate) fn setup_note_trainer_menu(
             state.set(AppState::BendingTrainer)
         },
     );
-    spawn_button(
-        &mut commands,
-        root,
-        &loc.msg("note-trainer-guitar"),
-        |_: On<Activate>,
-         mut trainer: ResMut<NoteTrainer>,
-         mut state: ResMut<NextState<AppState>>| {
-            trainer.choose(Guitar::standard(GuitarBody::Electric).into());
-            state.set(AppState::NoteTrainer);
-        },
-    );
-    spawn_button(
-        &mut commands,
-        root,
-        &loc.msg("note-trainer-bass"),
-        |_: On<Activate>,
-         mine: Res<harmonicon_platform::settings::MyInstruments>,
-         mut trainer: ResMut<NoteTrainer>,
-         mut state: ResMut<NextState<AppState>>| {
-            let mut bass = Guitar::bass();
-            if let Some(tuning) = mine
-                .bass_tuning
-                .as_deref()
-                .and_then(|id| bass.tuning_presets().iter().find(|preset| preset.id == id))
-            {
-                bass.strings = tuning.strings.to_vec();
-            }
-            bass.capo = mine.bass_capo.unwrap_or(0).min(bass.frets);
-            trainer.choose(bass.into());
-            state.set(AppState::NoteTrainer);
-        },
-    );
+    for kind in harmonicon_core::instrument::fretted_strings::FrettedKind::ALL {
+        spawn_button(
+            &mut commands,
+            root,
+            &loc.msg(&format!("note-trainer-{}", kind.instrument_kind().slug())),
+            move |_: On<Activate>,
+                  mine: Res<harmonicon_platform::settings::MyInstruments>,
+                  mut trainer: ResMut<NoteTrainer>,
+                  mut state: ResMut<NextState<AppState>>| {
+                let mut setup = kind.default_setup();
+                if let Some(preset) = mine
+                    .fretted_tuning(kind)
+                    .and_then(|id| setup.tuning_presets().iter().find(|preset| preset.id == id))
+                {
+                    setup.strings = preset.strings.to_vec();
+                }
+                setup.capo = mine.fretted_capo(kind).unwrap_or(0).min(setup.frets);
+                trainer.choose(setup.into());
+                state.set(AppState::NoteTrainer);
+            },
+        );
+    }
     spawn_button(
         &mut commands,
         root,

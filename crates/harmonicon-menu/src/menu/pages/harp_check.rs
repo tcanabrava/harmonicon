@@ -35,9 +35,11 @@ use harmonicon_core::harp_remap::{HarpMapping, RemapCost, remap_event};
 use harmonicon_core::instrument::Instrument;
 use harmonicon_core::instrument::flute::{Flute, FootJoint};
 use harmonicon_core::instrument::fretted_strings::FrettedKind;
+use harmonicon_core::instrument::guitar::Guitar;
+#[cfg(test)]
+use harmonicon_core::instrument::guitar::TUNINGS;
 #[cfg(test)]
 use harmonicon_core::instrument::guitar::tuning_of;
-use harmonicon_core::instrument::guitar::{Guitar, TUNINGS};
 use harmonicon_core::instrument::substitute::substitute_chart;
 use harmonicon_core::pitch_map::{HARP_KEYS, HarpKind, harp_for_key};
 use harmonicon_platform::localization::{Localization, LocalizationExt};
@@ -120,7 +122,7 @@ pub(crate) struct InstrumentControlsKind(Option<harmonicon_core::instrument::Ins
 #[derive(Component, Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum ControlsFor {
     Harmonica,
-    Guitar,
+    Fretted,
     Flute,
     /// Nothing to choose yet: a part's keyboard is the one it is played on.
     Piano,
@@ -128,7 +130,7 @@ pub(crate) enum ControlsFor {
 
 fn controls_for(chart: &HarpChart) -> ControlsFor {
     match chart.instrument() {
-        Some(Instrument::Fretted(_)) => ControlsFor::Guitar,
+        Some(Instrument::Fretted(_)) => ControlsFor::Fretted,
         Some(Instrument::Flute(_)) => ControlsFor::Flute,
         Some(Instrument::Piano(_)) => ControlsFor::Piano,
         _ => ControlsFor::Harmonica,
@@ -158,14 +160,10 @@ fn foot_label(foot: FootJoint, loc: &Localization) -> String {
 pub(crate) fn played_for(own: Option<Instrument>, mine: &MyInstruments) -> Option<Instrument> {
     match own? {
         Instrument::Fretted(guitar) => {
-            let (saved_tuning, saved_capo) = if guitar.kind == FrettedKind::Bass {
-                (&mine.bass_tuning, mine.bass_capo)
-            } else {
-                (&mine.guitar_tuning, mine.guitar_capo)
-            };
-            let tuning = saved_tuning
-                .as_deref()
-                .and_then(|id| guitar.tuning_presets().iter().find(|t| t.id == id));
+            let saved_tuning = mine.fretted_tuning(guitar.kind);
+            let saved_capo = mine.fretted_capo(guitar.kind);
+            let tuning =
+                saved_tuning.and_then(|id| guitar.tuning_presets().iter().find(|t| t.id == id));
             let strings = tuning.map_or_else(|| guitar.strings.clone(), |t| t.strings.to_vec());
             let capo = saved_capo.map_or(guitar.capo, |c| c.min(MAX_CAPO));
             Some(Guitar { strings, capo, ..guitar }.into())
@@ -235,6 +233,9 @@ pub(crate) fn substitution_message(
     if moved > 0 {
         let key = match played {
             Instrument::Flute(_) => "instrument-check-cost-fingerings",
+            Instrument::Fretted(setup) if setup.kind == FrettedKind::Cavaquinho => {
+                "instrument-check-cost-cavaquinho-frets"
+            }
             Instrument::Fretted(setup) if setup.kind == FrettedKind::Bass => {
                 "instrument-check-cost-bass-frets"
             }
@@ -392,8 +393,15 @@ pub(crate) fn setup_harp_check(
     });
     let title = match shown {
         ControlsFor::Harmonica => "harp-check-title",
-        ControlsFor::Guitar if is_bass => "instrument-check-title-bass",
-        ControlsFor::Guitar => "instrument-check-title-guitar",
+        ControlsFor::Fretted
+            if chart.and_then(HarpChart::instrument).is_some_and(|instrument| {
+                instrument.kind() == harmonicon_core::instrument::InstrumentKind::Cavaquinho
+            }) =>
+        {
+            "instrument-check-title-cavaquinho"
+        }
+        ControlsFor::Fretted if is_bass => "instrument-check-title-bass",
+        ControlsFor::Fretted => "instrument-check-title-guitar",
         ControlsFor::Flute => "instrument-check-title-flute",
         ControlsFor::Piano => "instrument-check-title-piano",
     };
@@ -444,12 +452,16 @@ pub(crate) fn setup_harp_check(
         entity
     };
     let harp_box = container(&mut commands, ControlsFor::Harmonica);
-    let guitar_box = container(&mut commands, ControlsFor::Guitar);
+    let guitar_box = container(&mut commands, ControlsFor::Fretted);
     let flute_box = container(&mut commands, ControlsFor::Flute);
 
     // A guitar's tuning: the named ones, plus the chart's own when it is
     // none of them. Picking one places the chart's notes onto it.
-    let presets = if is_bass { harmonicon_core::instrument::bass::TUNINGS } else { TUNINGS };
+    let setup = match chart.and_then(HarpChart::instrument) {
+        Some(Instrument::Fretted(setup)) => setup,
+        _ => FrettedKind::Guitar.default_setup(),
+    };
+    let presets = setup.tuning_presets();
     let mut tunings: Vec<String> = presets.iter().map(|t| tuning_label(Some(t.id), &loc)).collect();
     tunings.insert(0, tuning_label(None, &loc));
     let current_tuning = match &choice.played {
@@ -481,11 +493,7 @@ pub(crate) fn setup_harp_check(
                 .checked_sub(1)
                 .and_then(|index| setup.tuning_presets().get(index))
                 .map(|preset| preset.id.to_owned());
-            if setup.kind == FrettedKind::Bass {
-                mine.bass_tuning = picked;
-            } else {
-                mine.guitar_tuning = picked;
-            }
+            mine.set_fretted_tuning(setup.kind, picked);
             choice.played = played_for(own, &mine);
         },
     );
@@ -498,7 +506,7 @@ pub(crate) fn setup_harp_check(
         page_root,
         &loc.msg("instrument-check-capo"),
         &capos,
-        &capos[capo_index(if is_bass { mine.bass_capo } else { mine.guitar_capo })],
+        &capos[capo_index(mine.fretted_capo(setup.kind))],
         |ev: On<combobox::ComboboxSelect>,
          mut choice: ResMut<HarpChoice>,
          mut mine: ResMut<MyInstruments>,
@@ -510,12 +518,8 @@ pub(crate) fn setup_harp_check(
                 return;
             }
             // Remembered like the tuning; "as written" follows each chart.
-            if own.as_ref().is_some_and(|instrument| {
-                instrument.kind() == harmonicon_core::instrument::InstrumentKind::Bass
-            }) {
-                mine.bass_capo = capo_from_index(ev.index);
-            } else {
-                mine.guitar_capo = capo_from_index(ev.index);
+            if let Some(Instrument::Fretted(setup)) = &own {
+                mine.set_fretted_capo(setup.kind, capo_from_index(ev.index));
             }
             choice.played = played_for(own, &mine);
         },
@@ -716,8 +720,15 @@ pub(crate) fn refresh_harp_cost(
     });
     let intro = String::from(loc.msg(match shown {
         ControlsFor::Harmonica => "harp-check-intro",
-        ControlsFor::Guitar if is_bass => "instrument-check-intro-bass",
-        ControlsFor::Guitar => "instrument-check-intro-guitar",
+        ControlsFor::Fretted
+            if chart.instrument().is_some_and(|instrument| {
+                instrument.kind() == harmonicon_core::instrument::InstrumentKind::Cavaquinho
+            }) =>
+        {
+            "instrument-check-intro-cavaquinho"
+        }
+        ControlsFor::Fretted if is_bass => "instrument-check-intro-bass",
+        ControlsFor::Fretted => "instrument-check-intro-guitar",
         ControlsFor::Flute => "instrument-check-intro-flute",
         ControlsFor::Piano => "instrument-check-intro-piano",
     }));
@@ -732,20 +743,15 @@ pub(crate) fn refresh_harp_cost(
             let tuning = tuning_label(guitar.named_tuning().map(|t| t.id), &loc);
             String::from(if guitar.capo == 0 {
                 loc.msg_args(
-                    if is_bass {
-                        "instrument-check-chart-bass"
-                    } else {
-                        "instrument-check-chart-guitar"
-                    },
+                    &format!("instrument-check-chart-{}", guitar.kind.instrument_kind().slug()),
                     &[("tuning", tuning)],
                 )
             } else {
                 loc.msg_args(
-                    if is_bass {
-                        "instrument-check-chart-bass-capo"
-                    } else {
-                        "instrument-check-chart-guitar-capo"
-                    },
+                    &format!(
+                        "instrument-check-chart-{}-capo",
+                        guitar.kind.instrument_kind().slug()
+                    ),
                     &[("tuning", tuning), ("fret", guitar.capo.to_string())],
                 )
             })
@@ -805,6 +811,11 @@ pub(crate) fn track_label(entry: &TrackChart, loc: &Localization) -> String {
             (
                 "instrument",
                 loc.msg(match entry.chart.instrument() {
+                    Some(Instrument::Fretted(ref setup))
+                        if setup.kind == FrettedKind::Cavaquinho =>
+                    {
+                        "song-instrument-cavaquinho"
+                    }
                     Some(Instrument::Fretted(ref setup)) if setup.kind == FrettedKind::Bass => {
                         "song-instrument-bass"
                     }

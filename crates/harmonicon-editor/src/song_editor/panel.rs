@@ -441,7 +441,19 @@ pub(super) fn update_technique_button_visibility(
         NoteButtons::Chromatic
     };
     for (kind, mut node) in &mut buttons {
-        let visible = note_button_visible(*kind, set);
+        let supported = match state.effective_instrument() {
+            harmonicon_core::instrument::Instrument::Fretted(setup) => match kind {
+                ModButton::Bend => setup.supports_technique(
+                    harmonicon_core::instrument::guitar::StringTechnique::Bend(1.0),
+                ),
+                ModButton::Harmonic => setup.supports_technique(
+                    harmonicon_core::instrument::guitar::StringTechnique::Harmonic,
+                ),
+                _ => true,
+            },
+            _ => true,
+        };
+        let visible = note_button_visible(*kind, set) && supported;
         let want = if visible { Display::Flex } else { Display::None };
         if node.display != want {
             node.display = want;

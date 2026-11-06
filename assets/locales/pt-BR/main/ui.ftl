@@ -1120,3 +1120,19 @@ instrument-check-chart-bass-capo = Escrito para baixo em {$tuning}, com capotras
 gameplay-bass-neck = Braço do baixo · marcadores mostram casas · 0 solta · toque a corda marcada
 
 instrument-check-cost-bass-frets = {$count} nota(s) passam para outras casas do baixo
+
+song-instrument-cavaquinho = Cavaquinho
+editor-instrument-cavaquinho = Cavaquinho
+editor-cavaquinho-setup = Configuração do cavaquinho
+note-trainer-cavaquinho = Cavaquinho
+note-trainer-cavaquinho-title = Treinador de notas — Cavaquinho
+options-cavaquinho-tuning = Afinação do cavaquinho
+guitar-tuning-cavaquinho-brazilian = Brasileira · D5 B4 G4 D4
+guitar-tuning-cavaquinho-natural = Natural brasileira · E5 B4 G4 D4
+guitar-tuning-cavaquinho-mandolin = Violino / bandolim · E5 A4 D4 G3
+instrument-check-title-cavaquinho = Seu cavaquinho
+instrument-check-intro-cavaquinho = Escolha sua tradição de afinação ou siga a partitura. As notas mantêm a altura sonora e passam para casas disponíveis. Use o editor para uma afinação personalizada.
+instrument-check-chart-cavaquinho = Escrito para cavaquinho em {$tuning}.
+instrument-check-chart-cavaquinho-capo = Escrito para cavaquinho em {$tuning}, com capotraste na casa {$fret}.
+instrument-check-cost-cavaquinho-frets = {$count} nota(s) passam para outras casas do cavaquinho
+gameplay-cavaquinho-neck = Braço do cavaquinho · marcadores mostram casas · 0 solta · toque a corda marcada

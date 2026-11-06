@@ -112,34 +112,40 @@ pub(super) fn spawn_my_instruments(
         },
     );
 
-    let bass_presets = harmonicon_core::instrument::bass::TUNINGS;
-    let bass_options: Vec<_> = std::iter::once(follow_chart(loc))
-        .chain(
-            bass_presets
-                .iter()
-                .map(|preset| loc.msg(&format!("guitar-tuning-{}", preset.id)).to_string()),
-        )
-        .collect();
-    let bass_index = mine
-        .bass_tuning
-        .as_ref()
-        .and_then(|id| bass_presets.iter().position(|preset| preset.id == id))
-        .map_or(0, |index| index + 1);
-    combobox::spawn_combobox(
-        commands,
-        parent,
-        page_root,
-        &loc.msg("options-bass-tuning"),
-        &bass_options,
-        &bass_options[bass_index],
-        |ev: On<combobox::ComboboxSelect>, mut mine: ResMut<MyInstruments>| {
-            mine.bass_tuning = ev
-                .index
-                .checked_sub(1)
-                .and_then(|index| harmonicon_core::instrument::bass::TUNINGS.get(index))
-                .map(|preset| preset.id.to_owned());
-        },
-    );
+    for kind in [
+        harmonicon_core::instrument::fretted_strings::FrettedKind::Bass,
+        harmonicon_core::instrument::fretted_strings::FrettedKind::Cavaquinho,
+    ] {
+        let setup = kind.default_setup();
+        let presets = setup.tuning_presets();
+        let options: Vec<_> = std::iter::once(follow_chart(loc))
+            .chain(
+                presets
+                    .iter()
+                    .map(|preset| loc.msg(&format!("guitar-tuning-{}", preset.id)).to_string()),
+            )
+            .collect();
+        let selected = mine
+            .fretted_tuning(kind)
+            .and_then(|id| presets.iter().position(|preset| preset.id == id))
+            .map_or(0, |index| index + 1);
+        combobox::spawn_combobox(
+            commands,
+            parent,
+            page_root,
+            &loc.msg(&format!("options-{}-tuning", kind.instrument_kind().slug())),
+            &options,
+            &options[selected],
+            move |ev: On<combobox::ComboboxSelect>, mut mine: ResMut<MyInstruments>| {
+                let picked = ev
+                    .index
+                    .checked_sub(1)
+                    .and_then(|index| presets.get(index))
+                    .map(|preset| preset.id.to_owned());
+                mine.set_fretted_tuning(kind, picked);
+            },
+        );
+    }
     let capos = capo_options(follow_chart(loc), loc);
     combobox::spawn_combobox(
         commands,

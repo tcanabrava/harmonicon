@@ -9,52 +9,81 @@ use harmonicon_ui::dialogs::{
 
 pub(super) struct Shape {
     pub name: &'static str,
-    pub frets: [Option<u8>; 6],
-    fingers: [u8; 6],
+    pub frets: &'static [Option<u8>],
+    fingers: &'static [u8],
 }
 // String 1 first. None means do not strum; zero means open.
 pub(super) const SHAPES: &[Shape] = &[
     Shape {
         name: "Em",
-        frets: [Some(0), Some(0), Some(0), Some(2), Some(2), Some(0)],
-        fingers: [0, 0, 0, 3, 2, 0],
+        frets: &[Some(0), Some(0), Some(0), Some(2), Some(2), Some(0)],
+        fingers: &[0, 0, 0, 3, 2, 0],
     },
     Shape {
         name: "E",
-        frets: [Some(0), Some(0), Some(1), Some(2), Some(2), Some(0)],
-        fingers: [0, 0, 1, 3, 2, 0],
+        frets: &[Some(0), Some(0), Some(1), Some(2), Some(2), Some(0)],
+        fingers: &[0, 0, 1, 3, 2, 0],
     },
     Shape {
         name: "Am",
-        frets: [Some(0), Some(1), Some(2), Some(2), Some(0), None],
-        fingers: [0, 1, 3, 2, 0, 0],
+        frets: &[Some(0), Some(1), Some(2), Some(2), Some(0), None],
+        fingers: &[0, 1, 3, 2, 0, 0],
     },
     Shape {
         name: "A",
-        frets: [Some(0), Some(2), Some(2), Some(2), Some(0), None],
-        fingers: [0, 3, 2, 1, 0, 0],
+        frets: &[Some(0), Some(2), Some(2), Some(2), Some(0), None],
+        fingers: &[0, 3, 2, 1, 0, 0],
     },
     Shape {
         name: "D",
-        frets: [Some(2), Some(3), Some(2), Some(0), None, None],
-        fingers: [2, 3, 1, 0, 0, 0],
+        frets: &[Some(2), Some(3), Some(2), Some(0), None, None],
+        fingers: &[2, 3, 1, 0, 0, 0],
     },
     Shape {
         name: "Dm",
-        frets: [Some(1), Some(3), Some(2), Some(0), None, None],
-        fingers: [1, 3, 2, 0, 0, 0],
+        frets: &[Some(1), Some(3), Some(2), Some(0), None, None],
+        fingers: &[1, 3, 2, 0, 0, 0],
     },
     Shape {
         name: "C",
-        frets: [Some(0), Some(1), Some(0), Some(2), Some(3), None],
-        fingers: [0, 1, 0, 2, 3, 0],
+        frets: &[Some(0), Some(1), Some(0), Some(2), Some(3), None],
+        fingers: &[0, 1, 0, 2, 3, 0],
     },
     Shape {
         name: "G",
-        frets: [Some(3), Some(0), Some(0), Some(0), Some(2), Some(3)],
-        fingers: [3, 0, 0, 0, 1, 2],
+        frets: &[Some(3), Some(0), Some(0), Some(0), Some(2), Some(3)],
+        fingers: &[3, 0, 0, 0, 1, 2],
     },
 ];
+// Brazilian D4-G4-B4-D5 tuning, string 1 first. These voicings contain
+// complete triads; finger numbers are suggestions, not microphone evidence.
+pub(super) const CAVAQUINHO_SHAPES: &[Shape] = &[
+    Shape { name: "G", frets: &[Some(0), Some(0), Some(0), Some(0)], fingers: &[0, 0, 0, 0] },
+    Shape { name: "C", frets: &[Some(2), Some(1), Some(0), Some(2)], fingers: &[3, 1, 0, 2] },
+    Shape { name: "D", frets: &[Some(4), Some(3), Some(2), Some(0)], fingers: &[3, 2, 1, 0] },
+    Shape { name: "Em", frets: &[Some(2), Some(0), Some(0), Some(2)], fingers: &[2, 0, 0, 1] },
+];
+
+pub(super) fn shapes_for(setup: &Guitar) -> Option<&'static [Shape]> {
+    use harmonicon_core::instrument::fretted_strings::FrettedKind;
+    if setup.capo != 0 {
+        return None;
+    }
+    match setup.kind {
+        FrettedKind::Guitar
+            if setup.strings == harmonicon_core::instrument::guitar::STANDARD_TUNING =>
+        {
+            Some(SHAPES)
+        }
+        FrettedKind::Cavaquinho
+            if setup.strings == harmonicon_core::instrument::cavaquinho::BRAZILIAN_TUNING =>
+        {
+            Some(CAVAQUINHO_SHAPES)
+        }
+        _ => None,
+    }
+}
+
 impl Shape {
     pub(super) fn positions(&self) -> Vec<FretAssignment> {
         self.frets
@@ -78,8 +107,8 @@ impl Shape {
     }
 }
 
-#[derive(Default)]
 pub(super) struct ChordPractice {
+    shapes: &'static [Shape],
     pub index: usize,
     pub landed: u32,
     pub held: f32,
@@ -87,17 +116,33 @@ pub(super) struct ChordPractice {
     present: Vec<u8>,
     extras: Vec<u8>,
 }
+impl Default for ChordPractice {
+    fn default() -> Self {
+        Self {
+            shapes: SHAPES,
+            index: 0,
+            landed: 0,
+            held: 0.0,
+            awaiting_release: false,
+            present: Vec::new(),
+            extras: Vec::new(),
+        }
+    }
+}
 impl ChordPractice {
+    pub fn new(shapes: &'static [Shape]) -> Self {
+        Self { shapes, ..default() }
+    }
     pub fn shape(&self) -> &'static Shape {
-        &SHAPES[self.index]
+        &self.shapes[self.index]
     }
     pub fn step_by(&mut self, delta: isize) {
-        let index = (self.index as isize + delta).rem_euclid(SHAPES.len() as isize) as usize;
+        let index = (self.index as isize + delta).rem_euclid(self.shapes.len() as isize) as usize;
         self.select(index);
     }
     fn select(&mut self, index: usize) {
-        if index < SHAPES.len() && index != self.index {
-            *self = Self { index, landed: self.landed, ..default() };
+        if index < self.shapes.len() && index != self.index {
+            *self = Self { shapes: self.shapes, index, landed: self.landed, ..default() };
         }
     }
     /// Every expected absolute pitch must be in this frame. Do not collect
@@ -231,7 +276,7 @@ pub(super) fn spawn(parent: &mut ChildSpawnerCommands, loc: &Localization) {
         });
 }
 
-pub(super) fn spawn_diagram(parent: &mut ChildSpawnerCommands) {
+pub(super) fn spawn_diagram(parent: &mut ChildSpawnerCommands, setup: &Guitar) {
     parent
         .spawn((
             Panel,
@@ -245,8 +290,10 @@ pub(super) fn spawn_diagram(parent: &mut ChildSpawnerCommands) {
             },
         ))
         .with_children(|diagram| {
-            for string in 0..6 {
-                let x = (5 - string) as f32 * 100.0 / 5.0;
+            let count = usize::from(setup.string_count());
+            let names = setup.string_labels();
+            for (string, name) in names.into_iter().enumerate() {
+                let x = (count - 1 - string) as f32 * 100.0 / count.saturating_sub(1).max(1) as f32;
                 diagram.spawn((
                     Node {
                         position_type: PositionType::Absolute,
@@ -258,7 +305,7 @@ pub(super) fn spawn_diagram(parent: &mut ChildSpawnerCommands) {
                     BackgroundColor(Color::srgb(0.7, 0.7, 0.75)),
                 ));
                 diagram.spawn((
-                    Text::new(["e", "B", "G", "D", "A", "E"][string]),
+                    Text::new(name),
                     TextFont { font_size: FontSize::Px(13.0), ..default() },
                     TextColor(Color::WHITE),
                     Node {
@@ -368,7 +415,7 @@ pub(super) fn controls(
     loc: &Localization,
 ) {
     let Some(chord) = &trainer.chord else { return };
-    let options: Vec<String> = SHAPES.iter().map(|s| s.name.to_string()).collect();
+    let options: Vec<String> = chord.shapes.iter().map(|s| s.name.to_string()).collect();
     spawn_combobox(
         commands,
         host,
@@ -440,9 +487,40 @@ mod tests {
                 shape
                     .frets
                     .iter()
-                    .zip(shape.fingers)
+                    .zip(shape.fingers.iter().copied())
                     .all(|(f, finger)| f.is_none_or(|f| f == 0 || (1..=4).contains(&finger)))
             );
         }
+    }
+}
+
+#[cfg(test)]
+mod cavaquinho_tests {
+    use super::*;
+    #[test]
+    fn four_string_shapes_sound_complete_triads_and_keep_their_own_library() {
+        let setup = Guitar::cavaquinho();
+        let mut practice = ChordPractice::new(shapes_for(&setup).unwrap());
+        for (shape, mut expected) in CAVAQUINHO_SHAPES.iter().zip([
+            vec![2, 7, 11],
+            vec![0, 4, 7],
+            vec![2, 6, 9],
+            vec![4, 7, 11],
+        ]) {
+            assert_eq!(shape.frets.len(), 4);
+            assert_eq!(shape.fingers.len(), 4);
+            let mut actual: Vec<_> =
+                shape.pitches(&setup).into_iter().map(|pitch| pitch % 12).collect();
+            actual.sort_unstable();
+            actual.dedup();
+            expected.sort_unstable();
+            assert_eq!(actual, expected, "{}", shape.name);
+            assert_eq!(practice.shape().name, shape.name);
+            practice.step_by(1);
+        }
+        assert_eq!(practice.shape().name, "G");
+        let mut alternate = setup;
+        alternate.strings = harmonicon_core::instrument::cavaquinho::TUNINGS[1].strings.to_vec();
+        assert!(shapes_for(&alternate).is_none(), "a shape is tied to its actual tuning");
     }
 }

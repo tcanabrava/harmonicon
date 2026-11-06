@@ -222,7 +222,10 @@ mod tests {
             // Drafts start empty; the chart format requires a note before
             // saving. Verify each adapter can author a valid first event.
             use harmonicon_core::instrument::InstrumentModel;
-            let position = state.effective_instrument().positions_for(60)[0];
+            let instrument = state.effective_instrument();
+            let pitch =
+                instrument.valid_pitches().into_iter().min().expect("a playable instrument");
+            let position = instrument.positions_for(pitch)[0];
             state.notes.push(super::super::state::GridNote {
                 id: 1,
                 tick: 0,
