@@ -476,6 +476,10 @@ impl Plugin for ThemePlugin {
     }
 }
 
+/// The bundled theme a failed load falls back to. Always shipped:
+/// `scan_ui_themes` lists it even when no `assets/themes/` entry is found.
+const FALLBACK_THEME: &str = "default";
+
 /// The in-flight `theme.json` load kicked off by [`request_theme_load`],
 /// consumed once it resolves by [`apply_theme_when_loaded`]. Absent
 /// whenever no theme.json load is outstanding.
@@ -529,7 +533,20 @@ fn apply_theme_when_loaded(
                 "Could not load theme.json for '{}' from {}themes/{}/: {err}",
                 pending.name, pending.prefix, pending.name
             );
-            commands.remove_resource::<PendingTheme>();
+            // The selection usually outlives its theme: an external theme
+            // folder deleted, or a theme.json broken by hand. Showing the
+            // bundled default beats menus with no backgrounds, button art or
+            // sounds; `SelectedTheme` is left alone, so the player's choice
+            // returns if the theme does.
+            if pending.name == FALLBACK_THEME {
+                commands.remove_resource::<PendingTheme>();
+            } else {
+                commands.insert_resource(PendingTheme {
+                    handle: asset_server.load(format!("themes/{FALLBACK_THEME}/theme.json")),
+                    prefix: "",
+                    name: FALLBACK_THEME.to_string(),
+                });
+            }
             return;
         }
         _ => return, // still loading
@@ -761,6 +778,32 @@ mod tests {
         // No further change → silent.
         app.update();
         assert_eq!(app.world().resource::<ReloadCount>().0, 2, "should not fire without change");
+    }
+
+    #[test]
+    fn a_theme_that_fails_to_load_falls_back_to_the_bundled_default() {
+        let assets = concat!(env!("CARGO_MANIFEST_DIR"), "/../../assets");
+        let mut app = App::new();
+        app.add_plugins((
+            MinimalPlugins,
+            bevy::asset::AssetPlugin { file_path: assets.into(), ..default() },
+        ))
+        .init_asset::<Image>()
+        .init_asset::<AudioSource>()
+        .add_plugins(ThemePlugin)
+        // Not a bundled theme, and there is no `external://` source here,
+        // so its theme.json fails the way a deleted external theme's does.
+        .insert_resource(SelectedTheme("no-such-theme".into()));
+        for _ in 0..200 {
+            app.update();
+            if app.world().get_resource::<PendingTheme>().is_none() {
+                break;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(5));
+        }
+        assert!(app.world().get_resource::<PendingTheme>().is_none(), "the load never settled");
+        assert!(app.world().resource::<LoadedTheme>().colors.is_some(), "no fallback theme");
+        assert_eq!(app.world().resource::<SelectedTheme>().0, "no-such-theme");
     }
 
     #[test]
