@@ -60,7 +60,7 @@ pub fn decode(chart: &HarpChart, event: &NoteEvent) -> Result<NoteTarget, Placem
             NoteTarget::Sounding { midi: acoustic, placement: None }
                 .with_placement(&instrument, position)
         }
-        Instrument::Flute(_) => {
+        Instrument::Flute(_) | Instrument::Clarinet(_) => {
             if event.hole.is_some()
                 || event.action.is_some()
                 || event.position.is_some()

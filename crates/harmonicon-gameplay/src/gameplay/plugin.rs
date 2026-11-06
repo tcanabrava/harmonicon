@@ -157,6 +157,12 @@ impl Plugin for GameplayPlugin {
         )
         // The guitar's Note Trainer (its own AppState, no song).
         .init_resource::<note_trainer::NoteTrainer>()
+        .add_systems(
+            Update,
+            (super::wind_visuals::update_song, super::wind_visuals::rebuild)
+                .chain()
+                .run_if(in_state(AppState::Playing)),
+        )
         .add_systems(OnEnter(AppState::NoteTrainer), note_trainer::setup)
         .add_systems(
             OnExit(AppState::NoteTrainer),
@@ -176,6 +182,7 @@ impl Plugin for GameplayPlugin {
                 note_trainer::update_position_hint.after(note_trainer::listen),
                 note_trainer::update_flute_drawing.after(note_trainer::listen),
                 note_trainer::update_flute_picker.after(note_trainer::listen),
+                note_trainer::update_clarinet.after(note_trainer::listen),
                 note_trainer::update_piano_keys.after(note_trainer::listen),
                 note_trainer::update_hands.after(note_trainer::listen),
                 note_trainer::handle_escape.run_if(not(tour_active)),

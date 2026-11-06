@@ -175,6 +175,7 @@ impl BendingTrainerSettings {
 #[derive(Resource, Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct MyInstruments {
+    pub clarinet_key: Option<harmonicon_core::instrument::clarinet::ClarinetKey>,
     /// The guitar's tuning, by `harmonicon_core::instrument::guitar::Tuning`
     /// id (`"drop-d"`). An id no tuning has any more reads as `None`.
     pub guitar_tuning: Option<String>,
@@ -667,6 +668,7 @@ mod tests {
     #[test]
     fn my_instruments_round_trip_through_the_settings_file() {
         let mine = MyInstruments {
+            clarinet_key: Some(harmonicon_core::instrument::clarinet::ClarinetKey::A),
             cavaquinho_tuning: Some("cavaquinho-natural".into()),
             cavaquinho_capo: Some(0),
             bass_tuning: Some("bass-five".into()),

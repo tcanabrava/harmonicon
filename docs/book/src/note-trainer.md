@@ -163,3 +163,28 @@ checks pitches, not the fingering, strumming gesture or number of physical strin
 
 The open-string frequencies follow [UFERSA's acoustics study, table 6](https://mnpef.ufersa.edu.br/wp-content/uploads/sites/94/2021/03/Disserta%C3%A7%C3%A3o-Final.pdf).
 The named tuning variants follow [Musixe's teaching chart](https://static.musixe.com/wp-content/uploads/2021/05/15110318/Aula-1-Cavaquinho-Apresentacao-PDF.pdf).
+
+
+## Clarinet
+
+Choose **Clarinet** for a Boehm soprano instrument in B♭ or A. The setup
+combobox also saves your choice for other sessions. This first version supports
+**written E3–C6**; altissimo and other key systems are outside its fingering table.
+
+Select a written note directly on the score. Gold marks the target; register
+exercises also outline the starting note. **Register · twelfths** practises the
+lower-to-clarion relationship, with the register key shown separately from the
+thumb hole. **Alternate fingerings** includes verified left/right little-finger
+choices. Press **Listen** to hear the sounding pitch of the written target.
+
+The contact diagram uses circles for holes and ovals for levers. Gold means
+cover or press. The microphone checks pitch and timing; it cannot confirm the
+finger contacts. The basic fingerings follow the Woodwind Fingering Guide’s
+[chalumeau](https://www.wfg.woodwind.org/clarinet/cl_bas_1.html) and
+[clarion](https://www.wfg.woodwind.org/clarinet/cl_bas_2.html) tables.
+
+
+In **Play**, clarinet parts use a horizontal diagram, with a smaller preview of
+the next different fingering above it. The score and playhead carry the timing;
+there is no falling-note highway. A short cue shows when to start and how much
+of the note remains. The trainer retains its upright contact map.

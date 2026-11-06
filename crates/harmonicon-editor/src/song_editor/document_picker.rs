@@ -156,9 +156,7 @@ pub(super) fn sync_picker(
 /// from the adapter. No other document's notes or metadata are retained.
 pub(super) fn fresh(selection: super::state::InstrumentSelection) -> EditorState {
     let mut state = EditorState { instrument: selection, mode: Mode::Edit, ..Default::default() };
-    if super::piano_note::is_piano(&state) {
-        super::piano_note::centre_on_notes(&mut state);
-    }
+    super::piano_note::reset_window(&mut state);
     state
 }
 

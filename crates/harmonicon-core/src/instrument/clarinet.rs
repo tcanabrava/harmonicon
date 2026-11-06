@@ -163,6 +163,45 @@ impl FingeringChart for Clarinet {
     }
 }
 
+impl super::InstrumentModel for Clarinet {
+    fn range(&self) -> Option<(u8, u8)> {
+        let range = Clarinet::range(*self);
+        Some((*range.start(), *range.end()))
+    }
+    fn positions_for(&self, midi: u8) -> Vec<super::PlayPosition> {
+        positions_for(self, midi).into_iter().map(super::PlayPosition::Fingering).collect()
+    }
+    fn valid_pitches(&self) -> std::collections::HashSet<u8> {
+        Clarinet::range(*self).collect()
+    }
+    fn pitch_of(&self, position: &super::PlayPosition) -> Option<u8> {
+        let super::PlayPosition::Fingering(at) = position else { return None };
+        Clarinet::pitch_of(*self, *at)
+    }
+    fn can_sound_together(&self, _: &super::PlayPosition, _: &super::PlayPosition) -> bool {
+        false
+    }
+    fn reconcile(&self, _: &super::PlayPosition, _: &mut [super::PlayPosition]) {}
+    fn techniques(&self) -> &'static [super::TechniqueKind] {
+        use super::TechniqueKind::*;
+        &[Target, Register, Position]
+    }
+    fn expression_scope(&self) -> super::ExpressionScope {
+        super::ExpressionScope::WholeInstrument
+    }
+    fn envelope(&self) -> super::Envelope {
+        super::Envelope::Sustained
+    }
+    fn lane_layout(&self) -> super::LaneLayout {
+        // One arrival lane: the score and finger-contact diagram carry pitch
+        // detail instead of squeezing 33 pitches into narrow columns.
+        super::LaneLayout {
+            axis: super::ScrollAxis::Vertical,
+            lanes: vec![super::Lane::new(String::new(), None)],
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -196,6 +235,27 @@ mod tests {
             assert!(clarinet.pattern(high).unwrap().contains(ControlId(1)));
         }
     }
+    #[test]
+    fn runtime_model_uses_sounding_pitch_and_one_voice() {
+        use super::super::{Instrument, InstrumentModel};
+        let instrument: Instrument = Clarinet::default().into();
+        assert_eq!(instrument.kind(), super::super::InstrumentKind::Clarinet);
+        assert_eq!(InstrumentModel::range(&instrument), Some((50, 82)));
+        let low = instrument.positions_for(50)[0];
+        let other = instrument.positions_for(51)[0];
+        assert_eq!(instrument.pitch_of(&low), Some(50));
+        assert!(!instrument.can_sound_together(&low, &other));
+        assert_eq!(
+            instrument
+                .notation()
+                .written_pitch(50, crate::notation::KeySignature::default())
+                .unwrap()
+                .name(),
+            "E3"
+        );
+        assert_eq!(instrument.synth_voice(), crate::synth::Voice::Clarinet);
+    }
+
     #[test]
     fn direct_lookup_matches_the_table_and_rejects_invalid_variants() {
         for key in [ClarinetKey::Bb, ClarinetKey::A] {

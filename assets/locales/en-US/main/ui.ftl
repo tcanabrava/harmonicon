@@ -1140,3 +1140,27 @@ instrument-check-chart-cavaquinho = Written for a cavaquinho in {$tuning}.
 instrument-check-chart-cavaquinho-capo = Written for a cavaquinho in {$tuning}, capo at fret {$fret}.
 instrument-check-cost-cavaquinho-frets = {$count} note(s) move to other frets on your cavaquinho
 gameplay-cavaquinho-neck = Cavaquinho fretboard · markers show fret numbers · 0 open · play the marked string
+
+# Boehm soprano clarinet
+instrument-clarinet = Clarinet
+song-instrument-clarinet = Clarinet
+clarinet-setup = Clarinet setup
+clarinet-bb = B♭ soprano · Boehm
+clarinet-a = A soprano · Boehm
+clarinet-as-written = Follow each chart
+clarinet-trainer-title = Note Trainer — Clarinet
+clarinet-register-tab = Register · twelfths
+clarinet-register-instruction = Written { $start } → { $note }: add the register key. Keep the indicated finger contacts.
+clarinet-target-instruction = Play written { $note } · fingering { $fingering }
+clarinet-now = Now · { $note }
+clarinet-next = Next different note · { $note }
+clarinet-diagram-help = Gold: press or cover. Circles: holes. Ovals: keys. T: thumb hole; Register: separate thumb lever. L/R: left/right fingers. Pitch detection cannot verify your fingers.
+clarinet-play-help = Boehm soprano clarinet · supported written range E3–C6. The score shows written notes; detection and audio use sounding pitch.
+clarinet-editor-help = The keyboard and grid use concert pitch. The score transposes to written clarinet notation. Supported written range: E3–C6.
+clarinet-setup-rejected = This setup would put an existing note outside the supported range. Move that note before changing setup.
+
+clarinet-starts-in = Starts in { $seconds } s
+clarinet-hold = Hold · { $seconds } s remaining
+clarinet-play-now = Play now
+
+editor-wind-invalid = This wind instrument plays one supported note at a time.

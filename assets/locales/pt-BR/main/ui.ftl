@@ -1137,3 +1137,27 @@ instrument-check-chart-cavaquinho = Escrito para cavaquinho em {$tuning}.
 instrument-check-chart-cavaquinho-capo = Escrito para cavaquinho em {$tuning}, com capotraste na casa {$fret}.
 instrument-check-cost-cavaquinho-frets = {$count} nota(s) passam para outras casas do cavaquinho
 gameplay-cavaquinho-neck = Braço do cavaquinho · marcadores mostram casas · 0 solta · toque a corda marcada
+
+# Clarinete soprano Boehm
+instrument-clarinet = Clarinete
+song-instrument-clarinet = Clarinete
+clarinet-setup = Configuração do clarinete
+clarinet-bb = Soprano em Si♭ · Boehm
+clarinet-a = Soprano em Lá · Boehm
+clarinet-as-written = Seguir cada partitura
+clarinet-trainer-title = Treino de notas — Clarinete
+clarinet-register-tab = Registro · duodécimas
+clarinet-register-instruction = Escrito { $start } → { $note }: acrescente a chave de registro. Mantenha os dedos indicados.
+clarinet-target-instruction = Toque { $note } escrito · digitação { $fingering }
+clarinet-now = Agora · { $note }
+clarinet-next = Próxima nota diferente · { $note }
+clarinet-diagram-help = Dourado: pressionar ou cobrir. Círculos: orifícios. Ovais: chaves. T: orifício do polegar; Register: alavanca separada. L/R: dedos esquerdos/direitos. A detecção de altura não verifica os dedos.
+clarinet-play-help = Clarinete soprano Boehm · extensão escrita compatível E3–C6. A partitura mostra notas escritas; o áudio e a detecção usam a altura real.
+clarinet-editor-help = O teclado e a grade usam afinação de concerto. A partitura é transposta para clarinete. Extensão escrita compatível: E3–C6.
+clarinet-setup-rejected = Esta configuração deixaria uma nota fora da extensão compatível. Mova essa nota antes de mudar a configuração.
+
+clarinet-starts-in = Começa em { $seconds } s
+clarinet-hold = Sustente · faltam { $seconds } s
+clarinet-play-now = Toque agora
+
+editor-wind-invalid = Este instrumento de sopro toca uma nota compatível por vez.

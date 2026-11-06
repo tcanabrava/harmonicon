@@ -28,10 +28,12 @@ pub(super) fn decode_note(
     let midi = harmonicon_core::midi::note_to_midi(event.note.as_deref()?)? as f32;
     let position = match instrument {
         Instrument::Piano(_) => PlayPosition::Key(midi as u8),
-        Instrument::Flute(_) => PlayPosition::Fingering(FingeringAssignment {
-            note: midi as u8,
-            alternate: event.fingering.unwrap_or(0),
-        }),
+        Instrument::Flute(_) | Instrument::Clarinet(_) => {
+            PlayPosition::Fingering(FingeringAssignment {
+                note: midi as u8,
+                alternate: event.fingering.unwrap_or(0),
+            })
+        }
         _ => {
             let at = event.position?;
             PlayPosition::Fret(FretAssignment {

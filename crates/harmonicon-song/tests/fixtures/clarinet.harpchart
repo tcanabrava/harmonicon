@@ -1,0 +1,163 @@
+{
+  "metadata": {
+    "format_version": "1.13.0",
+    "description": "Boehm soprano clarinet test: sounding pitches, register twelfth and repeated next note."
+  },
+  "song": {
+    "title": "Clarinet foundations",
+    "artist": "Harmonicon",
+    "genre": "Exercise",
+    "tempo_bpm": 90,
+    "key": "Bb",
+    "difficulty": "easy",
+    "time_signature": "4/4"
+  },
+  "timing": {
+    "resolution": 480,
+    "tempo_map": [
+      {
+        "tick": 0,
+        "bpm": 90
+      }
+    ]
+  },
+  "instrument": {
+    "type": "clarinet",
+    "key": "bb"
+  },
+  "track": [
+    {
+      "tick": 0,
+      "duration": 0.55,
+      "phrase": "Chalumeau",
+      "events": [
+        {
+          "note": "D3"
+        }
+      ]
+    },
+    {
+      "tick": 480,
+      "duration": 0.55,
+      "events": [
+        {
+          "note": "F3"
+        }
+      ]
+    },
+    {
+      "tick": 960,
+      "duration": 0.55,
+      "events": [
+        {
+          "note": "G3"
+        }
+      ]
+    },
+    {
+      "tick": 1440,
+      "duration": 0.55,
+      "events": [
+        {
+          "note": "A3"
+        }
+      ]
+    },
+    {
+      "tick": 1920,
+      "duration": 0.55,
+      "events": [
+        {
+          "note": "Bb3"
+        }
+      ]
+    },
+    {
+      "tick": 2400,
+      "duration": 0.55,
+      "events": [
+        {
+          "note": "C4"
+        }
+      ]
+    },
+    {
+      "tick": 2880,
+      "duration": 0.55,
+      "events": [
+        {
+          "note": "D4"
+        }
+      ]
+    },
+    {
+      "tick": 3360,
+      "duration": 0.55,
+      "events": [
+        {
+          "note": "Eb4"
+        }
+      ]
+    },
+    {
+      "tick": 3840,
+      "duration": 0.55,
+      "phrase": "Clarion",
+      "events": [
+        {
+          "note": "D3"
+        }
+      ]
+    },
+    {
+      "tick": 4320,
+      "duration": 0.55,
+      "events": [
+        {
+          "note": "A4"
+        }
+      ]
+    },
+    {
+      "tick": 4800,
+      "duration": 0.55,
+      "events": [
+        {
+          "note": "A4"
+        }
+      ]
+    },
+    {
+      "tick": 5280,
+      "duration": 0.55,
+      "events": [
+        {
+          "note": "D5"
+        }
+      ]
+    },
+    {
+      "tick": 5760,
+      "duration": 0.55,
+      "events": [
+        {
+          "note": "F5"
+        }
+      ]
+    },
+    {
+      "tick": 6240,
+      "duration": 0.55,
+      "events": [
+        {
+          "note": "Bb5"
+        }
+      ]
+    }
+  ],
+  "scoring": {
+    "perfect_window_ms": 50,
+    "good_window_ms": 100,
+    "miss_window_ms": 130
+  }
+}

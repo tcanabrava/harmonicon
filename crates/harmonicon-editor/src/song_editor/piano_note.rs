@@ -122,7 +122,12 @@ pub(super) fn reveal_row(state: &mut EditorState, row: u8) {
 
 /// Instrument changes discard the previous instrument's pitch-window offset.
 pub(super) fn reset_window(state: &mut EditorState) {
-    state.row_offset = 0;
+    state.row_offset = match state.effective_instrument() {
+        Instrument::Clarinet(clarinet) => {
+            super::note_model::FLUTE_TOP_NOTE - *clarinet.range().end()
+        }
+        _ => 0,
+    };
     if is_piano(state) {
         centre_on_notes(state);
     }

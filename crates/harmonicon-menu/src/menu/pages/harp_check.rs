@@ -124,6 +124,7 @@ pub(crate) enum ControlsFor {
     Harmonica,
     Fretted,
     Flute,
+    Clarinet,
     /// Nothing to choose yet: a part's keyboard is the one it is played on.
     Piano,
 }
@@ -132,6 +133,7 @@ fn controls_for(chart: &HarpChart) -> ControlsFor {
     match chart.instrument() {
         Some(Instrument::Fretted(_)) => ControlsFor::Fretted,
         Some(Instrument::Flute(_)) => ControlsFor::Flute,
+        Some(Instrument::Clarinet(_)) => ControlsFor::Clarinet,
         Some(Instrument::Piano(_)) => ControlsFor::Piano,
         _ => ControlsFor::Harmonica,
     }
@@ -169,6 +171,12 @@ pub(crate) fn played_for(own: Option<Instrument>, mine: &MyInstruments) -> Optio
             Some(Guitar { strings, capo, ..guitar }.into())
         }
         Instrument::Flute(flute) => Some(Flute::new(mine.flute_foot.unwrap_or(flute.foot)).into()),
+        Instrument::Clarinet(setup) => Some(
+            harmonicon_core::instrument::clarinet::Clarinet {
+                key: mine.clarinet_key.unwrap_or(setup.key),
+            }
+            .into(),
+        ),
         Instrument::Piano(piano) => Some(piano.into()),
         Instrument::Harmonica(_) => None,
     }
@@ -232,7 +240,7 @@ pub(crate) fn substitution_message(
     let mut parts = Vec::new();
     if moved > 0 {
         let key = match played {
-            Instrument::Flute(_) => "instrument-check-cost-fingerings",
+            Instrument::Flute(_) | Instrument::Clarinet(_) => "instrument-check-cost-fingerings",
             Instrument::Fretted(setup) if setup.kind == FrettedKind::Cavaquinho => {
                 "instrument-check-cost-cavaquinho-frets"
             }
@@ -403,6 +411,7 @@ pub(crate) fn setup_harp_check(
         ControlsFor::Fretted if is_bass => "instrument-check-title-bass",
         ControlsFor::Fretted => "instrument-check-title-guitar",
         ControlsFor::Flute => "instrument-check-title-flute",
+        ControlsFor::Clarinet => "instrument-clarinet",
         ControlsFor::Piano => "instrument-check-title-piano",
     };
     let (root, header, page_root) =
@@ -522,6 +531,44 @@ pub(crate) fn setup_harp_check(
                 mine.set_fretted_capo(setup.kind, capo_from_index(ev.index));
             }
             choice.played = played_for(own, &mine);
+        },
+    );
+
+    let clarinet_box = container(&mut commands, ControlsFor::Clarinet);
+    let clarinets = vec![
+        loc.msg("clarinet-as-written").to_string(),
+        loc.msg("clarinet-bb").to_string(),
+        loc.msg("clarinet-a").to_string(),
+    ];
+    let index = match mine.clarinet_key {
+        None => 0,
+        Some(harmonicon_core::instrument::clarinet::ClarinetKey::Bb) => 1,
+        Some(_) => 2,
+    };
+    combobox::spawn_combobox(
+        &mut commands,
+        clarinet_box,
+        page_root,
+        &loc.msg("clarinet-setup"),
+        &clarinets,
+        &clarinets[index],
+        |ev: On<combobox::ComboboxSelect>,
+         mut choice: ResMut<HarpChoice>,
+         mut mine: ResMut<MyInstruments>,
+         selected: Option<Res<SelectedSong>>,
+         manifests: Res<Assets<SongManifest>>| {
+            mine.clarinet_key = match ev.index {
+                1 => Some(harmonicon_core::instrument::clarinet::ClarinetKey::Bb),
+                2 => Some(harmonicon_core::instrument::clarinet::ClarinetKey::A),
+                _ => None,
+            };
+            let own = selected
+                .as_ref()
+                .and_then(|s| manifests.get(&s.0))
+                .and_then(|m| m.chart.instrument());
+            if matches!(own, Some(Instrument::Clarinet(_))) {
+                choice.played = played_for(own, &mine);
+            }
         },
     );
 
@@ -730,6 +777,7 @@ pub(crate) fn refresh_harp_cost(
         ControlsFor::Fretted if is_bass => "instrument-check-intro-bass",
         ControlsFor::Fretted => "instrument-check-intro-guitar",
         ControlsFor::Flute => "instrument-check-intro-flute",
+        ControlsFor::Clarinet => "clarinet-play-help",
         ControlsFor::Piano => "instrument-check-intro-piano",
     }));
     for mut label in &mut intros {
@@ -759,6 +807,13 @@ pub(crate) fn refresh_harp_cost(
         Some(Instrument::Flute(flute)) => String::from(
             loc.msg_args("instrument-check-chart-flute", &[("foot", foot_label(flute.foot, &loc))]),
         ),
+        Some(Instrument::Clarinet(setup)) => loc
+            .msg(if setup.key == harmonicon_core::instrument::clarinet::ClarinetKey::Bb {
+                "clarinet-bb"
+            } else {
+                "clarinet-a"
+            })
+            .to_string(),
         Some(Instrument::Piano(piano)) => String::from(
             loc.msg_args("instrument-check-chart-piano", &[("keys", piano.keys.to_string())]),
         ),
@@ -821,6 +876,7 @@ pub(crate) fn track_label(entry: &TrackChart, loc: &Localization) -> String {
                     }
                     Some(Instrument::Fretted(_)) => "harp-check-instrument-guitar",
                     Some(Instrument::Flute(_)) => "harp-check-instrument-flute",
+                    Some(Instrument::Clarinet(_)) => "instrument-clarinet",
                     Some(Instrument::Piano(_)) => "harp-check-instrument-piano",
                     _ => "harp-check-instrument-harmonica",
                 })

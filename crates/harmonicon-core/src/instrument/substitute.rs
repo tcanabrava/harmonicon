@@ -47,6 +47,22 @@ pub fn substitute_chart(chart: &HarpChart, played: &Instrument) -> Vec<Vec<Optio
             .into_iter()
             .map(|item| item.into_iter().map(|p| p.and_then(|p| onto_flute(flute, p))).collect())
             .collect(),
+        (Instrument::Clarinet(_), Instrument::Clarinet(_)) => decoded
+            .into_iter()
+            .map(|item| {
+                item.into_iter()
+                    .map(|position| {
+                        position.and_then(|position| {
+                            if played.pitch_of(&position).is_some() {
+                                return Some(position);
+                            }
+                            let PlayPosition::Fingering(at) = position else { return None };
+                            played.positions_for(at.note).into_iter().next()
+                        })
+                    })
+                    .collect()
+            })
+            .collect(),
         (Instrument::Fretted(from), Instrument::Fretted(to)) if from.kind == to.kind => {
             onto_guitar(from, to, &decoded)
         }

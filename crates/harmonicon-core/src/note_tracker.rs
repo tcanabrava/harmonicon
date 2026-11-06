@@ -100,8 +100,8 @@ impl VoiceFilter {
             }
             // One voice: the same rule as a one-string guitar, the
             // strongest pitch the flute can play.
-            Instrument::Flute(flute) => {
-                Self::Strings { pitches: InstrumentModel::valid_pitches(flute), strings: 1 }
+            Instrument::Flute(_) | Instrument::Clarinet(_) => {
+                Self::Strings { pitches: instrument.valid_pitches(), strings: 1 }
             }
             // Ten fingers: any keys at once, the ten strongest heard.
             Instrument::Piano(piano) => {

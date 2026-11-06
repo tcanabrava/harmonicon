@@ -49,6 +49,7 @@ use serde_json::{Value, json};
 enum Target {
     Guitar,
     Flute,
+    Clarinet,
     Piano,
 }
 
@@ -57,6 +58,7 @@ impl Target {
         match name {
             "guitar" => Some(Self::Guitar),
             "flute" => Some(Self::Flute),
+            "clarinet" => Some(Self::Clarinet),
             "piano" => Some(Self::Piano),
             _ => None,
         }
@@ -66,6 +68,7 @@ impl Target {
         match self {
             Self::Guitar => "guitar",
             Self::Flute => "flute",
+            Self::Clarinet => "clarinet",
             Self::Piano => "piano",
         }
     }
@@ -74,6 +77,7 @@ impl Target {
         match self {
             Self::Guitar => Guitar::standard(GuitarBody::Acoustic).into(),
             Self::Flute => Flute::new(FootJoint::C).into(),
+            Self::Clarinet => harmonicon_core::instrument::clarinet::Clarinet::default().into(),
             Self::Piano => harmonicon_core::instrument::piano::Piano::grand().into(),
         }
     }
@@ -83,6 +87,7 @@ impl Target {
         match self {
             Self::Guitar => 60,
             Self::Flute => 74,
+            Self::Clarinet => 65,
             Self::Piano => 72,
         }
     }
@@ -123,7 +128,8 @@ fn item_pitches(chart: &HarpChart, item: usize) -> Vec<u8> {
 
 /// Whether a harmonica chart's modifier means anything on `target`.
 fn keeps_modifier(target: Target, modifier: &Value) -> bool {
-    target == Target::Flute && modifier.get("type").and_then(Value::as_str) == Some("vibrato")
+    matches!(target, Target::Flute | Target::Clarinet)
+        && modifier.get("type").and_then(Value::as_str) == Some("vibrato")
 }
 
 fn port(source: &Path, target: Target) -> Result<(PathBuf, usize, usize, i32), String> {
@@ -145,7 +151,7 @@ fn port(source: &Path, target: Target) -> Result<(PathBuf, usize, usize, i32), S
             let pitches: Vec<u8> =
                 item_pitches(&chart, i).into_iter().filter_map(|p| shifted(p, shift)).collect();
             match target {
-                Target::Flute => pitches.into_iter().take(1).collect(),
+                Target::Flute | Target::Clarinet => pitches.into_iter().take(1).collect(),
                 Target::Guitar | Target::Piano => pitches,
             }
         })
@@ -222,6 +228,7 @@ fn port(source: &Path, target: Target) -> Result<(PathBuf, usize, usize, i32), S
     let spec = match &instrument {
         Instrument::Fretted(guitar) => ChartInstrument::from_fretted(guitar),
         Instrument::Flute(flute) => ChartInstrument::from_flute(flute),
+        Instrument::Clarinet(clarinet) => ChartInstrument::Clarinet { key: clarinet.key },
         Instrument::Piano(piano) => ChartInstrument::from_piano(piano),
         Instrument::Harmonica(_) => unreachable!("the target is a guitar, flute or piano"),
     };
@@ -237,11 +244,12 @@ fn port(source: &Path, target: Target) -> Result<(PathBuf, usize, usize, i32), S
     let what = match target {
         Target::Guitar => "a standard-tuned guitar",
         Target::Flute => "a C-foot flute",
+        Target::Clarinet => "a B-flat Boehm soprano clarinet",
         Target::Piano => "an 88-key piano",
     };
     let review = match target {
         Target::Piano => "Generated part",
-        Target::Guitar | Target::Flute => "Generated fingering",
+        Target::Guitar | Target::Flute | Target::Clarinet => "Generated fingering",
     };
     let metadata = &mut out["metadata"];
     metadata["format_version"] = json!(harmonicon_core::chart::CURRENT_FORMAT_VERSION);

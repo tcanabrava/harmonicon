@@ -15,7 +15,7 @@ pub(crate) fn setup(
     commands.insert_resource(MusicScorePlayhead::default());
     commands.insert_resource(MusicScoreSelection::default());
     commands.insert_resource(harmonicon_ui::music_score::MusicScoreSections::default());
-    if trainer.guitar().is_none() && trainer.flute().is_none() && trainer.piano().is_none() {
+    if matches!(trainer.instrument, Instrument::Harmonica(_)) {
         return;
     }
     if let Some((low, high)) = trainer.instrument.range() {
@@ -40,19 +40,24 @@ pub(crate) fn setup(
         ))
         .id();
     let title = commands
-        .spawn_scene(title_column_scene(String::from(loc.msg(if trainer.flute().is_some() {
-            "note-trainer-flute-title"
-        } else if trainer.piano().is_some() {
-            "note-trainer-piano-title"
-        } else if trainer.instrument.kind()
-            == harmonicon_core::instrument::InstrumentKind::Cavaquinho
-        {
-            "note-trainer-cavaquinho-title"
-        } else if trainer.instrument.kind() == harmonicon_core::instrument::InstrumentKind::Bass {
-            "note-trainer-bass-title"
-        } else {
-            "note-trainer-guitar-title"
-        }))))
+        .spawn_scene(title_column_scene(String::from(loc.msg(
+            if matches!(trainer.instrument, Instrument::Clarinet(_)) {
+                "clarinet-trainer-title"
+            } else if trainer.flute().is_some() {
+                "note-trainer-flute-title"
+            } else if trainer.piano().is_some() {
+                "note-trainer-piano-title"
+            } else if trainer.instrument.kind()
+                == harmonicon_core::instrument::InstrumentKind::Cavaquinho
+            {
+                "note-trainer-cavaquinho-title"
+            } else if trainer.instrument.kind() == harmonicon_core::instrument::InstrumentKind::Bass
+            {
+                "note-trainer-bass-title"
+            } else {
+                "note-trainer-guitar-title"
+            },
+        ))))
         .id();
     let header = commands.spawn_scene(header_scene()).id();
     commands.entity(header).add_child(title);
@@ -123,6 +128,9 @@ pub(crate) fn setup(
         flute_setup::spawn(&mut commands, root, flute, &loc);
     }
 
+    if let Instrument::Clarinet(setup) = trainer.instrument {
+        clarinet::spawn_setup(&mut commands, root, setup, &loc);
+    }
     let previous = String::from(loc.msg("note-trainer-previous"));
     let next = String::from(loc.msg("note-trainer-next"));
     let listen = String::from(loc.msg("note-trainer-listen"));
@@ -175,7 +183,7 @@ pub(crate) fn setup(
     commands.entity(content).with_children(|root| {
         root.spawn(Node {
             width: Val::Percent(100.0),
-            flex_direction: if trainer.guitar().is_some() || trainer.flute().is_some() {
+            flex_direction: if trainer.guitar().is_some() || trainer.instrument.fingering_chart().is_some() {
                 FlexDirection::Row
             } else {
                 FlexDirection::Column
@@ -190,7 +198,7 @@ pub(crate) fn setup(
             workspace
                 .spawn(Node {
                     width: Val::Percent(100.0),
-                    flex_basis: if trainer.guitar().is_some() {
+                    flex_basis: if trainer.guitar().is_some() || matches!(trainer.instrument, Instrument::Clarinet(_)) {
                         Val::Px(420.0)
                     } else if trainer.flute().is_some() {
                         Val::Px(300.0)
@@ -265,6 +273,10 @@ pub(crate) fn setup(
                         TextFont { font_size: FontSize::Px(16.0), ..default() },
                         TextColor(Color::srgb(0.6, 0.65, 0.75)),
                     ));
+                    if let Instrument::Clarinet(setup) = trainer.instrument {
+                        super::super::wind_visuals::spawn_slot(card, setup, false);
+                        card.spawn((Text::new(loc.msg("clarinet-diagram-help").to_string()), TextFont { font_size: FontSize::Px(13.0), ..default() }));
+                    }
                 });
             if let Some(font) = font.as_deref() {
                 workspace
@@ -272,7 +284,7 @@ pub(crate) fn setup(
                         width: Val::Percent(100.0),
                         flex_basis: if trainer.guitar().is_some() {
                             Val::Px(400.0)
-                        } else if trainer.flute().is_some() {
+                        } else if trainer.instrument.fingering_chart().is_some() {
                             Val::Px(680.0)
                         } else {
                             Val::Auto
@@ -298,7 +310,15 @@ pub(crate) fn setup(
                                 ..default()
                             })
                             .with_children(|staff| {
-                                if let Some(flute) = trainer.flute() {
+                                if matches!(trainer.instrument, Instrument::Clarinet(_)) {
+                                    flute_picker::spawn_for_instrument(
+                                        staff,
+                                        font,
+                                        &trainer.instrument,
+                                        &loc,
+                                    );
+
+                                } else if let Some(flute) = trainer.flute() {
                                     flute_picker::spawn(staff, font, flute, &loc);
                                 } else {
                                     teaching::spawn_staff(
@@ -313,6 +333,7 @@ pub(crate) fn setup(
                     });
             }
         });
+        if matches!(trainer.instrument, Instrument::Clarinet(_)) { return; }
         root.spawn(Node {
             width: Val::Percent(100.0),
             flex_direction: FlexDirection::Column,
@@ -377,7 +398,15 @@ pub(crate) fn setup(
                     ));
                 }
                 (_, _, Some(piano)) => piano::spawn(strip, piano, &loc),
-                _ => {}
+                _ => {
+                    if let Instrument::Clarinet(setup) = trainer.instrument {
+                        super::super::wind_visuals::spawn_slot(strip, setup, false);
+                        strip.spawn((
+                            Text::new(loc.msg("clarinet-diagram-help").to_string()),
+                            TextFont { font_size: FontSize::Px(14.0), ..default() },
+                        ));
+                    }
+                }
             }
         });
     });

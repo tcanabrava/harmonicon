@@ -323,6 +323,16 @@
         },
         {
           "type": "object",
+          "description": "A Boehm soprano clarinet (format 1.13.0). key defaults to bb. Notes are sounding pitches; the score transposes to written notation. Supported written range E3–C6.",
+          "required": ["type"],
+          "additionalProperties": false,
+          "properties": {
+            "type": { "type": "string", "enum": ["clarinet"] },
+            "key": { "type": "string", "enum": ["bb", "a"] }
+          }
+        },
+        {
+          "type": "object",
           "description": "A piano (format 1.10.0). keys is the keyboard's size: 88 (A0 to C8, the default), 76 (E1 to G7), 61 (C2 to C7) or 49 (C2 to C6). Its events name only their note.",
           "required": ["type"],
           "additionalProperties": false,

@@ -45,7 +45,9 @@ use super::GameplayRoot;
 use super::flute_visuals::{FluteDrawing, FluteKey, paint_flute_keys};
 mod bend;
 mod chords;
+mod clarinet;
 pub(super) use chords::update as update_chords;
+pub(super) use clarinet::update as update_clarinet;
 mod flute_picker;
 mod flute_setup;
 pub(super) use flute_picker::update as update_flute_picker;
@@ -288,7 +290,10 @@ impl NoteTrainer {
     fn guitar(&self) -> Option<&Guitar> {
         match &self.instrument {
             Instrument::Fretted(guitar) => Some(guitar),
-            Instrument::Harmonica(_) | Instrument::Flute(_) | Instrument::Piano(_) => None,
+            Instrument::Harmonica(_)
+            | Instrument::Flute(_)
+            | Instrument::Clarinet(_)
+            | Instrument::Piano(_) => None,
         }
     }
 
@@ -302,7 +307,10 @@ impl NoteTrainer {
     fn flute(&self) -> Option<&Flute> {
         match &self.instrument {
             Instrument::Flute(flute) => Some(flute),
-            Instrument::Harmonica(_) | Instrument::Fretted(_) | Instrument::Piano(_) => None,
+            Instrument::Harmonica(_)
+            | Instrument::Fretted(_)
+            | Instrument::Clarinet(_)
+            | Instrument::Piano(_) => None,
         }
     }
 
@@ -312,6 +320,7 @@ impl NoteTrainer {
         let instrument = match &self.instrument {
             Instrument::Fretted(setup) => setup.kind.instrument_kind().slug(),
             Instrument::Flute(_) => "flute",
+            Instrument::Clarinet(_) => "clarinet",
             Instrument::Piano(_) => "piano",
             Instrument::Harmonica(_) => return None,
         };
@@ -417,9 +426,14 @@ fn kind_key(instrument: &Instrument, kind: TechniqueKind) -> &'static str {
     match kind {
         TechniqueKind::Target => "note-trainer-kind-target",
         TechniqueKind::Glide => "note-trainer-kind-glide",
+        TechniqueKind::Register if matches!(instrument, Instrument::Clarinet(_)) => {
+            "clarinet-register-tab"
+        }
         TechniqueKind::Register if flute => "note-trainer-kind-register-flute",
         TechniqueKind::Register => "note-trainer-kind-register",
-        TechniqueKind::Position if flute => "note-trainer-kind-position-flute",
+        TechniqueKind::Position if instrument.fingering_chart().is_some() => {
+            "note-trainer-kind-position-flute"
+        }
         TechniqueKind::Position => "note-trainer-kind-position",
     }
 }
@@ -429,6 +443,31 @@ fn instruction(loc: &Localization, instrument: &Instrument, drill: &Drill) -> St
     match instrument {
         Instrument::Fretted(guitar) => guitar_instruction(loc, guitar, drill),
         Instrument::Flute(_) => flute_instruction(loc, drill),
+        Instrument::Clarinet(clarinet) => {
+            let written = |pitch: f32| {
+                midi_to_note(i32::from(
+                    clarinet.notation().transposition.written_semitone(pitch.round() as u8),
+                ))
+            };
+            let note = written(drill.target);
+            if let Some(start) = drill.start {
+                loc.msg_args(
+                    "clarinet-register-instruction",
+                    &[("start", written(start)), ("note", note)],
+                )
+                .to_string()
+            } else {
+                let alternate = match drill.position {
+                    PlayPosition::Fingering(at) => at.alternate + 1,
+                    _ => 1,
+                };
+                loc.msg_args(
+                    "clarinet-target-instruction",
+                    &[("note", note), ("fingering", alternate.to_string())],
+                )
+                .to_string()
+            }
+        }
         // A key is its note: there is nothing to say but which.
         Instrument::Piano(_) => String::from(
             loc.msg_args("note-trainer-flute-target", &[("note", note_name(drill.target))]),
@@ -485,6 +524,15 @@ fn guitar_instruction(loc: &Localization, guitar: &Guitar, drill: &Drill) -> Str
 /// The live line under the instruction: what the tuner hears against the
 /// drill. A landing outranks it for a moment.
 fn status(loc: &Localization, practice: &Practice, tolerance_cents: f32) -> String {
+    status_with_names(loc, practice, tolerance_cents, note_name)
+}
+
+fn status_with_names(
+    loc: &Localization,
+    practice: &Practice,
+    tolerance_cents: f32,
+    name: impl Fn(f32) -> String,
+) -> String {
     if let Some((key, _)) = practice.selection_notice {
         return loc.msg(key).to_string();
     }
@@ -493,7 +541,7 @@ fn status(loc: &Localization, practice: &Practice, tolerance_cents: f32) -> Stri
             return loc
                 .msg_args(
                     "trainer-bend-start-first",
-                    &[("start", drill.start.map(note_name).unwrap_or_default())],
+                    &[("start", drill.start.map(&name).unwrap_or_default())],
                 )
                 .to_string();
         }
@@ -516,7 +564,7 @@ fn status(loc: &Localization, practice: &Practice, tolerance_cents: f32) -> Stri
         return loc.msg("trainer-release-repeat").to_string();
     }
     if practice.celebrate > 0.0 {
-        let next = practice.drill().map(|d| note_name(d.target)).unwrap_or_default();
+        let next = practice.drill().map(|d| name(d.target)).unwrap_or_default();
         return String::from(loc.msg_args("note-trainer-landed", &[("note", next)]));
     }
     let Some(drill) = practice.drill() else { return String::new() };
@@ -536,8 +584,8 @@ fn status(loc: &Localization, practice: &Practice, tolerance_cents: f32) -> Stri
         Some(Heard::Elsewhere) => loc.msg_args(
             "note-trainer-elsewhere",
             &[
-                ("heard", practice.heard_midi.map(note_name).unwrap_or_default()),
-                ("note", note_name(drill.target)),
+                ("heard", practice.heard_midi.map(&name).unwrap_or_default()),
+                ("note", name(drill.target)),
             ],
         ),
     };
@@ -699,7 +747,14 @@ pub(super) fn update_labels(
     } else if let (Some(chord), Some(guitar)) = (&trainer.chord, trainer.guitar()) {
         chord.status(guitar, &audio, &loc)
     } else {
-        status(&loc, practice, settings.tolerance_cents)
+        let shift = -f32::from(trainer.instrument.notation().transposition.semitones);
+        if matches!(trainer.instrument, Instrument::Clarinet(_)) {
+            status_with_names(&loc, practice, settings.tolerance_cents, |pitch| {
+                note_name(pitch + shift)
+            })
+        } else {
+            status(&loc, practice, settings.tolerance_cents)
+        }
     };
     for mut text in &mut texts.p1() {
         set(&mut text, now.clone());

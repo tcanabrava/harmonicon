@@ -13,12 +13,14 @@ use super::interaction::next_expr;
 use super::note_model::FLUTE_TOP_NOTE;
 use super::state::{DEFAULT_INTENSITY, EditorState, GridNote};
 use super::ui::ModButton;
-use harmonicon_core::instrument::flute::{FingeringAssignment, Flute};
-use harmonicon_core::instrument::{Instrument, PlayPosition};
+use harmonicon_core::instrument::PlayPosition;
+#[cfg(test)]
+use harmonicon_core::instrument::flute::Flute;
+use harmonicon_core::instrument::wind::FingeringAssignment;
 use harmonicon_core::note_target::NoteTarget;
 
-pub(super) fn is_flute(state: &EditorState) -> bool {
-    matches!(state.effective_instrument(), Instrument::Flute(_))
+pub(super) fn is_wind(state: &EditorState) -> bool {
+    state.effective_instrument().fingering_chart().is_some()
 }
 
 fn fingering_of(note: &GridNote) -> Option<FingeringAssignment> {
@@ -33,8 +35,12 @@ fn fingered(note: GridNote, at: FingeringAssignment) -> GridNote {
 }
 
 /// How many fingerings `note` has, standard included.
-pub(super) fn fingering_count(flute: &Flute, note: &GridNote) -> usize {
-    fingering_of(note).map_or(0, |at| flute.fingerings_for(at.note).len())
+pub(super) fn fingering_count(
+    flute: &dyn harmonicon_core::instrument::wind::FingeringChart,
+    note: &GridNote,
+) -> usize {
+    fingering_of(note)
+        .map_or(0, |at| harmonicon_core::instrument::wind::positions_for(flute, at.note).len())
 }
 
 /// Places a note on `row` at `tick` on its standard fingering, with the
@@ -42,11 +48,11 @@ pub(super) fn fingering_count(flute: &Flute, note: &GridNote) -> usize {
 /// and a note still sounding at `tick` ends there: one voice. Refused, and
 /// reported, on another note's onset.
 pub(super) fn place(state: &mut EditorState, row: u8, tick: usize, len: usize) {
-    let Instrument::Flute(flute) = state.effective_instrument() else { return };
-    let Some(pitch) = (FLUTE_TOP_NOTE + 1)
-        .checked_sub(row)
-        .filter(|&pitch| !flute.fingerings_for(pitch).is_empty())
-    else {
+    let instrument = state.effective_instrument();
+    let Some(flute) = instrument.fingering_chart() else { return };
+    let Some(pitch) = (FLUTE_TOP_NOTE + 1).checked_sub(row).filter(|&pitch| {
+        !harmonicon_core::instrument::wind::positions_for(flute, pitch).is_empty()
+    }) else {
         state.unplayable_notice = true;
         return;
     };
@@ -83,7 +89,8 @@ pub(super) fn place(state: &mut EditorState, row: u8, tick: usize, len: usize) {
 /// vibrato like the harmonica's. With nothing selected Vibrato arms the
 /// next note's.
 pub(super) fn apply_modifier(state: &mut EditorState, kind: ModButton) {
-    let Instrument::Flute(flute) = state.effective_instrument() else { return };
+    let instrument = state.effective_instrument();
+    let Some(flute) = instrument.fingering_chart() else { return };
     let Some(anchor) = state.selected_note().copied() else {
         if kind == ModButton::Vibrato {
             state.sticky_expr = next_expr(kind, state.sticky_expr);
@@ -95,7 +102,9 @@ pub(super) fn apply_modifier(state: &mut EditorState, kind: ModButton) {
         match kind {
             ModButton::Fingering => {
                 if let Some(at) = fingering_of(n) {
-                    let count = flute.fingerings_for(at.note).len().max(1) as u8;
+                    let count = harmonicon_core::instrument::wind::positions_for(flute, at.note)
+                        .len()
+                        .max(1) as u8;
                     *n = fingered(
                         *n,
                         FingeringAssignment { alternate: (at.alternate + 1) % count, ..at },
@@ -118,7 +127,8 @@ pub(super) fn transpose(
     state: &mut EditorState,
     semitones: i32,
 ) -> super::transpose::TransposeOutcome {
-    let Instrument::Flute(flute) = state.effective_instrument() else {
+    let instrument = state.effective_instrument();
+    let Some(flute) = instrument.fingering_chart() else {
         return super::transpose::TransposeOutcome { semitones, ..Default::default() };
     };
     let everything = state.selected.is_empty();
@@ -127,7 +137,9 @@ pub(super) fn transpose(
     for n in state.notes.iter_mut().filter(|n| everything || ids.contains(&n.id)) {
         let Some(at) = fingering_of(n) else { continue };
         let target = u8::try_from(i32::from(at.note) + semitones).ok();
-        match target.filter(|&note| !flute.fingerings_for(note).is_empty()) {
+        match target.filter(|&note| {
+            !harmonicon_core::instrument::wind::positions_for(flute, note).is_empty()
+        }) {
             Some(note) => {
                 *n = fingered(*n, FingeringAssignment { note, alternate: 0 });
                 moved += 1;

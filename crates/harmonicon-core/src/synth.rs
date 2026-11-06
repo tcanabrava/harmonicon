@@ -28,6 +28,8 @@ pub enum Voice {
     /// Vibrato is breath vibrato, as on the harmonica; wah has no flute
     /// meaning, so it stays the harmonica's.
     Flute,
+    /// An original reed approximation with stronger odd partials.
+    Clarinet,
     /// A struck piano string: inharmonic partials decaying from the
     /// hammer, damped when the key lifts. Expression isn't modelled.
     Piano,
@@ -311,8 +313,8 @@ pub fn render_pcm_with(notes: &[PhraseNote], secs_per_tick: f32, voice: Voice) -
         if start >= buf.len() {
             continue;
         }
-        let dur = ((n.len as f32 * secs_per_tick * SAMPLE_RATE as f32) as usize)
-            .min(buf.len() - start);
+        let dur =
+            ((n.len as f32 * secs_per_tick * SAMPLE_RATE as f32) as usize).min(buf.len() - start);
 
         // Unique per-note LCG seed so each note has an independent breath-noise
         // stream — the slice index stands in for a per-note identity (e.g.
@@ -368,10 +370,14 @@ pub fn render_pcm_with(notes: &[PhraseNote], secs_per_tick: f32, voice: Voice) -
             // Amplitude dips toward WAH_AMP_CLOSED when cupped.
             // Tone color is crossfaded from muffled (fundamental only) to the
             // full bright harmonic stack as the hands open.
-            let (bright, muffled) = if voice == Voice::Flute {
-                flute_wave(sin_x, cos_x)
-            } else {
-                harmonica_wave(sin_x, cos_x)
+            let (bright, muffled) = match voice {
+                Voice::Flute => flute_wave(sin_x, cos_x),
+                Voice::Clarinet => {
+                    let third = 3.0 * sin_x - 4.0 * sin_x.powi(3);
+                    let fifth = 16.0 * sin_x.powi(5) - 20.0 * sin_x.powi(3) + 5.0 * sin_x;
+                    ((sin_x + 0.4 * third + 0.18 * fifth) / 1.58, sin_x)
+                }
+                _ => harmonica_wave(sin_x, cos_x),
             };
             let (tone, amp_mod) = if let Expr::Wah(rate) = n.expr {
                 let wah_open = ((TAU * rate * t).sin() + 1.0) * 0.5;
@@ -560,7 +566,8 @@ mod tests {
     #[test]
     fn the_render_length_is_capped_whatever_the_notes_say() {
         let cap = (MAX_RENDER_SECS * SAMPLE_RATE as f32).ceil() as usize;
-        let far = [PhraseNote { tick: usize::MAX, len: usize::MAX, freq: Some(440.0), expr: Expr::None }];
+        let far =
+            [PhraseNote { tick: usize::MAX, len: usize::MAX, freq: Some(440.0), expr: Expr::None }];
         assert_eq!(render_len(&far, 0.01), cap, "tick + len would overflow");
         let one = [PhraseNote { tick: 0, len: 1, freq: Some(440.0), expr: Expr::None }];
         assert_eq!(render_len(&one, f32::NAN), cap);

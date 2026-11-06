@@ -902,8 +902,8 @@ pub(super) fn spawn_note(
                             &moving_ids,
                             &targets,
                         ),
-                        if matches!(instrument, Instrument::Flute(_)) {
-                            "editor-flute-invalid"
+                        if instrument.fingering_chart().is_some() {
+                            "editor-wind-invalid"
                         } else if matches!(instrument, Instrument::Piano(_)) {
                             "editor-piano-invalid"
                         } else {

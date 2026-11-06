@@ -126,7 +126,9 @@ pub fn setup(
 
     let compact = display.compact.0;
     let is_guitar = matches!(instrument, Some(harmonicon_core::instrument::Instrument::Fretted(_)));
+    let is_clarinet = matches!(instrument, Some(harmonicon_core::instrument::Instrument::Clarinet(_)));
     let is_flute = matches!(instrument, Some(harmonicon_core::instrument::Instrument::Flute(_)));
+    if is_clarinet { highway_lanes.0 = None; }
     let aural = display.lesson.is_some_and(|lesson| lesson.aural);
     let modifiers = used_modifiers(chart);
     let lyrics = harmonicon_core::lyrics::lyric_lines(chart);
@@ -145,9 +147,8 @@ pub fn setup(
     // The meter's own beat count, for the HUD's beat dots — from the one
     // reading of the chart's meter gameplay has (`bars::chart_meter`).
     let beats_per_bar = usize::from(super::bars::chart_meter(chart).numerator.max(1));
-    // Filled in below; the shared score readout hangs off the highway so it
-    // can sit a fixed distance above that node's own hit line.
-    let mut highway = Entity::PLACEHOLDER;
+    // Feedback attaches to the highway, or a score-led instrument's footer.
+    let mut readout_parent = Entity::PLACEHOLDER;
     // Background painted first (this node itself), Main Layout second
     // — everything else here is a child, so it always paints above
     // the background. The song-progress bar (`BAR_Z_INDEX`) still
@@ -202,7 +203,7 @@ pub fn setup(
             .with_children(|left| {
                 let mut spawn_track = |parent: &mut ChildSpawnerCommands| {
                     // Note highway
-                    highway = parent
+                    readout_parent = parent
                         .spawn((
                             Node {
                                 width: Val::Percent(100.0),
@@ -267,6 +268,27 @@ pub fn setup(
                             TextFont { font_size: FontSize::Px(13.0), ..default() },
                             TextColor(Color::WHITE),
                         ));
+                    }
+                } else if let Some(harmonicon_core::instrument::Instrument::Clarinet(setup)) =
+                    instrument
+                {
+                    // A score-led stage: no NoteHighway or falling note entities.
+                    // This transparent footer only anchors score and judgment text.
+                    readout_parent = left.spawn(Node { width: Val::Percent(100.0), height: Val::Px(72.0), flex_shrink: 0.0, ..default() }).id();
+                    if !aural {
+                        left.spawn(Node {
+                            flex_direction: FlexDirection::Column,
+                            justify_content: JustifyContent::Center,
+                            align_items: AlignItems::Center,
+                            width: Val::Percent(100.0),
+                            flex_grow: 1.0,
+                            row_gap: Val::Px(16.0),
+                            ..default()
+                        })
+                        .with_children(|stage| {
+                            super::wind_visuals::spawn_play_slot(stage, setup, true);
+                            super::wind_visuals::spawn_play_slot(stage, setup, false);
+                        });
                     }
                 } else {
                     spawn_track(left);
@@ -345,13 +367,13 @@ pub fn setup(
         });
 
     // Beat/downbeat guides scroll inside the highway, behind the notes.
-    beat_guides::spawn_beat_guides(&mut commands, highway);
+    if !is_clarinet { beat_guides::spawn_beat_guides(&mut commands, readout_parent); }
 
     // The wait-for-note coaching card, just clear of the hit band so the
     // frozen note's head stays visible beneath it.
     super::wait_freeze_overlay::spawn_wait_freeze_prompt(
         &mut commands,
-        highway,
+        readout_parent,
         Val::Percent(HIT_H_PCT + 6.0),
     );
 
@@ -360,8 +382,9 @@ pub fn setup(
     // readable without looking away from the notes being judged.
     spawn_score_readout(
         &mut commands,
-        highway,
-        score_anchor(highway_lanes.0.as_ref().map_or(ScrollAxis::Vertical, |l| l.axis)),
+        readout_parent,
+        if is_clarinet { ScoreReadoutAnchor { left: Val::Percent(0.0), width: Val::Percent(100.0), bottom: Val::Px(4.0) } }
+        else { score_anchor(highway_lanes.0.as_ref().map_or(ScrollAxis::Vertical, |l| l.axis)) },
     );
 
     let staff = panels.notation_staff && display.bravura.is_some();

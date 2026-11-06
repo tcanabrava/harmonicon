@@ -101,19 +101,11 @@ pub(super) fn update_mod_panel(
         bg.0 = if active { colors.btn_active } else { colors.btn_bg };
     }
     let fret = fingering.map_or(state.sticky_fret, |at| at.fret);
-    let flute_fingering = match (state.effective_instrument(), selected) {
-        (harmonicon_core::instrument::Instrument::Flute(flute), Some(n)) => {
-            match n.target.position() {
-                Some(PlayPosition::Fingering(at)) => Some(format!(
-                    "{}/{}",
-                    at.alternate + 1,
-                    super::flute_note::fingering_count(&flute, &n)
-                )),
-                _ => None,
-            }
-        }
-        _ => None,
-    };
+    let instrument = state.effective_instrument();
+    let flute_fingering = instrument.fingering_chart().zip(selected).and_then(|(chart, note)| {
+        let Some(PlayPosition::Fingering(at)) = note.target.position() else { return None };
+        Some(format!("{}/{}", at.alternate + 1, super::flute_note::fingering_count(chart, &note)))
+    });
     let bent = matches!(pitch, HarpTechnique::Bend(_))
         || matches!(string_technique, Some(StringTechnique::Bend(_)));
     for mut vis in &mut dot {
@@ -420,7 +412,7 @@ pub(super) fn update_technique_button_visibility(
     theme: Res<LoadedTheme>,
 ) {
     let colors = theme.song_editor_colors();
-    let flute = super::flute_note::is_flute(&state);
+    let flute = matches!(state.effective_instrument(), harmonicon_core::instrument::Instrument::Flute(_));
     for (mut node, mut bg) in &mut flute_view {
         let want = if flute { Display::Flex } else { Display::None };
         if node.display != want {
@@ -431,7 +423,7 @@ pub(super) fn update_technique_button_visibility(
     }
     let set = if super::guitar_note::is_guitar(&state) {
         NoteButtons::Guitar
-    } else if super::flute_note::is_flute(&state) {
+    } else if super::flute_note::is_wind(&state) {
         NoteButtons::Flute
     } else if super::piano_note::is_piano(&state) {
         NoteButtons::Piano
@@ -479,15 +471,10 @@ pub(super) fn update_harmonica_kind_text(
     loc: Res<Localization>,
     mut texts: Query<&mut Text, With<HarmonicaKindText>>,
 ) {
-    let key = if super::guitar_note::is_guitar(&state) {
-        "editor-instrument-guitar"
-    } else if super::flute_note::is_flute(&state) {
-        "editor-instrument-flute"
-    } else if super::piano_note::is_piano(&state) {
-        "editor-instrument-piano"
-    } else {
+    let kind = super::instrument_ui::InstrumentKind::of(&state.effective_instrument());
+    let key = if kind == super::instrument_ui::InstrumentKind::Harmonica {
         harmonica_kind_key(state.harmonica_kind())
-    };
+    } else { kind.label() };
     let label = String::from(loc.msg(key));
     for mut text in &mut texts {
         **text = label.clone();

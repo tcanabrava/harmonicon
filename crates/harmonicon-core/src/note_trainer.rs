@@ -49,6 +49,7 @@ pub fn drills(instrument: &Instrument, kind: TechniqueKind) -> Vec<Drill> {
         Instrument::Harmonica(harp) => harmonica_candidates(harp, kind),
         Instrument::Fretted(guitar) => guitar_candidates(guitar, kind),
         Instrument::Flute(flute) => return wind_drills(flute, kind),
+        Instrument::Clarinet(clarinet) => return wind_drills(clarinet, kind),
         Instrument::Piano(piano) => piano_candidates(piano),
     };
     let pitch = |p: PlayPosition| NoteTarget::Positioned(p).sounding_pitch(instrument);
@@ -239,9 +240,9 @@ pub fn hear(drill: &Drill, midi: f32) -> Heard {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::instrument::wind::FingeringAssignment;
     use crate::harmonica::{chromatic_harp, richter_harp};
     use crate::instrument::guitar::GuitarBody;
+    use crate::instrument::wind::FingeringAssignment;
 
     fn harp() -> Instrument {
         richter_harp("C").into()

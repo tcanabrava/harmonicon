@@ -76,6 +76,23 @@ pub(crate) fn setup_note_trainer_menu(
             state.set(AppState::NoteTrainer);
         },
     );
+    spawn_button(
+        &mut commands,
+        root,
+        &loc.msg("instrument-clarinet"),
+        |_: On<Activate>,
+         mine: Res<harmonicon_platform::settings::MyInstruments>,
+         mut trainer: ResMut<NoteTrainer>,
+         mut state: ResMut<NextState<AppState>>| {
+            trainer.choose(
+                harmonicon_core::instrument::clarinet::Clarinet {
+                    key: mine.clarinet_key.unwrap_or_default(),
+                }
+                .into(),
+            );
+            state.set(AppState::NoteTrainer);
+        },
+    );
     spawn_back_button(
         &mut commands,
         header,

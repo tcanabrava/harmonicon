@@ -430,7 +430,7 @@ impl EditorState {
         }
         match self.flute_fingering_view() {
             Some(flute) => harmonicon_core::instrument::flute::key_rows(flute.foot).len() as u8,
-            None => self.row_count(),
+            None => self.row_count().saturating_sub(self.row_offset),
         }
     }
 
@@ -700,6 +700,9 @@ impl EditorState {
             }
             harmonicon_core::instrument::Instrument::Flute(flute) => {
                 return super::note_model::FLUTE_TOP_NOTE + 1 - flute.lowest();
+            }
+            harmonicon_core::instrument::Instrument::Clarinet(clarinet) => {
+                return super::note_model::FLUTE_TOP_NOTE + 1 - *clarinet.range().start();
             }
             harmonicon_core::instrument::Instrument::Piano(piano) => {
                 return super::note_model::PIANO_TOP_NOTE + 1 - piano.lowest();

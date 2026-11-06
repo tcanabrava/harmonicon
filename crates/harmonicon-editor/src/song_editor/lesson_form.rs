@@ -373,6 +373,7 @@ pub(super) fn populate_from_lesson_manifest(manifest: &LessonManifest, state: &m
                 Family::Cavaquinho => EditorKind::Cavaquinho,
                 Family::Piano => EditorKind::Piano,
                 Family::Flute => EditorKind::Flute,
+                Family::Clarinet => EditorKind::Clarinet,
             }
             .selection();
         }

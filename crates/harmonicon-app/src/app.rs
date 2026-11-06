@@ -205,6 +205,7 @@ impl EffectiveHarmonica {
                 played.clone()
             }
             (Instrument::Flute(_), Some(played @ Instrument::Flute(_))) => played.clone(),
+            (Instrument::Clarinet(_), Some(played @ Instrument::Clarinet(_))) => played.clone(),
             _ => own,
         })
     }

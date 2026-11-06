@@ -360,6 +360,9 @@ pub(super) fn serialize_harpchart_notes(state: &EditorState, notes: &[GridNote])
         harmonicon_core::instrument::Instrument::Fretted(guitar) => {
             Some(harmonicon_core::chart::ChartInstrument::from_fretted(guitar))
         }
+        harmonicon_core::instrument::Instrument::Clarinet(clarinet) => {
+            Some(harmonicon_core::chart::ChartInstrument::Clarinet { key: clarinet.key })
+        }
         harmonicon_core::instrument::Instrument::Flute(flute) => {
             Some(harmonicon_core::chart::ChartInstrument::from_flute(flute))
         }

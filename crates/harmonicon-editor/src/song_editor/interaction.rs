@@ -64,7 +64,7 @@ pub(super) fn select_or_add(state: &mut EditorState, hole: u8, tick: usize) {
         super::guitar_note::place(state, hole, tick, len);
         return;
     }
-    if super::flute_note::is_flute(state) {
+    if super::flute_note::is_wind(state) {
         super::flute_note::place(state, hole, tick, len);
         return;
     }
@@ -196,7 +196,7 @@ pub(super) fn apply_modifier(state: &mut EditorState, kind: ModButton) {
         super::guitar_note::apply_modifier(state, kind);
         return;
     }
-    if super::flute_note::is_flute(state) {
+    if super::flute_note::is_wind(state) {
         super::flute_note::apply_modifier(state, kind);
         return;
     }
@@ -405,8 +405,8 @@ pub(super) fn report_technique_skips(
 ) {
     if state.unplayable_notice {
         state.bypass_change_detection().unplayable_notice = false;
-        feedback.set(loc.msg(if super::flute_note::is_flute(&state) {
-            "editor-flute-invalid"
+        feedback.set(loc.msg(if super::flute_note::is_wind(&state) {
+            "editor-wind-invalid"
         } else if super::piano_note::is_piano(&state) {
             "editor-piano-invalid"
         } else {

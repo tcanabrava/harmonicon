@@ -15,12 +15,26 @@ pub fn spawn_pitch_choices(
     font: &BravuraFont,
     pitches: &[u8],
 ) -> Vec<(u8, Entity)> {
+    let pitches: Vec<_> = pitches.iter().map(|&pitch| (pitch, pitch)).collect();
+    spawn_written_pitch_choices(parent, font, &pitches)
+}
+
+/// Written staff coordinates paired with the sounding IDs returned to callers.
+pub fn spawn_written_pitch_choices(
+    parent: &mut ChildSpawnerCommands,
+    font: &BravuraFont,
+    pitches: &[(u8, u8)],
+) -> Vec<(u8, Entity)> {
+    let label_top = pitches
+        .iter()
+        .map(|&(_, written)| y_for_step(staff_step(written, Clef::Treble)) + 20.0)
+        .fold(114.0_f32, f32::max);
     let mut choices = Vec::new();
     parent
         .spawn(Node {
             width: Val::Percent(100.0),
             min_width: Val::Px(600.0),
-            height: Val::Px(140.0),
+            height: Val::Px(label_top + 26.0),
             flex_shrink: 0.0,
             ..default()
         })
@@ -40,7 +54,7 @@ pub fn spawn_pitch_choices(
                     Color::WHITE,
                 ));
             });
-            for &midi in pitches {
+            for &(midi, written) in pitches {
                 let id = row
                     .spawn((
                         Button,
@@ -68,7 +82,7 @@ pub fn spawn_pitch_choices(
                             PitchChoiceInk(midi),
                         ))
                         .with_children(|marks| {
-                            let step = staff_step(midi, Clef::Treble);
+                            let step = staff_step(written, Clef::Treble);
                             for ledger in ledger_line_steps(step) {
                                 marks.spawn((
                                     Node {
@@ -95,7 +109,7 @@ pub fn spawn_pitch_choices(
                                 bevy::picking::Pickable::IGNORE,
                                 PitchChoiceInk(midi),
                             ));
-                            if needs_sharp(midi) {
+                            if needs_sharp(written) {
                                 marks.spawn((
                                     super::glyph(
                                         font,
@@ -125,12 +139,12 @@ pub fn spawn_pitch_choices(
                             ));
                         });
                         cell.spawn((
-                            Text::new(midi_to_note(i32::from(midi))),
+                            Text::new(midi_to_note(i32::from(written))),
                             TextFont { font_size: FontSize::Px(14.0), ..default() },
                             TextLayout::justify(Justify::Center),
                             Node {
                                 position_type: PositionType::Absolute,
-                                top: Val::Px(114.0),
+                                top: Val::Px(label_top),
                                 width: Val::Percent(100.0),
                                 ..default()
                             },
@@ -143,7 +157,7 @@ pub fn spawn_pitch_choices(
                     &mut row.commands().entity(id),
                     Color::srgb(0.07, 0.08, 0.11),
                 );
-                let name = midi_to_note(i32::from(midi));
+                let name = midi_to_note(i32::from(written));
                 row.commands().queue(move |world: &mut World| {
                     if let Some(mut node) = world.get_mut::<bevy::a11y::AccessibilityNode>(id) {
                         node.set_label(name);

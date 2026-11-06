@@ -32,6 +32,7 @@ pub mod wind;
 use crate::chart::Action;
 use crate::harmonica::Harmonica;
 use crate::pitch_map::{HoleAssignment, Technique, playable_assignments};
+use clarinet::Clarinet;
 use flute::{FingeringAssignment, Flute};
 use fretted_strings::FrettedInstrument;
 use guitar::{FretAssignment, StringTechnique};
@@ -60,11 +61,19 @@ pub enum InstrumentKind {
     Cavaquinho,
     Piano,
     Flute,
+    Clarinet,
 }
 
 impl InstrumentKind {
-    pub const ALL: [Self; 6] =
-        [Self::Harmonica, Self::Guitar, Self::Bass, Self::Cavaquinho, Self::Piano, Self::Flute];
+    pub const ALL: [Self; 7] = [
+        Self::Harmonica,
+        Self::Guitar,
+        Self::Bass,
+        Self::Cavaquinho,
+        Self::Piano,
+        Self::Flute,
+        Self::Clarinet,
+    ];
     pub const fn slug(self) -> &'static str {
         match self {
             Self::Harmonica => "harmonica",
@@ -73,6 +82,7 @@ impl InstrumentKind {
             Self::Cavaquinho => "cavaquinho",
             Self::Piano => "piano",
             Self::Flute => "flute",
+            Self::Clarinet => "clarinet",
         }
     }
     pub fn from_slug(value: &str) -> Option<Self> {
@@ -89,6 +99,7 @@ pub enum Instrument {
     Harmonica(Harmonica),
     Fretted(FrettedInstrument),
     Flute(Flute),
+    Clarinet(Clarinet),
     Piano(Piano),
 }
 
@@ -99,17 +110,26 @@ impl From<Harmonica> for Instrument {
 }
 
 impl Instrument {
+    pub fn fingering_chart(&self) -> Option<&dyn wind::FingeringChart> {
+        match self {
+            Self::Flute(flute) => Some(flute),
+            Self::Clarinet(clarinet) => Some(clarinet),
+            _ => None,
+        }
+    }
     pub const fn kind(&self) -> InstrumentKind {
         match self {
             Self::Harmonica(_) => InstrumentKind::Harmonica,
             Self::Fretted(setup) => setup.kind.instrument_kind(),
             Self::Piano(_) => InstrumentKind::Piano,
             Self::Flute(_) => InstrumentKind::Flute,
+            Self::Clarinet(_) => InstrumentKind::Clarinet,
         }
     }
     pub fn notation(&self) -> crate::notation::NotationContext {
         use crate::notation::{NotationContext, Transposition};
         let transposition = match self {
+            Self::Clarinet(clarinet) => clarinet.notation().transposition,
             Self::Fretted(setup) => match setup.kind {
                 fretted_strings::FrettedKind::Guitar | fretted_strings::FrettedKind::Bass => {
                     Transposition::OCTAVE_DOWN
@@ -127,8 +147,15 @@ impl Instrument {
             Self::Harmonica(_) => crate::synth::Voice::Harmonica,
             Self::Fretted(_) => crate::synth::Voice::PluckedString,
             Self::Flute(_) => crate::synth::Voice::Flute,
+            Self::Clarinet(_) => crate::synth::Voice::Clarinet,
             Self::Piano(_) => crate::synth::Voice::Piano,
         }
+    }
+}
+
+impl From<Clarinet> for Instrument {
+    fn from(clarinet: Clarinet) -> Self {
+        Self::Clarinet(clarinet)
     }
 }
 
@@ -737,6 +764,7 @@ impl InstrumentModel for Instrument {
             Self::Harmonica(harp) => harp.range(),
             Self::Fretted(guitar) => InstrumentModel::range(guitar),
             Self::Flute(flute) => InstrumentModel::range(flute),
+            Self::Clarinet(clarinet) => InstrumentModel::range(clarinet),
             Self::Piano(piano) => InstrumentModel::range(piano),
         }
     }
@@ -746,6 +774,7 @@ impl InstrumentModel for Instrument {
             Self::Harmonica(harp) => harp.positions_for(midi),
             Self::Fretted(guitar) => InstrumentModel::positions_for(guitar, midi),
             Self::Flute(flute) => InstrumentModel::positions_for(flute, midi),
+            Self::Clarinet(clarinet) => InstrumentModel::positions_for(clarinet, midi),
             Self::Piano(piano) => InstrumentModel::positions_for(piano, midi),
         }
     }
@@ -755,6 +784,7 @@ impl InstrumentModel for Instrument {
             Self::Harmonica(harp) => harp.valid_pitches(),
             Self::Fretted(guitar) => InstrumentModel::valid_pitches(guitar),
             Self::Flute(flute) => InstrumentModel::valid_pitches(flute),
+            Self::Clarinet(clarinet) => InstrumentModel::valid_pitches(clarinet),
             Self::Piano(piano) => InstrumentModel::valid_pitches(piano),
         }
     }
@@ -764,6 +794,7 @@ impl InstrumentModel for Instrument {
             Self::Harmonica(harp) => harp.pitch_of(position),
             Self::Fretted(guitar) => InstrumentModel::pitch_of(guitar, position),
             Self::Flute(flute) => InstrumentModel::pitch_of(flute, position),
+            Self::Clarinet(clarinet) => InstrumentModel::pitch_of(clarinet, position),
             Self::Piano(piano) => InstrumentModel::pitch_of(piano, position),
         }
     }
@@ -773,6 +804,7 @@ impl InstrumentModel for Instrument {
             Self::Harmonica(harp) => harp.can_sound_together(a, b),
             Self::Fretted(guitar) => InstrumentModel::can_sound_together(guitar, a, b),
             Self::Flute(flute) => InstrumentModel::can_sound_together(flute, a, b),
+            Self::Clarinet(clarinet) => InstrumentModel::can_sound_together(clarinet, a, b),
             Self::Piano(piano) => InstrumentModel::can_sound_together(piano, a, b),
         }
     }
@@ -782,6 +814,7 @@ impl InstrumentModel for Instrument {
             Self::Harmonica(harp) => harp.reconcile(anchor, others),
             Self::Fretted(guitar) => InstrumentModel::reconcile(guitar, anchor, others),
             Self::Flute(flute) => InstrumentModel::reconcile(flute, anchor, others),
+            Self::Clarinet(clarinet) => InstrumentModel::reconcile(clarinet, anchor, others),
             Self::Piano(piano) => InstrumentModel::reconcile(piano, anchor, others),
         }
     }
@@ -791,6 +824,7 @@ impl InstrumentModel for Instrument {
             Self::Harmonica(harp) => harp.techniques(),
             Self::Fretted(guitar) => InstrumentModel::techniques(guitar),
             Self::Flute(flute) => InstrumentModel::techniques(flute),
+            Self::Clarinet(clarinet) => InstrumentModel::techniques(clarinet),
             Self::Piano(piano) => InstrumentModel::techniques(piano),
         }
     }
@@ -800,6 +834,7 @@ impl InstrumentModel for Instrument {
             Self::Harmonica(harp) => harp.expression_scope(),
             Self::Fretted(guitar) => InstrumentModel::expression_scope(guitar),
             Self::Flute(flute) => InstrumentModel::expression_scope(flute),
+            Self::Clarinet(clarinet) => InstrumentModel::expression_scope(clarinet),
             Self::Piano(piano) => InstrumentModel::expression_scope(piano),
         }
     }
@@ -809,6 +844,7 @@ impl InstrumentModel for Instrument {
             Self::Harmonica(harp) => harp.envelope(),
             Self::Fretted(guitar) => InstrumentModel::envelope(guitar),
             Self::Flute(flute) => InstrumentModel::envelope(flute),
+            Self::Clarinet(clarinet) => InstrumentModel::envelope(clarinet),
             Self::Piano(piano) => InstrumentModel::envelope(piano),
         }
     }
@@ -818,6 +854,7 @@ impl InstrumentModel for Instrument {
             Self::Harmonica(harp) => harp.lane_layout(),
             Self::Fretted(guitar) => InstrumentModel::lane_layout(guitar),
             Self::Flute(flute) => InstrumentModel::lane_layout(flute),
+            Self::Clarinet(clarinet) => InstrumentModel::lane_layout(clarinet),
             Self::Piano(piano) => InstrumentModel::lane_layout(piano),
         }
     }

@@ -23,7 +23,6 @@ use harmonicon_core::chart::{
 };
 use harmonicon_core::harmonica::Harmonica;
 use harmonicon_core::instrument::Instrument;
-use harmonicon_core::instrument::flute::Flute;
 use harmonicon_core::instrument::guitar::fingering::{Onset, fingering};
 use harmonicon_core::instrument::guitar::{
     FretAssignment, Guitar, GuitarBody, STANDARD_TUNING, StringTechnique,
@@ -229,7 +228,11 @@ pub fn to_chart(
             (items, report, likely_key(&notes))
         }
         Instrument::Flute(flute) => {
-            let (items, report) = flute_items(&notes, flute);
+            let (items, report) = wind_items(&notes, flute);
+            (items, report, likely_key(&notes))
+        }
+        Instrument::Clarinet(clarinet) => {
+            let (items, report) = wind_items(&notes, clarinet);
             (items, report, likely_key(&notes))
         }
         Instrument::Piano(piano) => {
@@ -245,6 +248,9 @@ pub fn to_chart(
         }
         Instrument::Flute(flute) => {
             chart.instrument_spec = Some(ChartInstrument::from_flute(flute));
+        }
+        Instrument::Clarinet(clarinet) => {
+            chart.instrument_spec = Some(ChartInstrument::Clarinet { key: clarinet.key });
         }
         Instrument::Piano(piano) => {
             chart.instrument_spec = Some(ChartInstrument::from_piano(piano));
@@ -392,7 +398,10 @@ fn guitar_items(notes: &[ScoreNote], guitar: &Guitar) -> (Vec<TrackItem>, Conver
 /// cut short there, since the flute has one voice to give it. A note
 /// outside the flute's range is dropped and counted, never moved an
 /// octave: that would be a different tune.
-fn flute_items(notes: &[ScoreNote], flute: &Flute) -> (Vec<TrackItem>, ConversionReport) {
+fn wind_items(
+    notes: &[ScoreNote],
+    flute: &dyn harmonicon_core::instrument::wind::FingeringChart,
+) -> (Vec<TrackItem>, ConversionReport) {
     let mut report = ConversionReport { total: notes.len(), ..Default::default() };
     let mut line: Vec<ScoreNote> = Vec::new();
     for note in notes {
@@ -408,7 +417,7 @@ fn flute_items(notes: &[ScoreNote], flute: &Flute) -> (Vec<TrackItem>, Conversio
     }
     let mut items = Vec::new();
     for (i, note) in line.iter().enumerate() {
-        if flute.fingerings_for(note.midi).is_empty() {
+        if harmonicon_core::instrument::wind::positions_for(flute, note.midi).is_empty() {
             report.unreachable += 1;
             continue;
         }

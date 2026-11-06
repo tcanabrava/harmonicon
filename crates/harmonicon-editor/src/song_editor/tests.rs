@@ -4497,7 +4497,7 @@ fn switching_loading_and_undoing_back_to_flute_clear_piano_pitch_offsets() {
     history.record_if_changed(&flute);
     history.undo(&mut flute);
     assert_eq!(flute.row_offset, 0);
-    assert!(super::flute_note::is_flute(&flute));
+    assert!(super::flute_note::is_wind(&flute));
     history.undo(&mut flute);
     assert!(flute.row_visible(flute.notes[0].row()));
 }

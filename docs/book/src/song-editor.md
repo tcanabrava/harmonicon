@@ -616,3 +616,17 @@ with the document and can be played as written.
 Cavaquinho charts use song format **1.12.0**; cavaquinho lesson manifests require
 lesson format **4**. Selecting Cavaquinho in Lessons reads only its namespace and
 shows an empty state when no curriculum is installed.
+
+
+## Clarinet documents
+
+Choose **Clarinet** when creating a document, then choose a B♭ or A Boehm
+soprano setup under **Details**. The piano-shaped input and grid use concert
+pitch; the notation staff shows written clarinet pitches and their transposed
+key signature. A reminder above the grid distinguishes these two conventions.
+
+Changing setup preserves sounding pitches and assigns the new instrument’s
+standard fingerings. If a note would leave the supported written E3–C6 range,
+the editor keeps the existing setup and explains the failure. **Fingering**
+cycles the selected note’s available alternatives. Charts save sounding notes
+and stable fingering indices, using song format 1.13.0.

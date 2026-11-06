@@ -79,6 +79,7 @@ impl Snapshot {
                                 guitar.strings.capacity()
                             }
                             harmonicon_core::instrument::Instrument::Flute(_)
+                            | harmonicon_core::instrument::Instrument::Clarinet(_)
                             | harmonicon_core::instrument::Instrument::Piano(_) => 0,
                         }
                 }

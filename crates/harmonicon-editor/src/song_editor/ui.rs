@@ -447,9 +447,9 @@ pub(super) fn row_labels(
             .collect(),
         // A pitch per row, C7 at the top; the accidentals' swatches dark, as
         // a keyboard's black keys.
-        Instrument::Flute(_) => (1..=row_count)
+        Instrument::Flute(_) | Instrument::Clarinet(_) => (1..=row_count)
             .map(|row| {
-                let note = super::note_model::FLUTE_TOP_NOTE + 1 - row;
+                let note = super::note_model::FLUTE_TOP_NOTE + 1 - row - row_offset;
                 let sharp = matches!(note % 12, 1 | 3 | 6 | 8 | 10);
                 RowLabel {
                     text: harmonicon_core::midi::midi_to_note(i32::from(note)),
@@ -771,6 +771,7 @@ fn on_editor_tab_select(
 /// the `ScrollArea` — see [`setup`]'s own comment for why. The tool palette
 /// is the left sidebar beside it (`mod_panel::spawn_mod_panel`).
 fn spawn_fixed_chrome(root: &mut ChildSpawnerCommands, colors: SongEditorColors, hole_count: u8) {
+    root.spawn((super::clarinet_setup::PitchConvention, Text::new(""), TextFont { font_size: FontSize::Px(13.0), ..default() }, TextColor(colors.label), Node { display: Display::None, flex_shrink: 0.0, padding: UiRect::all(Val::Px(4.0)), ..default() }));
     root.spawn((
         GridRowContainer,
         Node {
@@ -913,6 +914,9 @@ fn pitch_keyboard(state: &EditorState) -> Option<(u8, u8)> {
         Instrument::Piano(_) => {
             let top = super::piano_note::row_note(state.row_offset + 1);
             Some((top + 1 - state.display_rows(), top))
+        }
+        Instrument::Clarinet(clarinet) => {
+            Some((*clarinet.range().start(), *clarinet.range().end()))
         }
         Instrument::Flute(flute) if state.flute_fingering_view().is_none() => {
             Some((flute.lowest(), super::note_model::FLUTE_TOP_NOTE))

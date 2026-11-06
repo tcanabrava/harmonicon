@@ -504,7 +504,7 @@ fn a_flute_plays_the_top_of_a_chord_one_note_at_a_time_and_drops_what_it_lacks()
     let note =
         |start_secs, duration_secs, midi| ScoreNote { start_secs, duration_secs, midi, fret: None };
     let notes = [note(0.0, 1.5, 60), note(0.0, 1.5, 64), note(1.0, 0.5, 67), note(2.0, 0.5, 40)];
-    let (items, report) = flute_items(&notes, &Flute::new(FootJoint::C));
+    let (items, report) = wind_items(&notes, &Flute::new(FootJoint::C));
     let played: Vec<(f64, f64, Option<&str>)> =
         items.iter().map(|i| (i.time.unwrap(), i.duration, i.events[0].note.as_deref())).collect();
     assert_eq!(played, [(0.0, 1.0, Some("E4")), (1.0, 0.5, Some("G4"))]);

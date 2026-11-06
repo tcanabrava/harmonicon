@@ -71,6 +71,10 @@ pub enum ChartInstrument {
     },
     /// A Boehm flute, from format 1.9.0. Its foot joint decides the lowest
     /// note; a C foot when not given.
+    Clarinet {
+        #[serde(default)]
+        key: crate::instrument::clarinet::ClarinetKey,
+    },
     Flute {
         #[serde(default)]
         foot: FootJoint,
@@ -179,6 +183,9 @@ impl ChartInstrument {
                 )
             }
             Self::Flute { foot } => Some(Flute::new(*foot).into()),
+            Self::Clarinet { key } => {
+                Some(crate::instrument::clarinet::Clarinet { key: *key }.into())
+            }
             Self::Piano { keys } => {
                 crate::instrument::piano::Piano::with_keys(*keys).map(Into::into)
             }
@@ -242,7 +249,7 @@ impl HarpChart {
 /// spec than this build supports up front, with a clear error, instead of
 /// failing on some confusing downstream `additionalProperties` schema
 /// rejection or (worse) silently misreading a field whose meaning changed.
-pub const CURRENT_FORMAT_VERSION: &str = "1.12.0";
+pub const CURRENT_FORMAT_VERSION: &str = "1.13.0";
 
 /// Parses a `"MAJOR.MINOR.PATCH"` version string into a comparable tuple.
 /// `None` for anything that isn't exactly three dot-separated integers.

@@ -22,10 +22,18 @@ pub(super) enum InstrumentKind {
     Cavaquinho,
     Piano,
     Flute,
+    Clarinet,
 }
 impl InstrumentKind {
-    pub const ALL: [Self; 6] =
-        [Self::Harmonica, Self::Guitar, Self::Bass, Self::Cavaquinho, Self::Piano, Self::Flute];
+    pub const ALL: [Self; 7] = [
+        Self::Harmonica,
+        Self::Guitar,
+        Self::Bass,
+        Self::Cavaquinho,
+        Self::Piano,
+        Self::Flute,
+        Self::Clarinet,
+    ];
     pub fn of(instrument: &Instrument) -> Self {
         match instrument {
             Instrument::Harmonica(_) => Self::Harmonica,
@@ -38,6 +46,7 @@ impl InstrumentKind {
             },
             Instrument::Piano(_) => Self::Piano,
             Instrument::Flute(_) => Self::Flute,
+            Instrument::Clarinet(_) => Self::Clarinet,
         }
     }
     pub fn label(self) -> &'static str {
@@ -48,6 +57,7 @@ impl InstrumentKind {
             Self::Cavaquinho => "editor-instrument-cavaquinho",
             Self::Piano => "editor-instrument-piano",
             Self::Flute => "editor-instrument-flute",
+            Self::Clarinet => "instrument-clarinet",
         }
     }
     pub fn selection(self) -> InstrumentSelection {
@@ -60,6 +70,7 @@ impl InstrumentKind {
             Self::Cavaquinho => Guitar::cavaquinho().into(),
             Self::Piano => Piano::grand().into(),
             Self::Flute => Flute::default().into(),
+            Self::Clarinet => harmonicon_core::instrument::clarinet::Clarinet::default().into(),
         };
         InstrumentSelection::Configured { instrument, harmonica_origin: None }
     }
@@ -160,6 +171,10 @@ pub(super) fn spawn_selector(
             }
         });
     parent.spawn((super::guitar_setup::GuitarSetup, Node::default()));
+    parent.spawn((
+        super::clarinet_setup::ClarinetSetup,
+        Node { flex_direction: FlexDirection::Column, row_gap: Val::Px(8.0), ..default() },
+    ));
 }
 
 #[cfg(test)]

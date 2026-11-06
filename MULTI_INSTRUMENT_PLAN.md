@@ -166,7 +166,21 @@ Each independently reviewable part receives a commit and relevant validation.
   `FingeringChart` metadata. Flute uses this shared path while retaining every
   previously verified register pair and alternate. Clarinet drill tests cover
   both setups and their twelfth interval without a flute-specific branch.
-- Core validation: 447 tests passed and core Clippy passed with warnings denied.
-  Clarinet chart/setup selection, editor, trainer and gameplay integration are
-  still pending; clarinet is not yet offered as a selectable instrument.
+- Step 5 complete: clarinet identity, chart encoding/validation, saved B♭/A
+  setups, pre-song reach reporting, catalog/curriculum selection, import/export,
+  editor and trainer integration. Charts retain sounding pitches and stable
+  alternate indices; written notation follows the instrument actually played.
+- Clarinet documents use a concert-pitch grid with an explicit convention label
+  and a transposed written score. Setup changes preserve sounding notes and
+  reject out-of-range changes atomically. Flute-only controls remain flute-only.
+- Play uses a horizontal clarinet with no falling-note highway, a smaller next-
+  different preview above the current fingering, and a start/hold cue. Timing
+  remains on the score and playhead. The trainer retains its upright contact
+  map, written-note picker, twelfth exercises and saved setup combobox.
+- Validation: 2,350 workspace library tests passed (one existing ignored test),
+  workspace Clippy passed with warnings denied, dev build passed, and all four
+  glyph-coverage checks passed. Live checks covered written-note selection,
+  register exercises, B♭/A setup changes, reach warnings, editor range, and
+  horizontal Play. Synthetic model checks do not replace real-instrument audio
+  evaluation. Song format 1.13.0 / lesson format 5; no clarinet curriculum bundled.
 - Steps 6–7 remain planned.

@@ -462,6 +462,26 @@ mod tests {
         assert_eq!(chart.track[0].events.len(), 3);
     }
 
+    #[test]
+    fn clarinet_chart_validates_pitch_range_and_alternate_fingerings() {
+        let original: serde_json::Value = serde_json::from_str(include_str!("../../tests/fixtures/clarinet.harpchart")).unwrap();
+        let mut value = original.clone();
+        let (_, chart) = validate_and_parse_chart(&mut value).unwrap();
+        assert_eq!(chart.instrument().unwrap().kind(), harmonicon_core::instrument::InstrumentKind::Clarinet);
+        assert_eq!(chart.event_pitch(&chart.track[0].events[0]), Some(50));
+        value = original.clone();
+        value["track"][0]["events"][0]["fingering"] = serde_json::json!(1);
+        validate_and_parse_chart(&mut value).unwrap();
+        value["track"][0]["events"][0]["fingering"] = serde_json::json!(99);
+        assert!(validate_and_parse_chart(&mut value).is_err());
+        value = original.clone();
+        value["track"][0]["duration"] = serde_json::json!(2.0);
+        assert!(validate_and_parse_chart(&mut value).is_err());
+        value = original;
+        value["track"][0]["events"][0]["note"] = serde_json::json!("C3");
+        assert!(validate_and_parse_chart(&mut value).is_err());
+    }
+
     fn flute_chart() -> serde_json::Value {
         serde_json::from_str(include_str!("../../tests/fixtures/flute-scale.harpchart")).unwrap()
     }

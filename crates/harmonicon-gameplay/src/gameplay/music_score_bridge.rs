@@ -10,7 +10,7 @@
 
 use bevy::prelude::*;
 
-use harmonicon_app::app::{AppState, GameplayMode, SelectedSong};
+use harmonicon_app::app::{AppState, EffectiveHarmonica, GameplayMode, SelectedSong};
 use harmonicon_core::chart::HarpChart;
 use harmonicon_core::chart::seconds_to_tick;
 use harmonicon_song::song::SongManifest;
@@ -76,6 +76,7 @@ fn sync_music_score_notes(
     mut bar_map: ResMut<MusicScoreBarMap>,
     highlight: Res<StaffHighlight>,
     signature: Option<ResMut<MusicScoreKeySignature>>,
+    effective: Option<Res<EffectiveHarmonica>>,
 ) {
     let Some(manifest) = manifests.get(&selected.0) else {
         return;
@@ -120,7 +121,11 @@ fn sync_music_score_notes(
         highlight.0,
     );
     preserve_authored_spelling(&mut score_notes.0, chart);
-    if let Some(instrument) = chart.instrument() {
+    if let Some(instrument) = effective
+        .as_ref()
+        .and_then(|effective| effective.instrument_for(chart))
+        .or_else(|| chart.instrument())
+    {
         let written_key = project_score(&mut score_notes.0, instrument.notation(), &chart.song.key);
         if let Some(mut signature) = signature {
             signature.set_if_neq(written_key);

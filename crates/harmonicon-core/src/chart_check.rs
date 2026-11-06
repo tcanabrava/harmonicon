@@ -10,8 +10,8 @@
 //! a player, so they are plain English rather than localized.
 
 use crate::chart::{FretPosition, HarpChart, Modifier, NoteEvent, Scoring, Timing};
-use crate::instrument::flute::{FingeringAssignment, Flute};
 use crate::instrument::guitar::{FretAssignment, Guitar, StringTechnique};
+use crate::instrument::wind::{FingeringAssignment, FingeringChart, positions_for};
 use crate::instrument::{Instrument, InstrumentModel, PlayPosition};
 use crate::midi::note_to_midi;
 
@@ -84,10 +84,46 @@ pub fn instrument_problems(chart: &HarpChart) -> Vec<String> {
             let problem = match &instrument {
                 Instrument::Harmonica(_) => harmonica_event_problem(event),
                 Instrument::Fretted(guitar) => guitar_event_problem(guitar, event),
-                Instrument::Flute(flute) => flute_event_problem(flute, event),
+                Instrument::Flute(flute) => wind_event_problem(flute, "flute", event),
+                Instrument::Clarinet(clarinet) => wind_event_problem(clarinet, "clarinet", event),
                 Instrument::Piano(piano) => piano_event_problem(piano, event),
             };
             problems.extend(problem.map(|p| format!("{at}: {p}")));
+        }
+    }
+    if matches!(instrument, Instrument::Clarinet(_)) {
+        let mut spans: Vec<_> = chart
+            .track
+            .iter()
+            .enumerate()
+            .map(|(index, item)| {
+                let start = item.tick.map_or_else(
+                    || item.time.unwrap_or_default(),
+                    |tick| {
+                        crate::chart::tick_to_seconds(
+                            tick,
+                            chart.timing.resolution,
+                            &chart.timing.tempo_map,
+                        )
+                    },
+                );
+                if item.events.len() > 1 {
+                    problems.push(format!(
+                        "track[{index}]: this wind instrument supports one note at a time"
+                    ));
+                }
+                (start, start + item.duration, index)
+            })
+            .collect();
+        spans.sort_by(|a, b| a.0.total_cmp(&b.0));
+        let mut end = 0.0_f64;
+        for (start, next_end, index) in spans {
+            if start + 1e-6 < end {
+                problems.push(format!(
+                    "track[{index}]: overlapping notes require more than one wind voice"
+                ));
+            }
+            end = end.max(next_end);
         }
     }
     problems
@@ -150,27 +186,25 @@ fn guitar_event_problem(guitar: &Guitar, event: &NoteEvent) -> Option<String> {
     }
 }
 
-fn flute_event_problem(flute: &Flute, event: &NoteEvent) -> Option<String> {
+fn wind_event_problem(chart: &dyn FingeringChart, name: &str, event: &NoteEvent) -> Option<String> {
     if event.hole.is_some() || event.action.is_some() || event.position.is_some() {
-        return Some(
-            "a flute event names a note and a fingering, not a hole or string".to_string(),
-        );
+        return Some(format!("a {name} event names a note and a fingering, not a hole or string"));
     }
     let Some(note) = event.note.as_deref() else {
-        return Some("a flute event needs its note".to_string());
+        return Some(format!("a {name} event needs its note"));
     };
     if let Some(other) = modifiers(event).iter().find(|m| !matches!(m, Modifier::Vibrato { .. })) {
-        return Some(format!("a flute has no {other:?}; only vibrato"));
+        return Some(format!("a {name} has no {other:?}; only vibrato"));
     }
     let Some(midi) = note_to_midi(note).and_then(|m| u8::try_from(m).ok()) else {
         return Some(format!("{note} is not a note"));
     };
     let alternate = event.fingering.unwrap_or(0);
-    let position = PlayPosition::Fingering(FingeringAssignment { note: midi, alternate });
-    match InstrumentModel::pitch_of(flute, &position) {
+    let position = FingeringAssignment { note: midi, alternate };
+    match chart.pattern(position) {
         Some(_) => None,
-        None if flute.fingerings_for(midi).is_empty() => {
-            Some(format!("{note} is outside this flute's range"))
+        None if positions_for(chart, midi).is_empty() => {
+            Some(format!("{note} is outside this {name}'s range"))
         }
         None => Some(format!("{note} has no fingering {alternate}")),
     }

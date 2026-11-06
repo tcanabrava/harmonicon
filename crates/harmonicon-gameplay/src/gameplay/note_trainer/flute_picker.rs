@@ -2,14 +2,14 @@
 //! Select flute targets in notation, with the instrument's actual range.
 use super::*;
 use bevy::ui::InteractionDisabled;
-use harmonicon_ui::music_score::{BravuraFont, PitchChoiceInk, spawn_pitch_choices};
+use harmonicon_ui::music_score::{BravuraFont, PitchChoiceInk, spawn_written_pitch_choices};
 
 #[derive(Component)]
 pub(crate) struct PitchChoice(u8);
 
 impl NoteTrainer {
     fn select_flute_pitch(&mut self, midi: u8) -> bool {
-        if self.flute().is_none() {
+        if self.instrument.fingering_chart().is_none() {
             return false;
         }
         let Some(index) = self.practice.drills.iter().position(|d| d.target.round() as u8 == midi)
@@ -26,6 +26,7 @@ impl NoteTrainer {
 }
 
 /// Keep octave boundaries readable; the final C belongs with the top octave.
+#[cfg(test)]
 fn pitch_rows(flute: &Flute) -> Vec<Vec<u8>> {
     let Some((low, high)) = InstrumentModel::range(flute) else {
         return vec![];
@@ -46,6 +47,24 @@ pub(super) fn spawn(
     flute: &Flute,
     loc: &Localization,
 ) {
+    spawn_for_instrument(parent, font, &Instrument::Flute(*flute), loc);
+}
+
+pub(super) fn spawn_for_instrument(
+    parent: &mut ChildSpawnerCommands,
+    font: &BravuraFont,
+    instrument: &Instrument,
+    loc: &Localization,
+) {
+    let Some((low, high)) = instrument.range() else { return };
+    let mut rows: Vec<Vec<(u8, u8)>> = Vec::new();
+    for pitch in low..=high {
+        let written = instrument.notation().transposition.written_semitone(pitch) as u8;
+        if rows.is_empty() || (written.is_multiple_of(12) && pitch != high && pitch > low.saturating_add(1)) {
+            rows.push(Vec::new());
+        }
+        rows.last_mut().unwrap().push((pitch, written));
+    }
     parent
         .spawn(Node {
             width: Val::Percent(100.0),
@@ -74,8 +93,8 @@ pub(super) fn spawn(
                     ..default()
                 })
                 .with_children(|score| {
-                    for pitches in pitch_rows(flute) {
-                        for (midi, entity) in spawn_pitch_choices(score, font, &pitches) {
+                    for pitches in &rows {
+                        for (midi, entity) in spawn_written_pitch_choices(score, font, pitches) {
                             score.commands().entity(entity).insert(PitchChoice(midi)).observe(
                                 move |_: On<Activate>, mut trainer: ResMut<NoteTrainer>| {
                                     trainer.select_flute_pitch(midi);

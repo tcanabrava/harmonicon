@@ -51,6 +51,7 @@ mod technique_cue;
 pub mod twelve_bar_blues_overlay;
 mod wait_freeze_overlay;
 pub mod warning_banner;
+mod wind_visuals;
 
 pub use harmonicon_core::scoring::{
     HitQuality, NoteOutcome, classify_note, compute_points, sustain_points,

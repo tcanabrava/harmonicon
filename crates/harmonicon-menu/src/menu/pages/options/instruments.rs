@@ -172,6 +172,32 @@ pub(super) fn spawn_my_instruments(
         },
     );
 
+    let clarinets = vec![
+        loc.msg("clarinet-as-written").to_string(),
+        loc.msg("clarinet-bb").to_string(),
+        loc.msg("clarinet-a").to_string(),
+    ];
+    let index = match mine.clarinet_key {
+        None => 0,
+        Some(harmonicon_core::instrument::clarinet::ClarinetKey::Bb) => 1,
+        Some(_) => 2,
+    };
+    combobox::spawn_combobox(
+        commands,
+        parent,
+        page_root,
+        &loc.msg("clarinet-setup"),
+        &clarinets,
+        &clarinets[index],
+        |ev: On<combobox::ComboboxSelect>, mut mine: ResMut<MyInstruments>| {
+            mine.clarinet_key = match ev.index {
+                1 => Some(harmonicon_core::instrument::clarinet::ClarinetKey::Bb),
+                2 => Some(harmonicon_core::instrument::clarinet::ClarinetKey::A),
+                _ => None,
+            };
+        },
+    );
+
     let views = view_options(loc);
     let current = VIEWS.iter().position(|v| *v == mine.flute_view).unwrap_or(0);
     combobox::spawn_combobox(
