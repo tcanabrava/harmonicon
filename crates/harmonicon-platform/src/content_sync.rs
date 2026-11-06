@@ -26,7 +26,7 @@ use harmonicon_packs::pack::{PackKind, PackManifest};
 use harmonicon_packs::repo::{Installed, InstalledRepo, RepoSpec};
 
 use crate::content_packs::{
-    ContentPacks, ContentPacksSet, PackEngine, PackStatus, RefreshContentPacks,
+    ContentPacks, ContentPacksSet, ContentSources, PackEngine, PackStatus, RefreshContentPacks,
 };
 
 /// Download (or re-download, for an update) one repository.
@@ -63,6 +63,9 @@ type InstallResult = Result<(InstalledRepo, PackManifest), String>;
 
 struct Job {
     slug: String,
+    /// What is being downloaded, so a result landing after the player
+    /// removed the source can be thrown away ([`collect_results`]).
+    spec: RepoSpec,
     rx: Receiver<InstallResult>,
     /// Finished with nothing sent means the thread panicked.
     thread: std::thread::JoinHandle<()>,
@@ -97,6 +100,15 @@ impl PackSync {
     pub fn busy(&self) -> bool {
         !self.jobs.is_empty()
     }
+
+    /// Asks a running download of `slug` to stop, for a source the player
+    /// just removed. Best effort: one past its last interruption point
+    /// still finishes, and [`collect_results`] discards what it installed.
+    pub fn cancel(&self, slug: &str) {
+        for job in self.jobs.iter().filter(|j| j.slug == slug) {
+            job.cancel.store(true, Ordering::Relaxed);
+        }
+    }
 }
 
 fn spawn_install(sync: &mut PackSync, kind: PackKind, spec: RepoSpec, engine: &PackEngine) {
@@ -113,6 +125,7 @@ fn spawn_install(sync: &mut PackSync, kind: PackKind, spec: RepoSpec, engine: &P
     let thread_cancel = cancel.clone();
     let engine = engine.0.clone();
     let thread_slug = slug.clone();
+    let job_spec = spec.clone();
     let spawned = std::thread::Builder::new().name(format!("pack-sync {slug}")).spawn(move || {
         let _span = info_span!("pack_install", slug = thread_slug).entered();
         let result = git::install(&spec, &packs_dir, kind, &engine, &thread_cancel)
@@ -123,7 +136,7 @@ fn spawn_install(sync: &mut PackSync, kind: PackKind, spec: RepoSpec, engine: &P
         Ok(thread) => {
             info!("Downloading {kind} pack {slug}");
             sync.failures.remove(&slug);
-            sync.jobs.push(Job { slug, rx, thread, cancel });
+            sync.jobs.push(Job { slug, spec: job_spec, rx, thread, cancel });
         }
         Err(e) => {
             sync.failures.insert(slug, e.to_string());
@@ -196,6 +209,7 @@ fn handle_requests(
 /// [`RefreshContentPacks`] for however many finished this frame.
 fn collect_results(
     mut sync_res: ResMut<PackSync>,
+    sources: Res<ContentSources>,
     mut finished: MessageWriter<PackSyncFinished>,
     mut refresh: MessageWriter<RefreshContentPacks>,
 ) {
@@ -219,6 +233,16 @@ fn collect_results(
             Err(TryRecvError::Disconnected) => Err("the download stopped unexpectedly".into()),
         };
         any_finished = true;
+        // Removed while it downloaded: the checkout has no source to belong
+        // to, and recording it would leave an orphan nothing lists or cleans.
+        let still_configured = sources.all().any(|(_, spec)| spec.slug() == job.slug);
+        if result.is_ok() && !still_configured {
+            if let Err(e) = uninstall(&job.spec) {
+                warn!("Could not delete pack {} removed during its download: {e}", job.slug);
+            }
+            sync.failures.remove(&job.slug);
+            continue;
+        }
         let error = match result {
             Ok((repo, manifest)) => match record_install(&job.slug, repo) {
                 Ok(()) => {

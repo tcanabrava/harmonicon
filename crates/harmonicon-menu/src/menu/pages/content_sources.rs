@@ -512,6 +512,7 @@ fn handle_confirm(
     mut pending: ResMut<PendingAction>,
     mut sources: ResMut<ContentSources>,
     mut install: MessageWriter<InstallPack>,
+    sync: Res<PackSync>,
 ) {
     for choice in chosen.read() {
         if choice.purpose != UPDATE_PURPOSE && choice.purpose != REMOVE_PURPOSE {
@@ -526,6 +527,7 @@ fn handle_confirm(
         if choice.purpose == UPDATE_PURPOSE {
             install.write(InstallPack { kind, spec });
         } else {
+            sync.cancel(&spec.slug());
             if let Err(e) = uninstall(&spec) {
                 warn!("Could not delete the files of {}: {e}", spec.slug());
             }
@@ -544,6 +546,7 @@ mod tests {
         let mut app = App::new();
         app.init_resource::<PendingAction>()
             .init_resource::<ContentSources>()
+            .init_resource::<PackSync>()
             .add_message::<ConfirmChosen>()
             .add_message::<InstallPack>()
             .add_systems(Update, handle_confirm);
