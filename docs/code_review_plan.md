@@ -452,6 +452,30 @@ without a pass, and nothing reads `SongManifest::waveform`.
 - Checked and sound: streak date maths (missed day, lapse, clock set
   back), `FirstRun` sampled before anything can save, the state enums.
 
+### 10. `harmonicon-ui` — done 2026-11-06, except `music_score`
+
+- **Bug, fixed `6560e1ba`, `278245f2`, `bf9a23ce`**: a modal `TabGroup`
+  confines focus only once focus is inside it, and none of the five
+  modals (confirm, file picker, tutorial overlay, document picker,
+  phrase editor) moved focus in. Tab walked the page behind each, and
+  Enter re-pressed whatever opened it. `KeyboardNavPlugin` now moves focus
+  into any modal on screen; the confirm dialog lands on No.
+- **Bug, fixed `278245f2`**: in Save mode the file dialog took Enter and
+  Space whatever had focus, so with a dialog button focused one Enter
+  pressed it *and* saved, closing the dialog twice in a frame.
+- **Bug, fixed `6560e1ba`**: the file dialog's Save label was a raw
+  English literal.
+- **Hazard, open**: the localization scan in `build.rs` flags only
+  literals that look like prose (several words); a test there pins
+  `Text({"Retry".to_string()})` as allowed. Single-word labels slip
+  through — "Save" did. Flagging every capitalised word would need an
+  allowlist for asset names and identifiers.
+- **Deferred**: `music_score` had uncommitted work in progress when this
+  crate was reviewed; review it once that lands. Its divisions by a
+  meter or a beat width are already guarded (`max(1)`, `> 0.0` checks).
+- Checked and sound: no `unwrap`/`expect`/`panic!` outside tests; the
+  file dialog's overwrite question; confirm dialog `DialogId` scoping.
+
 ### Carried into later sessions
 
 Found while making `cargo clippy --all-targets -- -D warnings` pass again
