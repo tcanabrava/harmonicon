@@ -21,7 +21,8 @@ use harmonicon_audio::pitch_detect::PitchRange;
 use harmonicon_platform::localization::{Localization, LocalizationExt};
 use harmonicon_platform::settings::ActionButtonStyle;
 use harmonicon_platform::theme::SongEditorColors;
-use harmonicon_ui::dialogs::file_dialog::{DialogMode, OpenFileDialog};
+use harmonicon_ui::dialogs::confirm_dialog::{ConfirmChosen, OpenConfirmDialog};
+use harmonicon_ui::dialogs::file_dialog::{DialogId, DialogMode, OpenFileDialog};
 
 /// Where a file dialog for authored `kind` content (`"songs"`, `"lessons"`)
 /// opens: the `~/Harmonicon/<kind>` drop folder, which the game watches
@@ -111,25 +112,58 @@ pub(super) fn spawn_file_buttons(
         |_: On<Activate>,
          state: Res<EditorState>,
          loc: Res<Localization>,
-         mut open: MessageWriter<OpenFileDialog>| {
-            open.write(match state.content_kind {
-                ContentKind::Song => OpenFileDialog {
-                    purpose: LOAD_PURPOSE,
-                    title: String::from(loc.msg("dialog-load-chart")),
-                    extensions: vec!["harpchart".into()],
-                    start_dir: drop_folder("songs"),
-                    mode: DialogMode::Open,
-                },
-                ContentKind::Lesson => OpenFileDialog {
-                    purpose: LOAD_PURPOSE,
-                    title: String::from(loc.msg("dialog-load-lesson")),
-                    extensions: vec!["json".into()],
-                    start_dir: drop_folder("lessons"),
-                    mode: DialogMode::Open,
-                },
-            });
+         mut open: MessageWriter<OpenFileDialog>,
+         mut confirm: MessageWriter<OpenConfirmDialog>| {
+            // Loading replaces the open document, notes and metadata alike,
+            // and undo only brings the notes back. Ask first, as starting a
+            // new document does.
+            if super::document_picker::has_content(&state) {
+                confirm.write(OpenConfirmDialog {
+                    purpose: LOAD_REPLACES_DOCUMENT,
+                    message: loc.msg("editor-load-replace-warning").to_string(),
+                });
+            } else {
+                open.write(load_request(&state, &loc));
+            }
         },
     );
+}
+
+/// The confirm dialog Load asks before replacing a document with content.
+const LOAD_REPLACES_DOCUMENT: DialogId = DialogId("song_editor_load_replaces_document");
+
+/// The file picker Load opens: a chart or a lesson, as the document is.
+fn load_request(state: &EditorState, loc: &Localization) -> OpenFileDialog {
+    match state.content_kind {
+        ContentKind::Song => OpenFileDialog {
+            purpose: LOAD_PURPOSE,
+            title: String::from(loc.msg("dialog-load-chart")),
+            extensions: vec!["harpchart".into()],
+            start_dir: drop_folder("songs"),
+            mode: DialogMode::Open,
+        },
+        ContentKind::Lesson => OpenFileDialog {
+            purpose: LOAD_PURPOSE,
+            title: String::from(loc.msg("dialog-load-lesson")),
+            extensions: vec!["json".into()],
+            start_dir: drop_folder("lessons"),
+            mode: DialogMode::Open,
+        },
+    }
+}
+
+/// Opens the file picker once the player agrees to replace the document.
+pub(super) fn load_after_confirmation(
+    mut answers: MessageReader<ConfirmChosen>,
+    state: Res<EditorState>,
+    loc: Res<Localization>,
+    mut open: MessageWriter<OpenFileDialog>,
+) {
+    for answer in answers.read().filter(|a| a.purpose == LOAD_REPLACES_DOCUMENT) {
+        if answer.confirmed {
+            open.write(load_request(&state, &loc));
+        }
+    }
 }
 
 /// Play/Pause/Stop/Practice — only shown in [`Mode::Play`] (wrapped in
@@ -355,5 +389,39 @@ impl Transport<'_, '_> {
     pub fn stop_all(&mut self) {
         self.stop_practice();
         self.stop_record();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use bevy::ecs::system::RunSystemOnce;
+
+    fn world() -> World {
+        let mut world = World::new();
+        world.init_resource::<EditorState>();
+        world.init_resource::<Localization>();
+        world.init_resource::<Messages<ConfirmChosen>>();
+        world.init_resource::<Messages<OpenFileDialog>>();
+        world
+    }
+
+    #[test]
+    fn load_opens_the_picker_only_once_replacing_the_document_is_agreed() {
+        let mut world = world();
+        world.write_message(ConfirmChosen { purpose: LOAD_REPLACES_DOCUMENT, confirmed: false });
+        world.run_system_once(load_after_confirmation).unwrap();
+        assert!(world.resource::<Messages<OpenFileDialog>>().is_empty(), "No keeps the document");
+
+        // An answer to some other question isn't consent to load.
+        world.write_message(ConfirmChosen { purpose: DialogId("elsewhere"), confirmed: true });
+        world.run_system_once(load_after_confirmation).unwrap();
+        assert!(world.resource::<Messages<OpenFileDialog>>().is_empty());
+
+        world.write_message(ConfirmChosen { purpose: LOAD_REPLACES_DOCUMENT, confirmed: true });
+        world.run_system_once(load_after_confirmation).unwrap();
+        let opened: Vec<_> = world.resource_mut::<Messages<OpenFileDialog>>().drain().collect();
+        assert_eq!(opened.len(), 1);
+        assert_eq!(opened[0].purpose, LOAD_PURPOSE);
     }
 }

@@ -13,7 +13,8 @@ Opening a fresh editor asks you to choose **Harmonica**, **Guitar**, **Piano**,
 **New** opens the chooser again; replacing a document with content asks for
 confirmation. Save first to retain that draft. Cancelling keeps it intact.
 In an empty document, **Details → Instrument** can also change the instrument.
-Loading a chart uses its saved instrument configuration. The Details pane
+Loading a chart uses its saved instrument configuration; like **New**, it
+asks before replacing a document that has content. The Details pane
 provides **Save**, **New**, and **Load** beside the instrument choices, so you
 can save a populated chart and start a document for another instrument.
 

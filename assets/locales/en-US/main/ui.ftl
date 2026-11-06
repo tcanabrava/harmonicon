@@ -1029,6 +1029,7 @@ editor-new-title = New document
 editor-new-instrument-question = Which instrument is this document for?
 
 editor-new-replace-warning = Create a new document and discard the current notes and metadata? Save your work first if you want to keep it.
+editor-load-replace-warning = Open another file and discard the current notes and metadata? Save your work first if you want to keep it.
 
 editor-transposed-position-warning = Transposed {$count} notes {$semitones} semitones — {$kept} left unchanged (unplayable or spot taken)
 

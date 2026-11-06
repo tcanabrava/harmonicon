@@ -168,7 +168,11 @@ impl Plugin for SongEditor2Plugin {
 
         app.init_resource::<document_picker::DocumentPicker>().add_systems(
             Update,
-            (document_picker::handle_confirmation, document_picker::sync_picker)
+            (
+                document_picker::handle_confirmation,
+                document_picker::sync_picker,
+                transport::load_after_confirmation,
+            )
                 .chain()
                 .in_set(EditorPass)
                 .run_if(in_state(AppState::SongEditor2)),
