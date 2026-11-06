@@ -376,6 +376,7 @@ dialog-load-lesson = Cargar lección
 dialog-select-music = Seleccionar música de fondo
 dialog-select-midi = Seleccionar archivo MIDI
 dialog-file-name = Nombre de archivo:
+dialog-save = Guardar
 dialog-cancel-esc = Cancelar  (Esc)
 
 # Song Editor 2 — mensajes de validación al arrastrar

@@ -8,6 +8,7 @@
 //! a time (a second [`OpenConfirmDialog`] while one is already open replaces
 //! it, same as `FileDialog`'s own single-dialog assumption).
 
+use bevy::input_focus::AutoFocus;
 use bevy::input_focus::tab_navigation::TabGroup;
 use bevy::prelude::*;
 use bevy::ui_widgets::Activate;
@@ -93,7 +94,12 @@ fn handle_open(
                     Children [
                         @choice_button(purpose, true, &loc.msg("dialog-yes"))
                         --
+                        // Focus starts inside the dialog, or Tab would walk
+                        // the page behind it (a modal TabGroup only holds
+                        // focus that is already in it). On No, so a second
+                        // Enter can't confirm something destructive.
                         @choice_button(purpose, false, &loc.msg("dialog-no"))
+                        AutoFocus
                     ]
                 ]
             ]
@@ -163,5 +169,37 @@ impl Plugin for ConfirmDialogPlugin {
             .add_message::<ConfirmChosen>()
             .init_resource::<ConfirmDialogOpen>()
             .add_systems(Update, (handle_open, close_on_escape).chain());
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use bevy::input_focus::InputFocus;
+
+    #[test]
+    fn opening_the_dialog_focuses_no() {
+        // A modal TabGroup only keeps focus that is already inside it, so
+        // without this Tab walked the page behind the dialog.
+        let mut app = App::new();
+        app.add_plugins((MinimalPlugins, AssetPlugin::default(), bevy::scene::ScenePlugin))
+            .init_resource::<InputFocus>()
+            .init_resource::<ButtonInput<KeyCode>>()
+            .init_resource::<Localization>()
+            .add_plugins(ConfirmDialogPlugin);
+        app.world_mut().write_message(OpenConfirmDialog {
+            purpose: DialogId("test"),
+            message: "Delete it?".into(),
+        });
+        for _ in 0..3 {
+            app.update();
+        }
+        let focused = app.world().resource::<InputFocus>().get().expect("nothing was focused");
+        let mut labels = app.world_mut().query::<(&ChildOf, &Text)>();
+        let label = labels
+            .iter(app.world())
+            .find(|(parent, _)| parent.parent() == focused)
+            .map(|(_, text)| text.0.clone());
+        assert_eq!(label.as_deref(), Some("dialog-no"));
     }
 }

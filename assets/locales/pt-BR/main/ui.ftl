@@ -376,6 +376,7 @@ dialog-load-lesson = Carregar lição
 dialog-select-music = Selecionar música de fundo
 dialog-select-midi = Selecionar arquivo MIDI
 dialog-file-name = Nome do arquivo:
+dialog-save = Salvar
 dialog-cancel-esc = Cancelar  (Esc)
 
 # Editor de Músicas 2 — mensagens de validação de arrastar

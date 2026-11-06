@@ -254,7 +254,7 @@ fn handle_open(
                         confirm_save(&mut dialog, &mut chosen, &mut confirm, &loc, &roots, next, &mut commands);
                     })
                     Children [
-                        Text({"Save".to_string()})
+                        Text({String::from(loc.msg("dialog-save"))})
                         TextFont { font_size: {FontSize::Px(15.0)} }
                         TextColor({Color::WHITE})
                     ]
