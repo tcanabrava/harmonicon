@@ -103,4 +103,10 @@ Each independently reviewable part receives a commit and relevant validation.
 - Step 0 complete: catalog-derived instrument combobox, localized All instruments,
   composed filtering, catalog-change recovery and dropdown keyboard isolation.
   Menu suite: 80 tests passed.
-- Steps 1–7 remain planned; no new instrument identity is enabled yet.
+- Step 1 complete: reusable borrowed `FrettedStrings` geometry and `FretPosition`;
+  Guitar delegates geometry while preserving its setup fields, chart format,
+  techniques and ergonomic policy. Four-/seven-string, re-entrant tuning and
+  capo/boundary cases covered; core suite: 429 tests passed.
+- Clippy passed for core and menu, all targets, with warnings denied.
+- Steps 2–7 remain planned; no new instrument identity is enabled yet. Next:
+  fretted electric bass using the shared model and presentation infrastructure.

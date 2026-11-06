@@ -19,6 +19,7 @@
 //! [`InstrumentModel::pitch_of`]'s answer.
 
 pub mod flute;
+pub mod fretted_strings;
 pub mod guitar;
 pub mod piano;
 pub mod substitute;

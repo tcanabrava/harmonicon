@@ -13,6 +13,7 @@
 //! A microphone hears the pitch, not the string, so a position here is the
 //! fingering a chart *suggests*; scoring compares pitches only.
 
+use super::fretted_strings::{FretPosition, FrettedStrings};
 use crate::midi::NOTE_NAMES;
 
 pub mod fingering;
@@ -125,15 +126,19 @@ impl Guitar {
         Self { strings: STANDARD_TUNING.to_vec(), frets, capo: 0, body }
     }
 
+    /// Shared neck geometry; guitar techniques and teaching remain here.
+    pub fn neck(&self) -> FrettedStrings<'_> {
+        FrettedStrings { strings: &self.strings, frets: self.frets, capo: self.capo }
+    }
+
     /// The pitch `string` sounds open, with the capo applied.
     pub fn open_pitch(&self, string: u8) -> Option<u8> {
-        let open = *self.strings.get(usize::from(string.checked_sub(1)?))?;
-        open.checked_add(self.capo)
+        self.neck().open_pitch(string)
     }
 
     /// The highest fret above the capo.
     pub fn top_fret(&self) -> u8 {
-        self.frets.saturating_sub(self.capo)
+        self.neck().top_fret()
     }
 
     /// The pitch `assignment` sounds, or `None` if this guitar can't play it.
@@ -143,7 +148,9 @@ impl Guitar {
             return None;
         }
         match a.technique {
-            StringTechnique::Fretted => open.checked_add(a.fret),
+            StringTechnique::Fretted => {
+                self.neck().pitch_at(FretPosition { string: a.string, fret: a.fret })
+            }
             StringTechnique::Bend(depth) => {
                 let up = depth.round();
                 if up <= 0.0 || up > MAX_BEND {
@@ -162,31 +169,24 @@ impl Guitar {
     /// low positions are what a beginner reaches for, and the order a
     /// fingering solver starts from.
     pub fn fretted_positions(&self, midi: u8) -> Vec<FretAssignment> {
-        let mut out: Vec<FretAssignment> = (1..=self.string_count())
-            .filter_map(|string| {
-                let fret = midi.checked_sub(self.open_pitch(string)?)?;
-                (fret <= self.top_fret()).then_some(FretAssignment {
-                    string,
-                    fret,
-                    technique: StringTechnique::Fretted,
-                })
+        self.neck()
+            .positions_for(midi)
+            .into_iter()
+            .map(|position| FretAssignment {
+                string: position.string,
+                fret: position.fret,
+                technique: StringTechnique::Fretted,
             })
-            .collect();
-        out.sort_by_key(|a| (a.fret, a.string));
-        out
+            .collect()
     }
 
     pub fn string_count(&self) -> u8 {
-        u8::try_from(self.strings.len()).unwrap_or(u8::MAX)
+        self.neck().string_count()
     }
 
     /// Lowest open string to the top fret of the highest one.
     pub fn range(&self) -> Option<(u8, u8)> {
-        let low = (1..=self.string_count()).filter_map(|s| self.open_pitch(s)).min()?;
-        let high = (1..=self.string_count())
-            .filter_map(|s| self.open_pitch(s)?.checked_add(self.top_fret()))
-            .max()?;
-        Some((low, high))
+        self.neck().range()
     }
 
     /// Whether `a` and `b` can be held at once: different strings, and
