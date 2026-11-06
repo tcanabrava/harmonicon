@@ -623,15 +623,18 @@ fn hand_region(positions: &[FretAssignment], top: u8) -> Option<(u8, u8)> {
 
 #[derive(Component)]
 pub(super) struct NeckOverview(Guitar);
+/// The highlighted hand position on the neck, for the group sounding now.
+/// The next group is shown by its ring dots alone ([`NeckDot::next`]).
 #[derive(Component)]
-pub(super) struct NeckRegion(bool);
+pub(super) struct NeckRegion;
 #[derive(Component)]
 pub(super) struct NeckDot {
     next: bool,
     string: u8,
 }
+/// The chord name over [`NeckRegion`].
 #[derive(Component)]
-pub(super) struct NeckLabel(bool);
+pub(super) struct NeckLabel;
 
 const NECK_NOW: Color = Color::srgb(0.98, 0.82, 0.35);
 const NECK_NEXT: Color = Color::srgb(0.48, 0.77, 1.0);
@@ -754,7 +757,7 @@ fn spawn_neck(
                     // group is shown by its rings alone.
                     board
                         .spawn((
-                            NeckRegion(false),
+                            NeckRegion,
                             NeckMotion::default(),
                             Node {
                                 position_type: PositionType::Absolute,
@@ -767,7 +770,7 @@ fn spawn_neck(
                         ))
                         .with_children(|region| {
                             region.spawn((
-                                NeckLabel(false),
+                                NeckLabel,
                                 Text::new(""),
                                 TextLayout::no_wrap(),
                                 TextFont { font_size: FontSize::Px(13.0), ..default() },
@@ -850,17 +853,11 @@ pub(super) fn update_neck_overview(
     let next_positions = positions(&next);
     let columns = f32::from(guitar.frets) + 1.0;
     let now_span = hand_region(&now_positions, guitar.top_fret());
-    let next_span = hand_region(&next_positions, guitar.top_fret());
-    for (region, mut node, mut fill, mut border, mut motion) in &mut regions {
-        let group = if region.0 { &next_positions } else { &now_positions };
-        let span = hand_region(group, guitar.top_fret());
-        let color = if region.0 { NECK_NEXT } else { NECK_NOW };
-        fill.0 = if span.is_none() {
-            Color::NONE
-        } else {
-            color.with_alpha(if region.0 { 0.05 } else { 0.14 })
-        };
-        *border = BorderColor::all(if span.is_none() { Color::NONE } else { color });
+    for (_, mut node, mut fill, mut border, mut motion) in &mut regions {
+        let group = &now_positions;
+        let span = now_span;
+        fill.0 = if span.is_none() { Color::NONE } else { NECK_NOW.with_alpha(0.14) };
+        *border = BorderColor::all(if span.is_none() { Color::NONE } else { NECK_NOW });
         if let Some((first, last)) = span {
             node.display = Display::Flex;
             node.left = Val::Percent(f32::from(first + guitar.capo) * 100.0 / columns);
@@ -907,15 +904,14 @@ pub(super) fn update_neck_overview(
             node.display = Display::None;
         }
     }
-    for (label, mut text, mut node) in &mut labels {
-        let span = if label.0 { next_span } else { now_span };
+    for (_, mut text, mut node) in &mut labels {
+        let span = now_span;
         let near_end =
             span.is_some_and(|(_, last)| last + guitar.capo >= guitar.frets.saturating_sub(3));
         node.left = if near_end { Val::Auto } else { Val::Px(0.0) };
         node.right = if near_end { Val::Px(0.0) } else { Val::Auto };
-        let name = group_name(if label.0 { &next } else { &current });
-        let key = if label.0 { "gameplay-guitar-neck-next" } else { "gameplay-guitar-neck-now" };
-        text.0 = loc.msg_args(key, &[("chord", name)]).to_string();
+        let name = group_name(&current);
+        text.0 = loc.msg_args("gameplay-guitar-neck-now", &[("chord", name)]).to_string();
     }
 }
 
@@ -1054,10 +1050,10 @@ pub(super) fn update_trainer_neck(
             };
         }
     }
-    for (region, mut node) in &mut regions {
+    for (_, mut node) in &mut regions {
         let span = hand_region(&positions, guitar.top_fret())
             .or_else(|| (!positions.is_empty()).then_some((0, 0)));
-        node.display = if !region.0 && span.is_some() { Display::Flex } else { Display::None };
+        node.display = if span.is_some() { Display::Flex } else { Display::None };
         if let Some((first, last)) = span {
             node.left = Val::Percent(f32::from(first + guitar.capo) * 100.0 / columns);
             node.width = Val::Percent(f32::from(last - first + 1) * 100.0 / columns);
