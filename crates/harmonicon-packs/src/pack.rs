@@ -49,7 +49,8 @@ pub struct Requires {
 pub struct PackManifest {
     pub schema: u32,
     pub kind: PackKind,
-    /// Stable identifier; also the name of the pack's directory on disk.
+    /// Stable identifier. Not the directory a checkout lives in: that is
+    /// `RepoSpec::slug`, which must be known before anything is downloaded.
     pub id: String,
     pub name: String,
     pub version: Version,

@@ -335,6 +335,31 @@ lock); this crate adapts its model. Findings:
   (core's `midi_file` already refuses a 0-tick header), the zero-numerator
   meter (downstream parses `0/4` as 4/4), fret/string lookups.
 
+### 4. `harmonicon-packs` — done 2026-11-06
+
+- **Bug, fixed `93823b8c`**: an address with nothing after its scheme
+  (`https://`) passed `validate` and slugged to `""`, and
+  `packs_dir.join("")` is `packs_dir`. Removing such an entry from Content
+  Sources ran `remove_dir_all(packs_dir)`, deleting every pack.
+  `RepoSpec::checkout_dir` now builds every pack path and refuses an empty
+  slug.
+- **Hazard, open**: `retained_songs::has_chart` keeps its own list of
+  chart extensions, a copy of `harmonicon_score::IMPORT_EXTENSIONS` plus
+  `harpchart`. A format added there and not here makes a removed song in
+  that format be deleted rather than kept. The crate can't take the score
+  crate as a dependency cheaply (it brings `guitarpro`); a test in a crate
+  that sees both would hold them together.
+- **Hazard, open**: retained songs accumulate in the checkout with no
+  bound, and every update counts them against `MAX_PACK_BYTES`. Once they
+  cross 1 GiB, every later update fails with "larger than 1024 MB" and
+  nothing says why or how to recover.
+- **Hazard, open**: `MAX_PACK_BYTES` is checked after the clone, so a
+  hostile or mistaken repository can fill the disk before it's refused.
+  Only reachable through an address the player chose.
+- Checked and sound: scheme allowlist (`ext::`, `http` refused), slug
+  sanitizing, symlink refusal, staged swap with rollback, compatibility
+  rules (pre-releases match their release), corrupt `installed.json`.
+
 ### Carried into later sessions
 
 Found while making `cargo clippy --all-targets -- -D warnings` pass again
