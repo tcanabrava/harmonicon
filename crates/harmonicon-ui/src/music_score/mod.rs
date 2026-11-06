@@ -54,6 +54,9 @@ use tie_material::{TieMaterialHandle, TieMaterialPlugin};
 mod notation;
 use notation::glyph;
 pub use notation::*;
+mod projection;
+mod key_signature;
+pub use projection::{MusicScoreKeySignature, project_notes, note_spelling, note_staff_step};
 
 mod meter_map;
 pub use meter_map::{BarPosition, MeterMap, MeterSegment};
@@ -211,7 +214,7 @@ const HIGHLIGHT_COLOR: Color = Color::srgb(0.98, 0.80, 0.25);
 
 const CLEF_X: f32 = 8.0;
 /// Where the time signature sits, clear of the clef glyph's own width.
-const TIME_SIG_X: f32 = CLEF_X + 26.0;
+const TIME_SIG_X: f32 = 104.0;
 /// The two digits straddle the middle line: numerator centred on the 4th
 /// step, denominator on the 2nd, the conventional upper/lower placement.
 const TIME_SIG_NUMERATOR_STEP: i32 = 6;
@@ -220,7 +223,7 @@ const TIME_SIG_DENOMINATOR_STEP: i32 = 2;
 /// playhead position draws — notes scroll right to left through it, the
 /// same "things move toward a fixed reference line" language the falling-
 /// note highway and song-progress playhead already use elsewhere.
-const PLAYHEAD_X: f32 = 56.0;
+const PLAYHEAD_X: f32 = 128.0;
 /// How wide a beat is drawn when a song has no reason to need more — and
 /// the floor [`MusicScoreSpacing`] clamps to, so a sparse song is never
 /// squeezed *tighter* than this.
@@ -334,7 +337,7 @@ impl MusicScoreBarMap {
             .into_iter()
             .enumerate()
             .map(|(index, (tick, _))| {
-                let note = NotationNote {
+                let note = NotationNote { spelling: None, 
                     start_beat: (previous as f64 + phase) / q,
                     duration_beats: (tick - previous) as f64 / q,
                     midi,
@@ -387,14 +390,14 @@ mod bar_map_tests {
     fn a_short_pause_widens_the_staff_until_its_rest_fits() {
         let bars = MusicScoreBarMap::default();
         let notes = vec![
-            NotationNote {
+            NotationNote { spelling: None, 
                 start_beat: 0.0,
                 duration_beats: 1.0,
                 midi: 60,
                 tied_from_previous: false,
                 highlighted: false,
             },
-            NotationNote {
+            NotationNote { spelling: None, 
                 start_beat: 1.25,
                 duration_beats: 1.0,
                 midi: 62,
@@ -591,7 +594,8 @@ pub struct InstrumentScoreClef(pub Clef);
 
 pub fn instrument_clef(kind: harmonicon_core::instrument::InstrumentKind) -> Option<Clef> {
     match kind {
-        harmonicon_core::instrument::InstrumentKind::Bass => Some(Clef::Bass8vb),
+        harmonicon_core::instrument::InstrumentKind::Bass => Some(Clef::Bass),
+        harmonicon_core::instrument::InstrumentKind::Guitar => Some(Clef::Treble),
         _ => None,
     }
 }
@@ -602,9 +606,11 @@ pub fn apply_instrument_clef(
     kind: harmonicon_core::instrument::InstrumentKind,
 ) {
     if let Some(clef) = instrument_clef(kind) {
-        parent.commands().entity(score).insert(InstrumentScoreClef(clef));
+        parent.commands().entity(score).insert((InstrumentScoreClef(clef), InstrumentOctaveAnnotation(if matches!(kind, harmonicon_core::instrument::InstrumentKind::Guitar | harmonicon_core::instrument::InstrumentKind::Bass) { -1 } else { 0 })));
     }
 }
+#[derive(Component, Clone, Copy)]
+struct InstrumentOctaveAnnotation(i8);
 #[derive(Component)]
 struct MusicScoreReference;
 
@@ -622,6 +628,12 @@ struct MusicScoreNoteGlyph;
 
 // ── Plugin ───────────────────────────────────────────────────────────────
 
+#[derive(bevy::ecs::system::SystemParam)]
+struct EngravingSettings<'w> {
+    spacing: Res<'w, MusicScoreSpacing>,
+    signature: Res<'w, MusicScoreKeySignature>,
+}
+
 pub struct MusicScorePlugin;
 
 impl Plugin for MusicScorePlugin {
@@ -634,7 +646,9 @@ impl Plugin for MusicScorePlugin {
             .init_resource::<MusicScoreMeter>()
             .init_resource::<MusicScoreBarMap>()
             .init_resource::<MusicScoreSpacing>()
+            .init_resource::<MusicScoreKeySignature>()
             .add_systems(Startup, load_bravura_font)
+            .add_systems(Update, key_signature::rebuild)
             .add_systems(Update, rebuild_full_score.after(derive_score_spacing))
             .add_systems(
                 Update,
@@ -654,6 +668,7 @@ impl Plugin for MusicScorePlugin {
                             .or_else(resource_changed::<MusicScoreBarMap>)
                             .or_else(resource_changed::<MusicScorePlayhead>)
                             .or_else(resource_changed::<MusicScoreSpacing>)
+                            .or_else(resource_changed::<MusicScoreKeySignature>)
                             .or_else(panel_width_changed),
                     )
                     .after(derive_score_spacing),
@@ -735,6 +750,9 @@ fn spawn_score(parent: &mut ChildSpawnerCommands, bravura: &BravuraFont, grand: 
     }
     let root_id = root.id();
     root.with_children(|panel| {
+        panel.spawn((Node { position_type: PositionType::Absolute, width: Val::Px(PLAYHEAD_X - 8.0), height: Val::Percent(100.0), ..default() }, BackgroundColor(harmonicon_platform::theme::HUD_PANEL_BG), ZIndex(1), bevy::picking::Pickable::IGNORE));
+        key_signature::spawn(panel, root_id, false);
+        if grand { key_signature::spawn(panel, root_id, true); }
         if grand {
             for line in 0..5 {
                 panel.spawn((
@@ -748,13 +766,7 @@ fn spawn_score(parent: &mut ChildSpawnerCommands, bravura: &BravuraFont, grand: 
                     BackgroundColor(Color::srgba(0.75, 0.75, 0.80, 0.6)),
                 ));
             }
-            panel.spawn(glyph(
-                bravura,
-                Clef::Bass.glyph(),
-                CLEF_X,
-                PANEL_HEIGHT + y_for_step(Clef::Bass.anchor_step()),
-                Color::WHITE,
-            ));
+            panel.spawn((glyph(bravura, Clef::Bass.glyph(), CLEF_X, PANEL_HEIGHT + y_for_step(Clef::Bass.anchor_step()), Color::WHITE), ZIndex(2)));
             for (numerator, step, digit) in
                 [(true, TIME_SIG_NUMERATOR_STEP, 4), (false, TIME_SIG_DENOMINATOR_STEP, 4)]
             {
@@ -766,7 +778,7 @@ fn spawn_score(parent: &mut ChildSpawnerCommands, bravura: &BravuraFont, grand: 
                         PANEL_HEIGHT + y_for_step(step),
                         Color::WHITE,
                     ),
-                    MusicScoreTimeSig { numerator },
+                    MusicScoreTimeSig { numerator }, ZIndex(2),
                 ));
             }
         }
@@ -792,6 +804,7 @@ fn spawn_score(parent: &mut ChildSpawnerCommands, bravura: &BravuraFont, grand: 
         panel.spawn((
             glyph(bravura, clef.glyph(), CLEF_X, y_for_step(clef.anchor_step()), Color::WHITE),
             MusicScoreClef,
+            ZIndex(2),
         ));
         // Time signature, beside the clef. Both digits are re-texted by
         // `rebuild_score_notes` when the meter changes; 4/4 to begin with,
@@ -803,7 +816,7 @@ fn spawn_score(parent: &mut ChildSpawnerCommands, bravura: &BravuraFont, grand: 
         ] {
             panel.spawn((
                 glyph(bravura, time_sig_glyphs(digit), TIME_SIG_X, y_for_step(step), Color::WHITE),
-                MusicScoreTimeSig { numerator },
+                MusicScoreTimeSig { numerator }, ZIndex(2),
             ));
         }
         // "Now" reference line — notes scroll toward/through this the same
@@ -818,7 +831,7 @@ fn spawn_score(parent: &mut ChildSpawnerCommands, bravura: &BravuraFont, grand: 
                 ..default()
             },
             BackgroundColor(Color::srgb(1.0, 0.15, 0.18)),
-            MusicScoreReference,
+            MusicScoreReference, ZIndex(3),
         ));
         // Notes layer: its local x=0 is the beat the glyphs were last
         // spawned around, and `rebuild_score_notes` slides it so that beat
@@ -879,17 +892,19 @@ fn rebuild_score_notes(
     selection: Res<MusicScoreSelection>,
     playhead: Res<MusicScorePlayhead>,
     panels: Query<
-        (&ComputedNode, Option<&PianoGrandStaff>, Option<Ref<InstrumentScoreClef>>),
+        (&ComputedNode, Option<&PianoGrandStaff>, Option<Ref<InstrumentScoreClef>>, Option<&InstrumentOctaveAnnotation>),
         With<MusicScorePanel>,
     >,
     mut layers: Query<(Entity, &mut Node), (With<MusicScoreNotesLayer>, Without<MusicScoreClef>)>,
     existing: Query<(Entity, &ChildOf), With<MusicScoreNoteGlyph>>,
     meter: Res<MusicScoreMeter>,
     bar_map: Res<MusicScoreBarMap>,
-    spacing: Res<MusicScoreSpacing>,
+    engraving: EngravingSettings,
     mut clefs: Query<(&mut Text, &mut Node), With<MusicScoreClef>>,
     mut time_sigs: Query<(&MusicScoreTimeSig, &mut Text), Without<MusicScoreClef>>,
 ) {
+    let spacing = &engraving.spacing;
+    let signature = &engraving.signature;
     let Some(bravura) = bravura else { return };
     let Some(tie_material) = tie_material else {
         return;
@@ -904,7 +919,7 @@ fn rebuild_score_notes(
     // conversion `gameplay_2d::size_note_ribbons` already applies for the
     // same reason.
     let Some(panel_width) =
-        panels.iter().next().map(|(n, _, _)| n.size().x * n.inverse_scale_factor())
+        panels.iter().next().map(|(n, _, _, _)| n.size().x * n.inverse_scale_factor())
     else {
         return;
     };
@@ -928,7 +943,8 @@ fn rebuild_score_notes(
         || meter.is_changed()
         || bar_map.is_changed()
         || spacing.is_changed()
-        || panels.iter().any(|(_, _, clef)| clef.is_some_and(|clef| clef.is_changed()))
+        || signature.is_changed()
+        || panels.iter().any(|(_, _, clef, _)| clef.is_some_and(|clef| clef.is_changed()))
     {
         let span = beats_behind + beats_ahead;
         let lo = now - beats_behind - span;
@@ -948,8 +964,10 @@ fn rebuild_score_notes(
             &existing,
             &mut clefs,
             &mut time_sigs,
-            panels.iter().next().is_some_and(|(_, grand, _)| grand.is_some()),
-            panels.iter().next().and_then(|(_, _, clef)| clef.map(|clef| clef.0)),
+            panels.iter().next().is_some_and(|(_, grand, _, _)| grand.is_some()),
+            panels.iter().next().and_then(|(_, _, clef, _)| clef.map(|clef| clef.0)),
+            panels.iter().next().and_then(|(_, _, _, octave)| octave.map(|octave| octave.0)).unwrap_or(0),
+            &signature.0,
         );
         commands.entity(layer).with_children(|parent| {
             for section in &sections.0 {
@@ -987,7 +1005,7 @@ fn rebuild_score_notes(
         });
         if let Some((start, end)) = selection.0 {
             let height = PANEL_HEIGHT
-                * if panels.iter().next().is_some_and(|(_, grand, _)| grand.is_some()) {
+                * if panels.iter().next().is_some_and(|(_, grand, _, _)| grand.is_some()) {
                     2.0
                 } else {
                     1.0
@@ -1063,6 +1081,8 @@ fn spawn_window(
     time_sigs: &mut Query<(&MusicScoreTimeSig, &mut Text), Without<MusicScoreClef>>,
     grand: bool,
     forced: Option<Clef>,
+    octave_annotation: i8,
+    signature: &harmonicon_core::notation::KeySignature,
 ) {
     for (glyph, parent) in existing {
         if parent.parent() == layer {
@@ -1087,7 +1107,7 @@ fn spawn_window(
             clefs,
             time_sigs,
             Some(Clef::Treble),
-            true,
+            true, 0, signature,
         );
         let bass = commands
             .spawn((
@@ -1117,7 +1137,7 @@ fn spawn_window(
             clefs,
             time_sigs,
             Some(Clef::Bass),
-            false,
+            false, 0, signature,
         );
     } else {
         spawn_staff_window(
@@ -1135,7 +1155,7 @@ fn spawn_window(
             clefs,
             time_sigs,
             forced,
-            true,
+            true, octave_annotation, signature,
         );
     }
 }
@@ -1155,11 +1175,15 @@ fn spawn_staff_window(
     time_sigs: &mut Query<(&MusicScoreTimeSig, &mut Text), Without<MusicScoreClef>>,
     forced: Option<Clef>,
     update_clef: bool,
+    octave_annotation: i8,
+    signature: &harmonicon_core::notation::KeySignature,
 ) {
     // One clef for the whole song, from its own range — see `choose_clef`.
     let clef = notation::resolve_clef(notes, forced);
     for (mut text, mut node) in clefs.iter_mut().filter(|_| update_clef) {
-        let glyph = clef.glyph();
+        let glyph = match (clef, octave_annotation) {
+            (Clef::Bass, -1) => "\u{E064}", (Clef::Treble, -1) => "\u{E052}", _ => clef.glyph(),
+        };
         if text.0 != glyph {
             text.0 = glyph.to_string();
             node.top = Val::Px(y_for_step(clef.anchor_step()) - GLYPH_BASELINE_CORRECTION);
@@ -1179,7 +1203,7 @@ fn spawn_staff_window(
     // an accidental's effect on the rest of its bar has to be known even
     // when the note that established it has already scrolled off.
     let stems = stem_roles(notes, clef);
-    let marks = accidentals(notes, clef, meter.beats_per_bar());
+    let marks = accidentals_with_key(notes, clef, meter.beats_per_bar(), *signature);
 
     commands.entity(layer).with_children(|parent| {
         // Bar lines first, so a notehead always paints over one rather than
@@ -1504,17 +1528,19 @@ fn rebuild_full_score(
     notes: Res<MusicScoreNotes>,
     meter: Res<MusicScoreMeter>,
     bars: Res<MusicScoreBarMap>,
-    spacing: Res<MusicScoreSpacing>,
+    engraving: EngravingSettings,
     mut layers: Query<(Entity, &mut FullScoreLayer)>,
     visibility: Query<&InheritedVisibility>,
     existing: Query<(Entity, &ChildOf), With<MusicScoreNoteGlyph>>,
     mut clefs: Query<(&mut Text, &mut Node), With<MusicScoreClef>>,
     mut signatures: Query<(&MusicScoreTimeSig, &mut Text), Without<MusicScoreClef>>,
-    mut roots: Query<(&mut Node, Option<&InstrumentScoreClef>), Without<MusicScoreClef>>,
+    mut roots: Query<(&mut Node, Option<&InstrumentScoreClef>, Option<&InstrumentOctaveAnnotation>), Without<MusicScoreClef>>,
 ) {
+    let spacing = &engraving.spacing;
+    let signature = &engraving.signature;
     let (Some(bravura), Some(tie)) = (bravura, tie) else { return };
     for (layer, mut full) in &mut layers {
-        if notes.is_changed() || bars.is_changed() || meter.is_changed() || spacing.is_changed() {
+        if notes.is_changed() || bars.is_changed() || meter.is_changed() || spacing.is_changed() || signature.is_changed() {
             full.dirty = true;
         }
         if !full.dirty || !visibility.get(full.root).is_ok_and(|v| v.get()) {
@@ -1522,8 +1548,9 @@ fn rebuild_full_score(
         }
         full.dirty = false;
         let end = notes.0.iter().map(|n| n.start_beat + n.duration_beats).fold(full.end, f64::max);
-        let forced = roots.get(full.root).ok().and_then(|(_, clef)| clef.map(|clef| clef.0));
-        if let Ok((mut root, _)) = roots.get_mut(full.root) {
+        let forced = roots.get(full.root).ok().and_then(|(_, clef, _)| clef.map(|clef| clef.0));
+        let octave_annotation = roots.get(full.root).ok().and_then(|(_, _, octave)| octave.map(|octave| octave.0)).unwrap_or(0);
+        if let Ok((mut root, _, _)) = roots.get_mut(full.root) {
             root.width = Val::Px(score_beat_x(end, spacing.0) + 80.0);
             root.flex_shrink = 0.0;
         }
@@ -1543,7 +1570,7 @@ fn rebuild_full_score(
             &mut clefs,
             &mut signatures,
             full.grand,
-            forced,
+            forced, octave_annotation, &signature.0,
         );
         commands.entity(layer).with_children(|parent| {
             for (index, beat) in std::iter::once(0.0).chain(bars.beats(0.0, end)).enumerate() {

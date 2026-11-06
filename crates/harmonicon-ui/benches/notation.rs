@@ -18,7 +18,7 @@ fn notes(count: usize, chord: bool) -> Vec<NotationNote> {
     for i in 0..count {
         let start_beat = i as f64 * 0.5;
         let tied = i > 0 && i % 16 == 0;
-        result.push(NotationNote {
+        result.push(NotationNote { spelling: None, 
             start_beat,
             duration_beats: 0.5,
             midi: if tied { 72 } else { [60, 62, 64, 65, 67, 69, 71, 72][i % 8] },
@@ -26,7 +26,7 @@ fn notes(count: usize, chord: bool) -> Vec<NotationNote> {
             highlighted: false,
         });
         if chord {
-            result.push(NotationNote {
+            result.push(NotationNote { spelling: None, 
                 start_beat,
                 duration_beats: 0.5,
                 midi: if tied { 76 } else { [64, 65, 67, 69, 71, 72, 74, 76][i % 8] },

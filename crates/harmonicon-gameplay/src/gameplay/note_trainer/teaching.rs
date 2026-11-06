@@ -9,7 +9,7 @@ pub(super) fn notation(drill: Option<&Drill>) -> Vec<NotationNote> {
 }
 
 pub(crate) fn pitch_notation(start: Option<f32>, target: f32) -> Vec<NotationNote> {
-    let note = |midi: f32, beat, highlighted| NotationNote {
+    let note = |midi: f32, beat, highlighted| NotationNote { spelling: None, 
         start_beat: beat,
         duration_beats: 1.0,
         midi: midi.round() as u8,
@@ -74,7 +74,7 @@ pub(crate) fn sync_score(trainer: Res<NoteTrainer>, mut notes: ResMut<MusicScore
             .shape()
             .pitches(guitar)
             .into_iter()
-            .map(|midi| NotationNote {
+            .map(|midi| NotationNote { spelling: None, 
                 start_beat: 0.0,
                 duration_beats: 1.0,
                 midi,

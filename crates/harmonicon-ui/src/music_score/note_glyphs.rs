@@ -19,7 +19,7 @@ pub(super) fn spawn_note_glyphs(
 ) {
     let beam = stem.beam;
     let x = ((note.start_beat - now) * scale as f64) as f32;
-    let step = staff_step(note.midi, clef);
+    let step = note_staff_step(note, clef);
     let rhythm = note_rhythm(note.duration_beats);
     let kind = rhythm.head;
     let notehead_y = y_for_step(step);
@@ -35,6 +35,9 @@ pub(super) fn spawn_note_glyphs(
     // said — not on this note alone.
     if let Some((mark, width_sp)) = match accidental {
         Accidental::Sharp => Some((glyph::ACCIDENTAL_SHARP, ACCIDENTAL_SHARP_WIDTH_SP)),
+        Accidental::Flat => Some((glyph::ACCIDENTAL_FLAT, 0.5)),
+        Accidental::DoubleSharp => Some((glyph::ACCIDENTAL_DOUBLE_SHARP, 1.0)),
+        Accidental::DoubleFlat => Some((glyph::ACCIDENTAL_DOUBLE_FLAT, 1.0)),
         Accidental::Natural => Some((glyph::ACCIDENTAL_NATURAL, ACCIDENTAL_NATURAL_WIDTH_SP)),
         Accidental::None => None,
     } {

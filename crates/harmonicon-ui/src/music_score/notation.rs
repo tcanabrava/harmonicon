@@ -30,6 +30,9 @@ pub(super) mod glyph {
     pub const NOTEHEAD_WHOLE: &str = "\u{E0A2}";
     pub const NOTEHEAD_HALF: &str = "\u{E0A3}";
     pub const NOTEHEAD_BLACK: &str = "\u{E0A4}";
+    pub const ACCIDENTAL_FLAT: &str = "\u{E260}";
+    pub const ACCIDENTAL_DOUBLE_SHARP: &str = "\u{E263}";
+    pub const ACCIDENTAL_DOUBLE_FLAT: &str = "\u{E264}";
     pub const ACCIDENTAL_SHARP: &str = "\u{E262}";
     pub const ACCIDENTAL_NATURAL: &str = "\u{E261}";
     pub const FLAG_8TH_UP: &str = "\u{E240}";
@@ -56,6 +59,8 @@ pub struct NotationNote {
     pub start_beat: f64,
     pub duration_beats: f64,
     pub midi: u8,
+    /// Explicit written spelling, independent of equal-tempered pitch identity.
+    pub spelling: Option<harmonicon_core::notation::SpelledPitch>,
     /// True for every segment after the first when [`split_at_bar_lines`]
     /// split a longer note across a bar line — [`spawn_note_glyphs`] draws
     /// a short tie mark connecting it back to the segment immediately
@@ -88,7 +93,7 @@ pub fn split_at_bar_lines(note: NotationNote, beats_per_bar: f64) -> Vec<Notatio
         let bar_index = (pos / beats_per_bar).floor();
         let next_bar_start = (bar_index + 1.0) * beats_per_bar;
         let seg_end = next_bar_start.min(end);
-        segments.push(NotationNote {
+        segments.push(NotationNote { spelling: note.spelling,
             start_beat: pos,
             duration_beats: seg_end - pos,
             midi: note.midi,
@@ -126,7 +131,7 @@ impl Clef {
     /// [`staff_step`] subtracts it, and everything downstream
     /// ([`y_for_step`], [`ledger_line_steps`]) then works in
     /// already-clef-relative steps and needs no clef of its own.
-    fn base_midi(self) -> u8 {
+    pub(super) fn base_midi(self) -> u8 {
         match self {
             Clef::Treble => 64,    // E4
             Clef::Treble8va => 76, // E5 — drawn an octave below its sound
@@ -288,6 +293,9 @@ pub enum Accidental {
     None,
     Sharp,
     Natural,
+    Flat,
+    DoubleSharp,
+    DoubleFlat,
 }
 
 /// Which accidental each note needs, following the bar rather than the note.
@@ -309,40 +317,21 @@ pub enum Accidental {
 /// window so a note doesn't lose its accidental just because the note that
 /// established it has scrolled off.
 pub fn accidentals(notes: &[NotationNote], clef: Clef, beats_per_bar: f64) -> Vec<Accidental> {
-    let mut out = Vec::with_capacity(notes.len());
-    // Staff step -> is that position currently sharpened. Cleared at every
-    // bar line, which is what makes this "per bar" at all.
-    let mut altered: std::collections::HashMap<i32, bool> = std::collections::HashMap::new();
-    let mut current_bar: Option<i64> = None;
-
-    for note in notes {
-        let bar =
-            if beats_per_bar > 0.0 { (note.start_beat / beats_per_bar).floor() as i64 } else { 0 };
-        if current_bar != Some(bar) {
-            altered.clear();
-            current_bar = Some(bar);
-        }
-
-        let step = staff_step(note.midi, clef);
-        let sharp = needs_sharp(note.midi);
-        let was_sharp = altered.get(&step).copied().unwrap_or(false);
-        out.push(if note.tied_from_previous {
-            // The tie carries the alteration across the bar line; restating
-            // it on the continuation is what the tie is for.
-            Accidental::None
-        } else if sharp && !was_sharp {
-            Accidental::Sharp
-        } else if !sharp && was_sharp {
-            Accidental::Natural
-        } else {
-            Accidental::None
-        });
-        // Recorded even for a tied continuation, so a later note at this
-        // position in the new bar is judged against what is actually
-        // sounding.
-        altered.insert(step, sharp);
-    }
-    out
+    accidentals_with_key(notes, clef, beats_per_bar, harmonicon_core::notation::KeySignature::default())
+}
+pub fn accidentals_with_key(notes: &[NotationNote], clef: Clef, beats_per_bar: f64, signature: harmonicon_core::notation::KeySignature) -> Vec<Accidental> {
+    let mut altered = std::collections::HashMap::<i32, i8>::new();
+    let mut current_bar = None;
+    notes.iter().map(|note| {
+        let bar = if beats_per_bar > 0.0 { (note.start_beat / beats_per_bar).floor() as i64 } else { 0 };
+        if current_bar != Some(bar) { altered.clear(); current_bar = Some(bar); }
+        let pitch = super::note_spelling(note);
+        let step = super::note_staff_step(note, clef);
+        let previous = altered.get(&step).copied().unwrap_or_else(|| signature.accidental_for(pitch.letter));
+        altered.insert(step, pitch.accidental);
+        if note.tied_from_previous || previous == pitch.accidental { return Accidental::None; }
+        match pitch.accidental { -2 => Accidental::DoubleFlat, -1 => Accidental::Flat, 0 => Accidental::Natural, 1 => Accidental::Sharp, 2 => Accidental::DoubleSharp, _ => Accidental::None }
+    }).collect()
 }
 
 /// Whether `midi` needs a sharp accidental drawn before its notehead. This
@@ -588,7 +577,7 @@ fn chords(notes: &[NotationNote]) -> Vec<Vec<usize>> {
 /// furthest-head rule across every note in it, so the beam leans away from
 /// the staff rather than through it.
 pub fn stem_roles(notes: &[NotationNote], clef: Clef) -> Vec<StemRole> {
-    let step = |i: usize| staff_step(notes[i].midi, clef);
+    let step = |i: usize| super::note_staff_step(&notes[i], clef);
     let furthest = |steps: &mut dyn Iterator<Item = i32>| {
         steps.max_by_key(|s| (*s - MIDDLE_LINE_STEP).abs()).unwrap_or(MIDDLE_LINE_STEP)
     };
@@ -696,7 +685,7 @@ mod tests {
     fn chord_of(midis: &[u8], start_beat: f64, duration_beats: f64) -> Vec<NotationNote> {
         midis
             .iter()
-            .map(|&midi| NotationNote {
+            .map(|&midi| NotationNote { spelling: None, 
                 start_beat,
                 duration_beats,
                 midi,
@@ -751,14 +740,14 @@ mod tests {
     fn a_tie_finds_its_own_segment_through_a_chord() {
         // A tied C5 whose previous entry is the E5 of a chord.
         let mut notes = vec![
-            NotationNote {
+            NotationNote { spelling: None, 
                 start_beat: 2.0,
                 duration_beats: 2.0,
                 midi: 72,
                 tied_from_previous: false,
                 highlighted: false,
             },
-            NotationNote {
+            NotationNote { spelling: None, 
                 start_beat: 2.0,
                 duration_beats: 2.0,
                 midi: 76,
@@ -766,7 +755,7 @@ mod tests {
                 highlighted: false,
             },
         ];
-        notes.push(NotationNote {
+        notes.push(NotationNote { spelling: None, 
             start_beat: 4.0,
             duration_beats: 1.0,
             midi: 72,
@@ -778,7 +767,7 @@ mod tests {
 
     #[test]
     fn a_highlighted_note_stays_highlighted_across_a_bar_line() {
-        let note = NotationNote {
+        let note = NotationNote { spelling: None, 
             start_beat: 3.0,
             duration_beats: 2.0,
             midi: 60,
@@ -878,7 +867,7 @@ mod tests {
 
     /// An eighth note (0.5 beats) at a pitch and time.
     fn eighth(midi: u8, start_beat: f64) -> NotationNote {
-        NotationNote {
+        NotationNote { spelling: None, 
             start_beat,
             duration_beats: 0.5,
             midi,
@@ -961,7 +950,7 @@ mod tests {
 
     #[test]
     fn a_group_of_sixteenths_gets_two_beams() {
-        let sixteenth = |start: f64| NotationNote {
+        let sixteenth = |start: f64| NotationNote { spelling: None, 
             start_beat: start,
             duration_beats: 0.25,
             midi: 64,
@@ -982,7 +971,7 @@ mod tests {
     fn a_mixed_group_takes_its_shortest_notes_beam_count() {
         let ns = [
             eighth(64, 0.0),
-            NotationNote {
+            NotationNote { spelling: None, 
                 start_beat: 0.5,
                 duration_beats: 0.25,
                 midi: 64,
@@ -1012,7 +1001,7 @@ mod tests {
     /// Notes every `gap` beats apart, at a pitch needing no accidental.
     fn evenly(gap: f64, count: usize) -> Vec<NotationNote> {
         (0..count)
-            .map(|i| NotationNote {
+            .map(|i| NotationNote { spelling: None, 
                 start_beat: i as f64 * gap,
                 duration_beats: gap,
                 midi: 64,
@@ -1061,7 +1050,7 @@ mod tests {
         // comfortable everywhere except two grace notes should stay
         // comfortable.
         let mut notes = evenly(1.0, 20);
-        notes.push(NotationNote {
+        notes.push(NotationNote { spelling: None, 
             start_beat: 20.01,
             duration_beats: 0.01,
             midi: 64,
@@ -1075,7 +1064,7 @@ mod tests {
     fn a_run_that_is_a_real_part_of_the_song_does_widen_it() {
         // Half the song in sixteenths is not a flourish.
         let mut notes = evenly(1.0, 8);
-        notes.extend((0..8).map(|i| NotationNote {
+        notes.extend((0..8).map(|i| NotationNote { spelling: None, 
             start_beat: 8.0 + i as f64 * 0.25,
             duration_beats: 0.25,
             midi: 64,
@@ -1090,21 +1079,21 @@ mod tests {
         // Notes sharing an onset are stacked, not sequential — counting a
         // zero gap would peg every chorded song at the maximum width.
         let notes = vec![
-            NotationNote {
+            NotationNote { spelling: None, 
                 start_beat: 0.0,
                 duration_beats: 1.0,
                 midi: 60,
                 tied_from_previous: false,
                 highlighted: false,
             },
-            NotationNote {
+            NotationNote { spelling: None, 
                 start_beat: 0.0,
                 duration_beats: 1.0,
                 midi: 64,
                 tied_from_previous: false,
                 highlighted: false,
             },
-            NotationNote {
+            NotationNote { spelling: None, 
                 start_beat: 1.0,
                 duration_beats: 1.0,
                 midi: 67,
@@ -1129,7 +1118,7 @@ mod tests {
         midis
             .iter()
             .enumerate()
-            .map(|(i, &midi)| NotationNote {
+            .map(|(i, &midi)| NotationNote { spelling: None, 
                 start_beat: i as f64,
                 duration_beats: 1.0,
                 midi,
@@ -1205,14 +1194,14 @@ mod tests {
         // the bar state has just been cleared — the tie is what carries the
         // alteration over, so restating it would be wrong.
         let notes = vec![
-            NotationNote {
+            NotationNote { spelling: None, 
                 start_beat: 3.0,
                 duration_beats: 1.0,
                 midi: 66,
                 tied_from_previous: false,
                 highlighted: false,
             },
-            NotationNote {
+            NotationNote { spelling: None, 
                 start_beat: 4.0,
                 duration_beats: 1.0,
                 midi: 66,
@@ -1231,14 +1220,14 @@ mod tests {
         // The tied-in F# leaves that line sharpened, so the following plain
         // F in the same bar still needs its natural.
         let notes = vec![
-            NotationNote {
+            NotationNote { spelling: None, 
                 start_beat: 4.0,
                 duration_beats: 1.0,
                 midi: 66,
                 tied_from_previous: true,
                 highlighted: false,
             },
-            NotationNote {
+            NotationNote { spelling: None, 
                 start_beat: 5.0,
                 duration_beats: 1.0,
                 midi: 65,
@@ -1389,7 +1378,7 @@ mod tests {
     /// A note at a given pitch, for the clef/beam tests (the `note`
     /// helper below fixes MIDI 60 because its own tests only vary time).
     fn note_at(midi: u8, start_beat: f64) -> NotationNote {
-        NotationNote {
+        NotationNote { spelling: None, 
             start_beat,
             duration_beats: 0.5,
             midi,
@@ -1399,7 +1388,7 @@ mod tests {
     }
 
     fn note(start_beat: f64, duration_beats: f64) -> NotationNote {
-        NotationNote {
+        NotationNote { spelling: None, 
             start_beat,
             duration_beats,
             midi: 60,
@@ -1445,7 +1434,7 @@ mod tests {
     #[test]
     fn split_at_bar_lines_preserves_midi() {
         let segments = split_at_bar_lines(
-            NotationNote {
+            NotationNote { spelling: None, 
                 start_beat: 2.0,
                 duration_beats: 4.0,
                 midi: 67,
@@ -1468,11 +1457,11 @@ mod tests {
 /// to use treble instead of disappearing above many ledger lines. A whole
 /// song chooses once from its median, so the moving score keeps a stable clef.
 pub fn resolve_clef(notes: &[NotationNote], forced: Option<Clef>) -> Clef {
-    if forced == Some(Clef::Bass8vb) && !notes.is_empty() {
+    if forced == Some(Clef::Bass) && !notes.is_empty() {
         let mut pitches: Vec<_> = notes.iter().map(|note| note.midi).collect();
         pitches.sort_unstable();
-        if pitches[pitches.len() / 2] >= 60 {
-            return Clef::Treble8vb;
+        if pitches[pitches.len() / 2] >= 72 {
+            return Clef::Treble;
         }
     }
     forced.unwrap_or_else(|| choose_clef(notes))
@@ -1487,7 +1476,7 @@ mod bass_notation_tests {
             assert_eq!(staff_step(sounding, Clef::Bass8vb), staff_step(sounding + 12, Clef::Bass));
         }
         assert_eq!(staff_step(67, Clef::Treble8vb), staff_step(79, Clef::Treble));
-        let high = NotationNote {
+        let high = NotationNote { spelling: None, 
             start_beat: 0.0,
             duration_beats: 1.0,
             midi: 67,
