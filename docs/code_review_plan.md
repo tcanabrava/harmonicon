@@ -476,22 +476,24 @@ without a pass, and nothing reads `SongManifest::waveform`.
 - Checked and sound: no `unwrap`/`expect`/`panic!` outside tests; the
   file dialog's overwrite question; confirm dialog `DialogId` scoping.
 
-### Carried into later sessions
+### 11. `harmonicon-gameplay` — done 2026-11-06, except the note trainer
 
-Found while making `cargo clippy --all-targets -- -D warnings` pass again
-before the review began (main was failing it in gameplay, editor and
-lessons):
-
-- **gameplay (a), possible Bug**: `pause_menu::resume_section_repeat`
-  rewinds on `paused.is_changed()`. That is also true on the system's
-  first run, so a song started with an active `LoopConfig` (Practice missed
-  section) may rewind during the countdown before the sink exists. This
-  would race `start_at_practice_range`. Verify with an App test.
-- **gameplay (a), Hazard**: the per-note reset block in
-  `resume_section_repeat` duplicates `handle_loop_boundary`'s; a new
-  `ScheduledNote` score field has to be cleared in both. Share one
-  `reset_note_score_state`.
-- **gameplay (c), Cleanup**: the guitar neck's "next" hand region was
-  dropped (a `for next in [false]` loop); `NeckRegion(bool)`/
-  `NeckLabel(bool)` and `update_neck_overview`'s `next_span` branches
-  still carry the dead half.
+- **Bug, fixed `683b9c31`**: `resume_section_repeat` rewound to the loop
+  on any change to `Paused` while unpaused, and song setup writes
+  `Paused(false)`. A song starting with an active loop (a practice range,
+  a chart's repeating section) jumped from the countdown into the loop
+  with no sink to seek. Now only a real resume counts; the per-note reset
+  it copied from `handle_loop_boundary` is shared (`replay_loop_range`).
+- **Bug, fixed `60845ab2`**: nothing required a chart's judging windows to
+  nest, though `classify_note` tests miss, then good, then perfect.
+  `chart_check::scoring_problems` now does, and the Song Editor saves the
+  three sorted.
+- **Cleanup, fixed `9ba09551`**: the guitar neck's never-spawned "next"
+  hand region and every branch on it.
+- **Deferred**: the note trainer (`note_trainer*`) is under active work;
+  review it when that settles.
+- Checked and sound: the clock (rate-slewed anchoring, snap threshold,
+  every jump through `rewind_to`, play/pause only on edges), the judge's
+  cursor (rebuilt in range by adaptive difficulty), every coaching ratio
+  (behind a minimum-sample guard such as `MIN_NOTES = 8`), no
+  `unwrap`/`expect` on a reachable path.
