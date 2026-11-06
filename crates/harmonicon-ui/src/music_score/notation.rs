@@ -1457,11 +1457,19 @@ mod tests {
 /// to use treble instead of disappearing above many ledger lines. A whole
 /// song chooses once from its median, so the moving score keeps a stable clef.
 pub fn resolve_clef(notes: &[NotationNote], forced: Option<Clef>) -> Clef {
-    if forced == Some(Clef::Bass) && !notes.is_empty() {
+    // A bass clef gives way to its treble counterpart for a part whose
+    // median sits high: written C5 or above. `Bass8vb` is written an octave
+    // above it sounds, so its threshold in sounding pitch is an octave lower.
+    let (threshold, treble) = match forced {
+        Some(Clef::Bass) => (72, Clef::Treble),
+        Some(Clef::Bass8vb) => (60, Clef::Treble8vb),
+        _ => return forced.unwrap_or_else(|| choose_clef(notes)),
+    };
+    if !notes.is_empty() {
         let mut pitches: Vec<_> = notes.iter().map(|note| note.midi).collect();
         pitches.sort_unstable();
-        if pitches[pitches.len() / 2] >= 72 {
-            return Clef::Treble;
+        if pitches[pitches.len() / 2] >= threshold {
+            return treble;
         }
     }
     forced.unwrap_or_else(|| choose_clef(notes))
