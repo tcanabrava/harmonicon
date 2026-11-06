@@ -26,6 +26,7 @@ pub mod fretted_strings;
 pub mod guitar;
 pub mod piano;
 pub mod substitute;
+pub mod wind;
 
 use crate::chart::Action;
 use crate::harmonica::Harmonica;
@@ -105,6 +106,20 @@ impl Instrument {
             Self::Flute(_) => InstrumentKind::Flute,
         }
     }
+    pub fn notation(&self) -> crate::notation::NotationContext {
+        use crate::notation::{NotationContext, Transposition};
+        let transposition = match self {
+            Self::Fretted(setup) => match setup.kind {
+                fretted_strings::FrettedKind::Guitar | fretted_strings::FrettedKind::Bass => {
+                    Transposition::OCTAVE_DOWN
+                }
+                fretted_strings::FrettedKind::Cavaquinho => Transposition::CONCERT,
+            },
+            Self::Harmonica(_) | Self::Flute(_) | Self::Piano(_) => Transposition::CONCERT,
+        };
+        NotationContext { transposition }
+    }
+
     /// How the synth sounds this instrument, for demos and auditions.
     pub fn synth_voice(&self) -> crate::synth::Voice {
         match self {
@@ -612,16 +627,9 @@ impl InstrumentModel for Flute {
         Some((notes.first()?.note, notes.last()?.note))
     }
 
-    /// The note's fingerings, standard first.
+    /// The chart's stable fingering order, standard first.
     fn positions_for(&self, midi: u8) -> Vec<PlayPosition> {
-        (0..self.fingerings_for(midi).len())
-            .map(|alternate| {
-                PlayPosition::Fingering(FingeringAssignment {
-                    note: midi,
-                    alternate: alternate as u8,
-                })
-            })
-            .collect()
+        wind::positions_for(self, midi).into_iter().map(PlayPosition::Fingering).collect()
     }
 
     fn valid_pitches(&self) -> std::collections::HashSet<u8> {

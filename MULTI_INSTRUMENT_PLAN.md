@@ -136,5 +136,11 @@ Each independently reviewable part receives a commit and relevant validation.
   dev build and documentation build passed. Live four-string chord selection and
   editor setup checked. Sounding tuning octaves verified against cited teaching
   references. Song format 1.12.0 / lesson format 4; older content remains supported.
-- Next: step 4, explicit notation/transposition and shared wind-fingering metadata.
+- Step 4 core foundation complete: explicit spelled pitches, diatonic/chromatic
+  written-to-sounding transposition, key signatures and enharmonic key handling.
+  Written notation can extend beyond the detector's bounded MIDI range.
+- Shared wind controls, masks, stable fingering variants and register-interval
+  rules added. Flute adapts its existing data without changing foot-joint range
+  or fingerings. Core suite: 439 tests passed; core Clippy passed.
+- Step 4 continues with score projection, spelling and key-signature rendering.
   Steps 5–7 remain planned.

@@ -170,11 +170,7 @@ pub struct Fingering {
 
 /// Where a flute note is played: the note, and which of its fingerings
 /// (0 the standard one, then the table's alternates for it).
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub struct FingeringAssignment {
-    pub note: u8,
-    pub alternate: u8,
-}
+pub use super::wind::FingeringAssignment;
 
 use Keys as K;
 

@@ -25,6 +25,7 @@ pub mod midi;
 /// Standard MIDI File parsing — named apart from [`midi`], which is pitch
 /// and note-number conversion.
 pub mod midi_file;
+pub mod notation;
 pub mod note_event_codec;
 pub mod note_target;
 pub mod note_tracker;
