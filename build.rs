@@ -236,15 +236,21 @@ fn pointer_click_violations(sources: &[(String, String)]) -> Vec<String> {
                 let t = l.trim_start();
                 t.starts_with("//") || t.starts_with("#[")
             };
+            // A blank line ends the walk: rustfmt never puts one inside a
+            // signature, and without it the walk ran through whole
+            // neighbouring functions, so one excuse covered the next
+            // handler's mistake too. The excuse must then sit in the comment
+            // block directly above, with no blank line between.
             let mut k = i;
-            while k > 0 && i - k < 30 && !is_comment(lines[k - 1]) {
+            while k > 0
+                && i - k < 30
+                && !is_comment(lines[k - 1])
+                && !lines[k - 1].trim().is_empty()
+            {
                 k -= 1;
             }
-            let excused = lines[..k]
-                .iter()
-                .rev()
-                .take_while(|l| is_comment(l) || l.trim().is_empty())
-                .any(|l| l.contains(NOT_A_BUTTON));
+            let excused =
+                lines[..k].iter().rev().take_while(|l| is_comment(l)).any(|l| l.contains(NOT_A_BUTTON));
             if !excused {
                 out.push(format!("{path}:{}: `On<PointerClick>`", i + 1));
             }
@@ -942,7 +948,7 @@ mod tests {
 
     // ── Message registration enforcement ─────────────────────────────────────
 
-    use super::message_registration_violations;
+    use super::{message_registration_violations, pointer_click_violations, scene_root_violations};
 
     fn sources(pairs: &[(&str, &str)]) -> Vec<(String, String)> {
         pairs.iter().map(|(p, s)| (p.to_string(), s.to_string())).collect()
@@ -991,5 +997,51 @@ mod tests {
     fn does_not_confuse_a_non_message_derive_for_message() {
         let src = sources(&[("a.rs", "#[derive(Resource, Default)]\npub struct Foo;\n")]);
         assert!(message_registration_violations(&src).is_empty());
+    }
+
+    // ── pointer_click_violations ─────────────────────────────────────────────
+
+    #[test]
+    fn flags_a_pointer_click_handler_with_no_excuse() {
+        let src = sources(&[("a.rs", "fn on_click(ev: On<PointerClick>, mut q: Query<&Node>) {}\n")]);
+        assert_eq!(pointer_click_violations(&src), vec!["a.rs:1: `On<PointerClick>`".to_string()]);
+        // Bevy 0.19's spelling, pasted in, is flagged the same way.
+        let old = sources(&[("b.rs", "fn on_click(ev: On<Pointer<Click>>) {}\n")]);
+        assert_eq!(pointer_click_violations(&old).len(), 1);
+    }
+
+    #[test]
+    fn a_marked_surface_is_excused_across_a_multi_line_signature() {
+        let src = sources(&[(
+            "a.rs",
+            "// not-a-widget-button: the backdrop is a plain Node\n\
+             fn backdrop_click(\n    ev: On<PointerClick>,\n    mut q: Query<&Node>,\n) {}\n",
+        )]);
+        assert!(pointer_click_violations(&src).is_empty());
+        // The excuse must sit above *this* handler, not anywhere in the file.
+        let far = sources(&[(
+            "a.rs",
+            "// not-a-widget-button: for the one above\nfn a() {}\n\nfn b(ev: On<PointerClick>) {}\n",
+        )]);
+        assert_eq!(pointer_click_violations(&far).len(), 1);
+    }
+
+    #[test]
+    fn a_comment_mentioning_pointer_click_is_not_a_handler() {
+        let src = sources(&[("a.rs", "    /// never take `On<PointerClick>` here\n")]);
+        assert!(pointer_click_violations(&src).is_empty());
+    }
+
+    // ── scene_root_violations ────────────────────────────────────────────────
+
+    #[test]
+    fn flags_scene_root_but_not_world_asset_root_or_a_comment() {
+        let src = sources(&[("a.rs", "commands.spawn(SceneRoot(handle));\n")]);
+        assert_eq!(scene_root_violations(&src), vec!["a.rs:1: `SceneRoot`".to_string()]);
+        let fine = sources(&[(
+            "a.rs",
+            "commands.spawn(WorldAssetRoot(handle));\n// not SceneRoot, see CLAUDE.md\n",
+        )]);
+        assert!(scene_root_violations(&fine).is_empty());
     }
 }

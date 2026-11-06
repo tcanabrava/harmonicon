@@ -505,3 +505,54 @@ No findings. It imports nothing from the editor; there's no
 (`bpm.max(1.0)`, `.max(1e-6)`, `total == 0`). The generated band's
 determinism under a recorded beat stream is already pinned by its own
 tests.
+
+### 13. `harmonicon-editor` — done 2026-11-06
+
+- **Bug, fixed `9c6bf557`**: Load replaced the open document without
+  asking, though New asks first. Undo restores the notes but not the
+  title, artist, scoring or other metadata, so unsaved work was lost to a
+  misclick. Load now asks the same question.
+- **Bug, fixed `60845ab2`** (with gameplay): typed scoring windows were
+  saved in whatever order the author left them; now sorted, since the
+  loader refuses windows that don't nest.
+- Checked and sound: every save writes atomically (`write_atomic`;
+  only dev-only `debug_record` uses `fs::write`); the document survives
+  leaving the editor; every real chart round-trips (existing content
+  tests); the `unwrap`/`panic!` sites are documented invariants or
+  guarded on the line before; MIDI import rides core's now-bounded
+  `midi_file` and `render_pcm`.
+
+### 14. `harmonicon-menu` — done 2026-11-06
+
+No findings. The Escape routing `match` has no catch-all arm, so every
+one of the 15 pages must name where Escape leads or the build fails; the
+only `unwrap`s are `write!` into a `String`.
+
+### 15. `harmonicon-lessons` — done 2026-11-06
+
+No findings. The new instrument chooser uses the shared menu root (its
+`TabGroup`), shared buttons and `On<Activate>`; tree layout is pure and
+densely tested.
+
+### 16. Root package + `harmonicon-android` — done 2026-11-06
+
+- **Gap, fixed**: two lints in the "Rules that override defaults" table,
+  `pointer_click_violations` and `scene_root_violations`, had no test, so
+  nothing showed either could fail. Both have tests now (run in CI by
+  `rustc --test build.rs`).
+- **Bug, fixed** (found by those tests): the `On<PointerClick>` excuse
+  search walked back through any non-comment lines, so one
+  `not-a-widget-button:` comment excused a mistake in a neighbouring
+  function up to 30 lines below. A blank line now ends the walk, and the
+  excuse must sit directly above the handler. Every existing excused site
+  still builds.
+- Checked and sound: `validate-pack` and `port-part` exit non-zero on
+  failure (2 for bad usage), the physical-design and shader tests guard
+  what CLAUDE.md says they do, `harmonicon-android` is `android_main`
+  only.
+
+## Review complete
+
+All sixteen crates reviewed. Deferred until in-progress work lands:
+`music_score` (ui) and the note trainer (gameplay). Open hazards are
+listed under each crate above.
