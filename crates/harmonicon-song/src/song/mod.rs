@@ -40,22 +40,12 @@ pub struct SongManifest {
     /// scored Play 2D has nothing meaningful to do with a backing track
     /// regardless of stem count.
     pub backing_stems: Option<Vec<BackingStemAudio>>,
-    /// Peak-amplitude waveform of `music` (or, when [`backing_stems`]
-    /// (Self::backing_stems) is populated instead, every stem
-    /// summed together — a display-only reference mix; actual playback
-    /// sums them for real, as separate simultaneous sinks), pre-analyzed
-    /// at load time (see `audio_system::waveform`) so the gameplay
-    /// progress bar can draw it immediately instead of decoding audio on
-    /// the main thread mid-setup.
-    pub waveform: Vec<f32>,
-    /// `music`'s (or the combined MIDI-track mix's) real decoded duration
-    /// in seconds — the timescale `waveform` is laid out on. Deliberately
-    /// *not* the same thing as the gameplay `SongEnd` (last chart note +
-    /// a fixed tail): a tightly-trimmed track ends before that tail
-    /// elapses, a padded one keeps going after it. Anything positioned
-    /// over the waveform (the playhead, the loop-range marker) must use
-    /// this, or it drifts out of sync with the waveform it's drawn on top
-    /// of.
+    /// `music`'s (or the longest MIDI stem's) real duration in seconds,
+    /// measured at load time. Deliberately *not* the same thing as the
+    /// gameplay `SongEnd` (last chart note + a fixed tail): a
+    /// tightly-trimmed track ends before that tail elapses, a padded one
+    /// keeps going after it. Anything following the music (Jam Session's
+    /// playhead and loop marker) must use this.
     pub music_duration_secs: f64,
     /// Unused by gameplay today (`jam::backing`'s `build_generated_manifest`
     /// notes this explicitly) — `Handle::default()` when the song doesn't
@@ -104,7 +94,6 @@ pub fn training_manifest(chart: HarpChart) -> SongManifest {
         background: Handle::default(),
         music: None,
         backing_stems: None,
-        waveform: Vec::new(),
         music_duration_secs: 0.0,
         elements: Handle::default(),
         assets_2d: None,

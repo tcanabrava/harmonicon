@@ -13,7 +13,6 @@ use super::{BackingStemAudio, SongManifest, TrackChart};
 use harmonicon_core::chart::{
     CURRENT_FORMAT_VERSION, HarpChart, format_version_supported, migrate_chart_json,
 };
-use harmonicon_audio::waveform::{WAVEFORM_BUCKETS, bucket_peaks};
 use harmonicon_core::synth::SAMPLE_RATE;
 use harmonicon_core::wav::encode_wav;
 
@@ -214,37 +213,31 @@ pub(super) async fn assemble_manifest(
         Err(_) => Handle::default(),
     };
 
-    // Pre-analyze the waveform here (asset load time, off the main
-    // thread) so the progress bar has it ready the instant the song
-    // starts. The same read doubles as the existence check: no
+    // Measure the backing track here (asset load time, off the main
+    // thread): gameplay times the song by its real length. The same read
+    // doubles as the existence check: no
     // `song/*.ogg`/`*.wav`/`*.mid` means no backing track rather than a
     // load failure — see `SongManifest::music`'s doc comment.
     let ogg_path = sibling(song_folder.join("song/music.ogg"));
     let wav_path = sibling(song_folder.join("song/music.wav"));
     let mid_path = sibling(song_folder.join("song/music.mid"));
-    let (music, backing_stems, waveform, music_duration_secs) =
+    let (music, backing_stems, music_duration_secs) =
         if let Ok(bytes) = load_context.read_asset_bytes(ogg_path.clone()).await {
-            let (waveform, duration) = harmonicon_audio::waveform::analyze_ogg_waveform(
-                &bytes,
-                harmonicon_audio::waveform::WAVEFORM_BUCKETS,
-            );
-            (Some(load_context.load::<AudioSource>(ogg_path)), None, waveform, duration)
+            let duration = harmonicon_audio::waveform::ogg_duration_secs(&bytes);
+            (Some(load_context.load::<AudioSource>(ogg_path)), None, duration)
         } else if let Ok(bytes) = load_context.read_asset_bytes(wav_path.clone()).await {
-            let (waveform, duration) = harmonicon_audio::waveform::analyze_wav_waveform(
-                &bytes,
-                harmonicon_audio::waveform::WAVEFORM_BUCKETS,
-            );
-            (Some(load_context.load::<AudioSource>(wav_path)), None, waveform, duration)
+            let duration = harmonicon_audio::waveform::wav_duration_secs(&bytes);
+            (Some(load_context.load::<AudioSource>(wav_path)), None, duration)
         } else if let Ok(bytes) = load_context.read_asset_bytes(mid_path.clone()).await {
             // A raw `.mid` — unlike `.ogg`/`.wav`, this isn't itself
             // audio the AssetServer can load; each of its tracks is
             // rendered here into its own `AudioSource` sub-asset
             // instead (see `load_midi_tracks`), so gameplay never needs
             // to touch MIDI parsing at all.
-            let (tracks, waveform, duration) = load_midi_tracks(&bytes, load_context);
-            (None, tracks, waveform, duration)
+            let (tracks, duration) = load_midi_tracks(&bytes, load_context);
+            (None, tracks, duration)
         } else {
-            (None, None, Vec::new(), 0.0)
+            (None, None, 0.0)
         };
 
     // Note the song's own 2D image path if it ships one. We deliberately do
@@ -278,7 +271,6 @@ pub(super) async fn assemble_manifest(
         background,
         music,
         backing_stems,
-        waveform,
         music_duration_secs,
         elements,
         assets_2d,
@@ -293,35 +285,28 @@ pub(super) async fn assemble_manifest(
 /// loaded (so it shares the manifest's own lifetime/dependency tracking,
 /// the same way the generated placeholder background below does) — see
 /// `SongManifest::backing_stems`'s doc comment for why a song ships these as
-/// separate stems instead of one pre-mixed file. Also returns a combined
-/// waveform/duration (every track's stem summed together) purely for the
-/// progress bar's display, so a MIDI-backed song's progress bar behaves
-/// the same as an ordinary music track's — actual playback still sums the
-/// tracks for real, as separate simultaneous sinks (`jam::session`).
+/// separate stems instead of one pre-mixed file, with the duration of the
+/// longest — the length of the backing as a whole, since playback runs
+/// every stem at once as its own sink (`jam::session`).
 fn load_midi_tracks(
     bytes: &[u8],
     load_context: &mut LoadContext,
-) -> (Option<Vec<BackingStemAudio>>, Vec<f32>, f64) {
+) -> (Option<Vec<BackingStemAudio>>, f64) {
     let Ok(smf) = midly::Smf::parse(bytes) else {
-        return (None, Vec::new(), 0.0);
+        return (None, 0.0);
     };
     let Ok(tpq) = harmonicon_core::midi_file::ticks_per_quarter(&smf) else {
-        return (None, Vec::new(), 0.0);
+        return (None, 0.0);
     };
     let tempo = harmonicon_core::midi_file::collect_tempo_map(&smf);
 
     let mut tracks = Vec::new();
-    let mut mix: Vec<f32> = Vec::new();
+    let mut longest = 0;
     for (index, track) in smf.tracks.iter().enumerate() {
         let Some(pcm) = harmonicon_core::midi_file::render_track_pcm(track, tpq, &tempo) else {
             continue;
         };
-        if mix.len() < pcm.len() {
-            mix.resize(pcm.len(), 0.0);
-        }
-        for (m, s) in mix.iter_mut().zip(&pcm) {
-            *m += s;
-        }
+        longest = longest.max(pcm.len());
         let name = harmonicon_core::midi_file::track_name_of(track)
             .unwrap_or_else(|| format!("Track {index}"));
         let wav = encode_wav(&pcm, SAMPLE_RATE);
@@ -331,11 +316,9 @@ fn load_midi_tracks(
     }
 
     if tracks.is_empty() {
-        return (None, Vec::new(), 0.0);
+        return (None, 0.0);
     }
-    let duration = mix.len() as f64 / SAMPLE_RATE as f64;
-    let waveform = bucket_peaks(&mix, WAVEFORM_BUCKETS);
-    (Some(tracks), waveform, duration)
+    (Some(tracks), longest as f64 / SAMPLE_RATE as f64)
 }
 
 /// Side (px) of a generated placeholder background — small and stretched to

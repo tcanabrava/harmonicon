@@ -181,11 +181,9 @@ load-bearing about *this* crate.
   render_backing_pcm`). Each track is rendered and registered as a labeled
   sub-asset at song-load time (`song::loader::load_midi_tracks`), off
   the main thread like the rest of `SongChartLoader` — nothing about
-  gameplay ever touches MIDI parsing itself. `waveform`/
-  `music_duration_secs` still populate (every track's stems summed
-  together, purely for the progress bar's display — actual playback
-  sums them for real, as separate sinks) so a MIDI-backed song's
-  progress bar behaves like an ordinary one.
+  gameplay ever touches MIDI parsing itself. `music_duration_secs` is
+  the longest stem's length, so a MIDI-backed song's progress bar times
+  like an ordinary one.
   **Playback and per-track muting** (`jam::midi_tracks`, Jam Session
   only — scored Play2D has nothing meaningful to do with a chart's
   *backing* track regardless of stem count): `gameplay::

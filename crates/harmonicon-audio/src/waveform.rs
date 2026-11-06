@@ -91,6 +91,34 @@ pub fn analyze_wav_waveform(bytes: &[u8], buckets: usize) -> (Vec<f32>, f64) {
     )
 }
 
+/// The real duration of an in-memory OGG, in seconds, for a caller that
+/// needs only that (the song loader): the container's stated duration when
+/// it has one, else a single counting pass. `0.0` on a decode failure.
+/// [`analyze_ogg_waveform`] always decodes twice, which is the price of its
+/// peaks.
+pub fn ogg_duration_secs(bytes: &[u8]) -> f64 {
+    let _span = info_span!("ogg_duration_secs", bytes = bytes.len()).entered();
+    let Ok(decoder) = rodio::Decoder::new(Cursor::new(bytes.to_vec())) else {
+        return 0.0;
+    };
+    if let Some(duration) = decoder.total_duration() {
+        return duration.as_secs_f64();
+    }
+    let channels = decoder.channels().get() as usize;
+    let sample_rate = decoder.sample_rate().get() as f64;
+    (decoder.count() / channels) as f64 / sample_rate
+}
+
+/// The duration of a 16-bit PCM WAV, in seconds, read from its header with
+/// no decoding. `0.0` for anything [`harmonicon_core::wav::wav_pcm16_data`]
+/// refuses.
+pub fn wav_duration_secs(bytes: &[u8]) -> f64 {
+    let Some((data, channels, sample_rate)) = harmonicon_core::wav::wav_pcm16_data(bytes) else {
+        return 0.0;
+    };
+    (data.len() / (usize::from(channels) * 2)) as f64 / f64::from(sample_rate)
+}
+
 /// Reduce an interleaved stream with O(buckets + channels) working memory.
 fn stream_peaks(
     mut samples: impl Iterator<Item = f32>,
@@ -210,6 +238,42 @@ mod tests {
         assert_eq!(waveform.len(), 8);
         assert!((duration - 1.0).abs() < 1e-6);
         assert!(waveform.iter().any(|&p| p > 0.0), "should be audible");
+    }
+
+    #[test]
+    fn durations_agree_with_the_full_analysis_and_degrade_on_bad_bytes() {
+        let samples = vec![0.25f32; 22_050];
+        let wav = harmonicon_core::wav::encode_wav(&samples, 44_100);
+        assert_eq!(wav_duration_secs(&wav), analyze_wav_waveform(&wav, 8).1);
+        assert!((wav_duration_secs(&wav) - 0.5).abs() < 1e-9);
+        assert_eq!(wav_duration_secs(b"not a wav file"), 0.0);
+        assert_eq!(ogg_duration_secs(b"not an ogg file"), 0.0);
+    }
+
+    /// The cheap duration must agree with the counted one on real music, or
+    /// switching the loader to it would move every song's timescale. Runs
+    /// over the songs pack when it is checked out beside this repo.
+    #[test]
+    fn the_stated_ogg_duration_matches_a_full_count_on_real_songs() {
+        let pack = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../harmonicon-songs");
+        let mut stack = vec![pack];
+        let mut checked = 0;
+        while let Some(dir) = stack.pop() {
+            let Ok(entries) = std::fs::read_dir(&dir) else { continue };
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.is_dir() && !entry.file_name().to_string_lossy().starts_with('.') {
+                    stack.push(path);
+                } else if path.extension().is_some_and(|e| e == "ogg") && checked < 8 {
+                    let bytes = std::fs::read(&path).unwrap();
+                    let counted = analyze_ogg_waveform(&bytes, 1).1;
+                    let stated = ogg_duration_secs(&bytes);
+                    assert!((counted - stated).abs() < 0.05, "{}: {counted} vs {stated}", path.display());
+                    checked += 1;
+                }
+            }
+        }
+        eprintln!("compared {checked} songs");
     }
 
     #[test]

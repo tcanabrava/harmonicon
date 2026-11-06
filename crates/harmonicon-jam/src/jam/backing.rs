@@ -21,7 +21,6 @@ use std::path::PathBuf;
 use bevy::audio::AudioSource;
 use bevy::prelude::*;
 
-use harmonicon_audio::waveform::{WAVEFORM_BUCKETS, bucket_peaks};
 use harmonicon_core::chart::{
     Action, Difficulty, Feel, HarpChart, Metadata, NoteEvent, Scoring, Song, TempoPoint, Timing,
     TrackItem,
@@ -873,12 +872,10 @@ pub fn generated_chart(
 }
 
 /// A generated jam's backing with all the expensive work done: the three
-/// stems synthesized and WAV-encoded, and their mix reduced to the progress
-/// bar's waveform. It touches no ECS state, so [`render_generated_backing`]
+/// stems synthesized and WAV-encoded. It touches no ECS state, so [`render_generated_backing`]
 /// can run on a worker thread; the render takes 100–250 ms.
 pub struct RenderedBacking {
     stems: Vec<(String, Vec<u8>)>,
-    waveform: Vec<f32>,
     music_duration_secs: f64,
 }
 
@@ -894,14 +891,7 @@ pub fn render_generated_backing(
 ) -> RenderedBacking {
     let stems = generate_backing_stems(key, bpm, progression, genre, energy, seed);
     let music_duration_secs = stems[0].1.len() as f64 / SAMPLE_RATE as f64;
-    let mut mix = vec![0.0; stems[0].1.len()];
-    for (_, pcm) in &stems {
-        for (mixed, sample) in mix.iter_mut().zip(pcm) {
-            *mixed += *sample;
-        }
-    }
     RenderedBacking {
-        waveform: bucket_peaks(&mix, WAVEFORM_BUCKETS),
         stems: stems.into_iter().map(|(name, pcm)| (name, encode_wav(&pcm, SAMPLE_RATE))).collect(),
         music_duration_secs,
     }
@@ -954,7 +944,7 @@ pub fn assemble_generated_manifest(
     elements: Handle<Image>,
     sources: &mut Assets<AudioSource>,
 ) -> SongManifest {
-    let RenderedBacking { stems, waveform, music_duration_secs } = rendered;
+    let RenderedBacking { stems, music_duration_secs } = rendered;
     let backing_stems = stems
         .into_iter()
         .map(|(name, wav)| BackingStemAudio {
@@ -969,7 +959,6 @@ pub fn assemble_generated_manifest(
         background,
         music: None,
         backing_stems: Some(backing_stems),
-        waveform,
         music_duration_secs,
         elements,
         assets_2d: None,
@@ -1401,6 +1390,5 @@ mod tests {
         assert_eq!(stems[COMPING_STEM].name, "Comping");
         assert!(stems.iter().all(|stem| sources.get(&stem.source).is_some()));
         assert!(manifest.music_duration_secs > 0.0);
-        assert_eq!(manifest.waveform.len(), WAVEFORM_BUCKETS);
     }
 }
