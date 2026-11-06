@@ -64,6 +64,10 @@ pub trait FingeringChart {
     /// Stable ordering and alternate indices; pitches are sounding pitches.
     fn patterns(&self) -> Vec<FingeringPattern>;
     fn register_rule(&self) -> Option<RegisterRule>;
+    /// Teaching pairs can include verified instrument-specific alternatives.
+    fn register_exercises(&self) -> Vec<(FingeringAssignment, FingeringAssignment)> {
+        register_pairs(self)
+    }
     fn pattern(&self, at: FingeringAssignment) -> Option<ControlMask> {
         self.patterns()
             .into_iter()
@@ -71,7 +75,10 @@ pub trait FingeringChart {
             .map(|pattern| pattern.pressed)
     }
 }
-pub fn positions_for(chart: &impl FingeringChart, pitch: u8) -> Vec<FingeringAssignment> {
+pub fn positions_for(
+    chart: &(impl FingeringChart + ?Sized),
+    pitch: u8,
+) -> Vec<FingeringAssignment> {
     chart
         .patterns()
         .into_iter()
@@ -82,7 +89,7 @@ pub fn positions_for(chart: &impl FingeringChart, pitch: u8) -> Vec<FingeringAss
 /// A register exercise needs both the declared interval and the required
 /// control relationship. Identical keys alone never imply an octave.
 pub fn register_pairs(
-    chart: &impl FingeringChart,
+    chart: &(impl FingeringChart + ?Sized),
 ) -> Vec<(FingeringAssignment, FingeringAssignment)> {
     let Some(rule) = chart.register_rule() else { return Vec::new() };
     let patterns: Vec<_> =
@@ -101,6 +108,10 @@ pub fn register_pairs(
 }
 
 impl FingeringChart for Flute {
+    fn register_exercises(&self) -> Vec<(FingeringAssignment, FingeringAssignment)> {
+        // Keep the flute's verified third-register and alternate exercises.
+        self.overblown_pairs()
+    }
     fn controls(&self) -> Vec<WindControl> {
         Keys::ALL
             .into_iter()

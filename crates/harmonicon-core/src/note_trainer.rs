@@ -17,8 +17,10 @@
 
 use crate::chart::Action;
 use crate::harmonica::Harmonica;
-use crate::instrument::flute::{FingeringAssignment, Flute};
+#[cfg(test)]
+use crate::instrument::flute::Flute;
 use crate::instrument::guitar::{FretAssignment, Guitar, StringTechnique};
+use crate::instrument::wind::FingeringChart;
 use crate::instrument::{Instrument, InstrumentModel, PlayPosition, TechniqueKind};
 use crate::note_target::NoteTarget;
 use crate::pitch_map::{HoleAssignment, Technique, max_bend};
@@ -46,7 +48,7 @@ pub fn drills(instrument: &Instrument, kind: TechniqueKind) -> Vec<Drill> {
     let candidates = match instrument {
         Instrument::Harmonica(harp) => harmonica_candidates(harp, kind),
         Instrument::Fretted(guitar) => guitar_candidates(guitar, kind),
-        Instrument::Flute(flute) => flute_candidates(flute, kind),
+        Instrument::Flute(flute) => return wind_drills(flute, kind),
         Instrument::Piano(piano) => piano_candidates(piano),
     };
     let pitch = |p: PlayPosition| NoteTarget::Positioned(p).sounding_pitch(instrument);
@@ -150,33 +152,49 @@ fn piano_candidates(
     (48..=84).filter(|&m| piano.has(m)).map(|m| (PlayPosition::Key(m), None)).collect()
 }
 
-/// `(position, the position it starts from)` for each flute drill of
-/// `kind`. A register jump is one set of keys overblown from its lower note
-/// to its upper one ([`Flute::overblown_pairs`]); a position drill is every
-/// fingering of a note that has more than one.
-fn flute_candidates(
-    flute: &Flute,
-    kind: TechniqueKind,
-) -> Vec<(PlayPosition, Option<PlayPosition>)> {
-    let at = |note, alternate| PlayPosition::Fingering(FingeringAssignment { note, alternate });
-    let (low, high) = InstrumentModel::range(flute).unwrap_or((60, 96));
-    match kind {
-        TechniqueKind::Target => (low..=high).map(|note| (at(note, 0), None)).collect(),
-        TechniqueKind::Register => flute
-            .overblown_pairs()
-            .into_iter()
-            .map(|(lower, upper)| {
-                (PlayPosition::Fingering(upper), Some(PlayPosition::Fingering(lower)))
-            })
+/// Wind practice uses sounding pitch and stable fingering IDs. Each chart
+/// defines its own register relationships, rather than inheriting flute rules.
+pub fn wind_drills(chart: &dyn FingeringChart, kind: TechniqueKind) -> Vec<Drill> {
+    let patterns = chart.patterns();
+    let positions: Vec<_> = match kind {
+        TechniqueKind::Target => patterns
+            .iter()
+            .filter(|pattern| pattern.position.alternate == 0)
+            .map(|pattern| (pattern.position, None))
             .collect(),
-        TechniqueKind::Position => (low..=high)
-            .flat_map(|note| {
-                let count = flute.fingerings_for(note).len() as u8;
-                (0..count).filter(move |_| count > 1).map(move |alt| (at(note, alt), None))
-            })
+        TechniqueKind::Position => {
+            let mut counts = std::collections::HashMap::<u8, usize>::new();
+            for pattern in &patterns {
+                *counts.entry(pattern.position.note).or_default() += 1;
+            }
+            patterns
+                .iter()
+                .filter(|pattern| counts[&pattern.position.note] > 1)
+                .map(|pattern| (pattern.position, None))
+                .collect()
+        }
+        TechniqueKind::Register => chart
+            .register_exercises()
+            .into_iter()
+            .map(|(lower, upper)| (upper, Some(lower)))
             .collect(),
         TechniqueKind::Glide => Vec::new(),
-    }
+    };
+    positions
+        .into_iter()
+        .filter_map(|(target, start)| {
+            chart.pattern(target)?;
+            if let Some(start) = start {
+                chart.pattern(start)?;
+            }
+            Some(Drill {
+                kind,
+                position: PlayPosition::Fingering(target),
+                start: start.map(|position| f32::from(position.note)),
+                target: f32::from(target.note),
+            })
+        })
+        .collect()
 }
 
 /// How far from a drill's target a pitch may sit and still count as
@@ -221,6 +239,7 @@ pub fn hear(drill: &Drill, midi: f32) -> Heard {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::instrument::wind::FingeringAssignment;
     use crate::harmonica::{chromatic_harp, richter_harp};
     use crate::instrument::guitar::GuitarBody;
 
@@ -365,5 +384,40 @@ mod tests {
         let harmonic =
             Drill { kind: TechniqueKind::Register, start: Some(52.0), target: 64.0, ..glide() };
         assert_eq!(hear(&harmonic, 58.0), Heard::Elsewhere, "a register jump has no way between");
+    }
+}
+
+#[cfg(test)]
+mod wind_practice_tests {
+    use super::*;
+    use crate::instrument::clarinet::{Clarinet, ClarinetKey};
+    #[test]
+    fn clarinet_drills_follow_setup_pitch_and_twelfth_register_relationships() {
+        for key in [ClarinetKey::Bb, ClarinetKey::A] {
+            let clarinet = Clarinet { key };
+            let targets = wind_drills(&clarinet, TechniqueKind::Target);
+            assert_eq!(targets.len(), 33);
+            assert_eq!(targets.first().unwrap().target, f32::from(*clarinet.range().start()));
+            let registers = wind_drills(&clarinet, TechniqueKind::Register);
+            assert_eq!(registers.len(), 14);
+            assert!(registers.iter().all(|drill| drill.target - drill.start.unwrap() == 19.0));
+            assert!(wind_drills(&clarinet, TechniqueKind::Glide).is_empty());
+            for drill in wind_drills(&clarinet, TechniqueKind::Position) {
+                let PlayPosition::Fingering(at) = drill.position else { panic!("wind position") };
+                assert!(clarinet.pattern(at).is_some());
+                assert!(crate::instrument::wind::positions_for(&clarinet, at.note).len() > 1);
+            }
+        }
+    }
+    #[test]
+    fn flute_keeps_every_verified_register_pair_and_alternate() {
+        let flute = Flute::default();
+        let actual = wind_drills(&flute, TechniqueKind::Register);
+        let expected = flute.overblown_pairs();
+        assert_eq!(actual.len(), expected.len());
+        for (drill, (lower, upper)) in actual.iter().zip(expected) {
+            assert_eq!(drill.position, PlayPosition::Fingering(upper));
+            assert_eq!(drill.start, Some(f32::from(lower.note)));
+        }
     }
 }

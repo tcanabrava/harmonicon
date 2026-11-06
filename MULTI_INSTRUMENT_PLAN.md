@@ -162,7 +162,11 @@ Each independently reviewable part receives a commit and relevant validation.
   [chalumeau](https://www.wfg.woodwind.org/clarinet/cl_bas_1.html) and
   [clarion](https://www.wfg.woodwind.org/clarinet/cl_bas_2.html) tables. Its register
   rule is a twelfth, not the flute’s octave; throat B♭ is excluded from that drill.
-- Core validation: 445 tests passed and core Clippy passed with warnings denied.
+- Wind practice now builds target, alternate-fingering and register drills from
+  `FingeringChart` metadata. Flute uses this shared path while retaining every
+  previously verified register pair and alternate. Clarinet drill tests cover
+  both setups and their twelfth interval without a flute-specific branch.
+- Core validation: 447 tests passed and core Clippy passed with warnings denied.
   Clarinet chart/setup selection, editor, trainer and gameplay integration are
   still pending; clarinet is not yet offered as a selectable instrument.
 - Steps 6–7 remain planned.
