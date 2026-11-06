@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 
-//! Decodes a whole song's audio into a coarse peak-amplitude waveform, for
-//! display on the gameplay progress bar (`gameplay::song_progress_overlay`).
-//! Runs once, at song-asset load time — see `song::loader` — so gameplay
-//! setup just reads the finished `Vec<f32>` off `SongManifest`.
+//! Decodes a whole song's audio into a coarse peak-amplitude waveform and
+//! its real duration. At song-asset load time (`song::loader`) the duration
+//! is what gameplay uses; the Song Editor draws the waveform itself
+//! (`song_editor::waveform`).
 
 use std::{io::Cursor, sync::Arc};
 

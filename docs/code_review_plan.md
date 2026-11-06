@@ -368,6 +368,21 @@ tolerance by a compile-time assert. Only a docs fix: two references to
 `Harmonicon Note Detection Roadmap.md` misspelled it as "Harmonica…",
 and one called it not checked in.
 
+### 6. `harmonicon-audio` — done 2026-11-06
+
+No bugs. The capture callback is allocation-free (proved by a counting
+allocator in its tests), every channel is bounded with `try_send`, a
+device dying mid-session reaches `MicStatus`, stale chunks are discarded
+after 250 ms, and silence is republished while disconnected so no
+consumer keeps an old pitch. Cleanups: two `println!`s in
+`create_audio_capture` now go through `info!`, and `waveform.rs` said its
+output was drawn on the gameplay progress bar, which no longer exists.
+
+Carried into the song session (8): `analyze_ogg_waveform` decodes the
+whole file **twice** (a frame count, then the peaks) at every song load.
+Gameplay only needs the duration, which the decoder can often report
+without a pass, and nothing reads `SongManifest::waveform`.
+
 ### Carried into later sessions
 
 Found while making `cargo clippy --all-targets -- -D warnings` pass again
