@@ -47,7 +47,7 @@ pub(crate) fn sync_teaching_score(
         for (slot, children) in &slots {
             if children.is_none() {
                 commands.entity(slot).with_children(|p| {
-                    super::super::note_trainer::teaching::spawn_staff(p, &font, false, &loc);
+                    super::super::note_trainer::teaching::spawn_staff(p, &font, false, None, &loc);
                 });
             }
         }

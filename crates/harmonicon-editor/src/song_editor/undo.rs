@@ -75,7 +75,7 @@ impl Snapshot {
                             harmonicon_core::instrument::Instrument::Harmonica(harp) => {
                                 harp_allocated_bytes(harp)
                             }
-                            harmonicon_core::instrument::Instrument::Guitar(guitar) => {
+                            harmonicon_core::instrument::Instrument::Fretted(guitar) => {
                                 guitar.strings.capacity()
                             }
                             harmonicon_core::instrument::Instrument::Flute(_)
@@ -421,7 +421,7 @@ mod tests {
         };
         let mut guitar = Guitar::standard(GuitarBody::Acoustic);
         guitar.capo = 2;
-        let instrument = Instrument::Guitar(guitar);
+        let instrument = Instrument::Fretted(guitar);
         let mut state = EditorState {
             instrument: InstrumentSelection::Configured {
                 instrument: instrument.clone(),

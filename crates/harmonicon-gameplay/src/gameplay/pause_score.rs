@@ -222,7 +222,10 @@ pub(super) fn update_pause_score(
                                     });
                                 }
                             });
-                        music_score::spawn_full_score(content, &bravura, grand, end);
+                        let score = music_score::spawn_full_score(content, &bravura, grand, end);
+                        if let Some(instrument) = chart.instrument() {
+                            music_score::apply_instrument_clef(content, score, instrument.kind());
+                        }
                         content
                             .spawn((
                                 Selection,

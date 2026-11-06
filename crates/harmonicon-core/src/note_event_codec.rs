@@ -35,7 +35,7 @@ pub fn decode(chart: &HarpChart, event: &NoteEvent) -> Result<NoteTarget, Placem
             target.candidates(&instrument)?;
             Ok(target)
         }
-        Instrument::Guitar(_) => {
+        Instrument::Fretted(_) => {
             if event.hole.is_some()
                 || event.action.is_some()
                 || modifiers

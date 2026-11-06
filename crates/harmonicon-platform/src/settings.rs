@@ -178,6 +178,9 @@ pub struct MyInstruments {
     /// The guitar's tuning, by `harmonicon_core::instrument::guitar::Tuning`
     /// id (`"drop-d"`). An id no tuning has any more reads as `None`.
     pub guitar_tuning: Option<String>,
+    /// Bass tuning is independent of the guitar, using the bass preset ids.
+    pub bass_tuning: Option<String>,
+    pub bass_capo: Option<u8>,
     /// The fret the guitar's capo sits on, `Some(0)` for none.
     pub guitar_capo: Option<u8>,
     /// The flute's foot joint.
@@ -545,12 +548,12 @@ fn apply_fullscreen(
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+    use crate::localization::{Localization, LocalizationExt};
     use figment::{
         Figment,
         providers::{Format, Json, Serialized},
     };
-    use super::*;
-    use crate::localization::{Localization, LocalizationExt};
 
     // ── BendingTrainerSettings ───────────────────────────────────────────
 
@@ -613,6 +616,8 @@ mod tests {
     #[test]
     fn my_instruments_round_trip_through_the_settings_file() {
         let mine = MyInstruments {
+            bass_tuning: Some("bass-five".into()),
+            bass_capo: Some(0),
             guitar_tuning: Some("drop-d".into()),
             guitar_capo: Some(2),
             flute_foot: Some(harmonicon_core::instrument::flute::FootJoint::B),

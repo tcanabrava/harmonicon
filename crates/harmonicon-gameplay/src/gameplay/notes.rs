@@ -619,7 +619,7 @@ mod tests {
         assert!(effective.harp_for(&chart).is_none());
         assert!(matches!(
             effective.instrument_for(&chart),
-            Some(harmonicon_core::instrument::Instrument::Guitar(_))
+            Some(harmonicon_core::instrument::Instrument::Fretted(_))
         ));
         let (notes, _) = build_scheduled_notes(&effective, &chart, &Default::default());
         assert_eq!(notes[0].expected_pitch, Some(57));

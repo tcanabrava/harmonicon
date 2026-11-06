@@ -1105,3 +1105,21 @@ lesson-instrument-empty = No lessons are installed for this instrument yet. Choo
 lesson-tree-instrument-title = {$instrument} · Lesson paths
 
 song-instrument-all = All instruments
+
+song-instrument-bass = Bass
+editor-instrument-bass = Bass
+editor-bass-setup = Bass setup
+note-trainer-bass = Bass
+note-trainer-bass-title = Note Trainer — Bass
+options-bass-tuning = Bass tuning
+guitar-tuning-bass-standard = 4 strings · G2 D2 A1 E1
+guitar-tuning-bass-five = 5 strings · G2 D2 A1 E1 B0
+guitar-tuning-bass-six = 6 strings · C3 G2 D2 A1 E1 B0
+guitar-tuning-bass-drop-d = Drop D · G2 D2 A1 D1
+instrument-check-title-bass = Your bass
+instrument-check-intro-bass = Choose your tuning. Notes keep their sounding pitches and move to playable frets. The score is written one octave above the sound. Pluck one string and mute the others; use a clean input for low notes.
+instrument-check-chart-bass = Written for a bass in {$tuning}.
+instrument-check-chart-bass-capo = Written for a bass in {$tuning}, capo at fret {$fret}.
+gameplay-bass-neck = Bass fretboard · markers show fret numbers · 0 open · play the marked string
+
+instrument-check-cost-bass-frets = {$count} note(s) move to other frets on your bass

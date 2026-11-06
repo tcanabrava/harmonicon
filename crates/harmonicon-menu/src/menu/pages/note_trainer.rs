@@ -46,6 +46,27 @@ pub(crate) fn setup_note_trainer_menu(
     spawn_button(
         &mut commands,
         root,
+        &loc.msg("note-trainer-bass"),
+        |_: On<Activate>,
+         mine: Res<harmonicon_platform::settings::MyInstruments>,
+         mut trainer: ResMut<NoteTrainer>,
+         mut state: ResMut<NextState<AppState>>| {
+            let mut bass = Guitar::bass();
+            if let Some(tuning) = mine
+                .bass_tuning
+                .as_deref()
+                .and_then(|id| bass.tuning_presets().iter().find(|preset| preset.id == id))
+            {
+                bass.strings = tuning.strings.to_vec();
+            }
+            bass.capo = mine.bass_capo.unwrap_or(0).min(bass.frets);
+            trainer.choose(bass.into());
+            state.set(AppState::NoteTrainer);
+        },
+    );
+    spawn_button(
+        &mut commands,
+        root,
         &loc.msg("note-trainer-flute"),
         |_: On<Activate>,
          mine: Res<harmonicon_platform::settings::MyInstruments>,

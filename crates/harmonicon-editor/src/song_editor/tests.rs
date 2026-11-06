@@ -1382,7 +1382,7 @@ fn editor_load_accepts_a_guitar_chart_with_its_authored_position() {
     load_harpchart(&value, &mut state, &mut Scroll::default());
     assert!(matches!(
         state.effective_instrument(),
-        harmonicon_core::instrument::Instrument::Guitar(_)
+        harmonicon_core::instrument::Instrument::Fretted(_)
     ));
     assert_eq!(state.notes.len(), 1);
     assert_eq!(
@@ -2605,7 +2605,7 @@ fn the_grid_draws_each_instrument_in_its_own_vocabulary() {
         (pitch_color(HarpTechnique::Normal), Dir::Draw.arrow().to_string())
     );
 
-    let guitar = Instrument::Guitar(Guitar::standard(GuitarBody::Electric));
+    let guitar = Instrument::Fretted(Guitar::standard(GuitarBody::Electric));
     let strings = row_labels(&guitar, 6, 0);
     let texts: Vec<&str> = strings.iter().map(|r| r.text.as_str()).collect();
     assert_eq!(texts, ["e", "B", "G", "D", "A", "E"], "string 1 is the top row");
@@ -4378,7 +4378,7 @@ fn instrument_transitions_and_undo_happen_after_view_updates() {
     app.update();
     assert!(matches!(
         app.world().resource::<EditorState>().effective_instrument(),
-        Instrument::Guitar(_)
+        Instrument::Fretted(_)
     ));
     app.update();
     app.world_mut().write_message(DocumentCommand::Undo);

@@ -1104,3 +1104,21 @@ lesson-instrument-empty = Todavía no hay lecciones instaladas para este instrum
 lesson-tree-instrument-title = {$instrument} · Rutas de aprendizaje
 
 song-instrument-all = Todos los instrumentos
+
+song-instrument-bass = Bajo
+editor-instrument-bass = Bajo
+editor-bass-setup = Configuración del bajo
+note-trainer-bass = Bajo
+note-trainer-bass-title = Entrenador de notas — Bajo
+options-bass-tuning = Afinación del bajo
+guitar-tuning-bass-standard = 4 cuerdas · G2 D2 A1 E1
+guitar-tuning-bass-five = 5 cuerdas · G2 D2 A1 E1 B0
+guitar-tuning-bass-six = 6 cuerdas · C3 G2 D2 A1 E1 B0
+guitar-tuning-bass-drop-d = Drop D · G2 D2 A1 D1
+instrument-check-title-bass = Tu bajo
+instrument-check-intro-bass = Elige tu afinación. Las notas conservan su sonido y pasan a trastes disponibles. La partitura se escribe una octava por encima del sonido. Pulsa una cuerda y silencia las demás; usa una entrada limpia para las notas graves.
+instrument-check-chart-bass = Escrito para un bajo en {$tuning}.
+instrument-check-chart-bass-capo = Escrito para un bajo en {$tuning}, con cejilla en el traste {$fret}.
+gameplay-bass-neck = Diapasón del bajo · los marcadores indican trastes · 0 al aire · toca la cuerda marcada
+
+instrument-check-cost-bass-frets = {$count} nota(s) pasan a otros trastes del bajo

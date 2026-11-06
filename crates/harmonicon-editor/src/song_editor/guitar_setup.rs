@@ -22,20 +22,11 @@ pub(super) struct GuitarSetup;
 #[derive(Component)]
 pub(super) struct TuningSlot;
 
-const TUNING_KEYS: [&str; 6] = [
-    "guitar-tuning-standard",
-    "guitar-tuning-drop-d",
-    "guitar-tuning-half-step-down",
-    "guitar-tuning-dadgad",
-    "guitar-tuning-open-g",
-    "guitar-tuning-open-d",
-];
-
 fn tuning_label(guitar: &Guitar, loc: &Localization) -> String {
-    let index = harmonicon_core::instrument::guitar::TUNINGS
-        .iter()
-        .position(|tuning| tuning.strings.as_slice() == guitar.strings.as_slice());
-    loc.msg(index.map_or("editor-guitar-tuning-custom", |i| TUNING_KEYS[i])).to_string()
+    guitar.named_tuning().map_or_else(
+        || loc.msg("editor-guitar-tuning-custom").to_string(),
+        |preset| loc.msg(&format!("guitar-tuning-{}", preset.id)).to_string(),
+    )
 }
 
 pub(super) fn sync_tuning(
@@ -46,6 +37,7 @@ pub(super) fn sync_tuning(
     roots: Query<Entity, With<super::ui::EditorRoot>>,
     mut values: Query<&mut ComboboxValue>,
     mut nodes: Query<&mut Node, With<TuningSlot>>,
+    mut last_kind: Local<Option<harmonicon_core::instrument::fretted_strings::FrettedKind>>,
 ) {
     let Ok((slot, children)) = slots.single() else { return };
     let guitar = current(&state);
@@ -54,7 +46,7 @@ pub(super) fn sync_tuning(
     }
     let Some(guitar) = guitar else { return };
     let label = tuning_label(&guitar, &loc);
-    if let Some(children) = children {
+    if let Some(children) = children.filter(|_| *last_kind == Some(guitar.kind) && !loc.is_changed()) {
         for child in children {
             if let Ok(mut value) = values.get_mut(*child)
                 && value.0 != label
@@ -63,12 +55,24 @@ pub(super) fn sync_tuning(
             }
         }
     } else if let Ok(root) = roots.single() {
-        let options: Vec<String> = TUNING_KEYS.iter().map(|key| loc.msg(key).to_string()).collect();
+        commands.entity(slot).despawn_children();
+        *last_kind = Some(guitar.kind);
+        let options: Vec<String> = guitar
+            .tuning_presets()
+            .iter()
+            .map(|preset| loc.msg(&format!("guitar-tuning-{}", preset.id)).to_string())
+            .collect();
         spawn_combobox(
             &mut commands,
             slot,
             root,
-            &loc.msg("options-guitar-tuning"),
+            &loc.msg(
+                if guitar.kind == harmonicon_core::instrument::fretted_strings::FrettedKind::Bass {
+                    "options-bass-tuning"
+                } else {
+                    "options-guitar-tuning"
+                },
+            ),
             &options,
             &label,
             |ev: On<ComboboxSelect>,
@@ -77,8 +81,7 @@ pub(super) fn sync_tuning(
              mut feedback: ResMut<SaveFeedback>,
              mut values: Query<&mut ComboboxValue>| {
                 let Some(mut guitar) = current(&state) else { return };
-                let Some(tuning) = harmonicon_core::instrument::guitar::TUNINGS.get(ev.index)
-                else {
+                let Some(tuning) = guitar.tuning_presets().get(ev.index) else {
                     return;
                 };
                 guitar.strings = tuning.strings.to_vec();
@@ -97,7 +100,7 @@ pub(super) fn sync_tuning(
 
 fn current(state: &EditorState) -> Option<Guitar> {
     match state.effective_instrument() {
-        Instrument::Guitar(guitar) => Some(guitar),
+        Instrument::Fretted(guitar) => Some(guitar),
         _ => None,
     }
 }
@@ -115,7 +118,7 @@ fn configure(state: &mut EditorState, guitar: Guitar) -> bool {
     {
         return false;
     }
-    let instrument = Instrument::Guitar(guitar);
+    let instrument = Instrument::Fretted(guitar);
     let mut notes = state.notes.clone();
     for note in &mut notes {
         let Some(at @ PlayPosition::Fret(_)) = note.target.position() else { return false };
@@ -190,7 +193,21 @@ pub(super) fn sync(
     }
     let colors = theme.song_editor_colors();
     commands.entity(host).with_children(|p| {
-        p.spawn((Text::new(loc.msg("editor-guitar-setup").to_string()), TextColor(colors.label)));
+        p.spawn((
+            Text::new(
+                loc.msg(
+                    if guitar.kind
+                        == harmonicon_core::instrument::fretted_strings::FrettedKind::Bass
+                    {
+                        "editor-bass-setup"
+                    } else {
+                        "editor-guitar-setup"
+                    },
+                )
+                .to_string(),
+            ),
+            TextColor(colors.label),
+        ));
         p.spawn((
             Text::new(loc.msg("editor-guitar-setup-help").to_string()),
             TextFont { font_size: FontSize::Px(13.0), ..default() },
@@ -310,7 +327,7 @@ mod tests {
         let mut guitar = current(&state).unwrap();
         guitar.strings[5] = 38;
         assert!(configure(&mut state, guitar.clone()));
-        assert_eq!(state.notes[0].target.sounding_pitch(&Instrument::Guitar(guitar)), Some(38.0));
+        assert_eq!(state.notes[0].target.sounding_pitch(&Instrument::Fretted(guitar)), Some(38.0));
         let chart: serde_json::Value =
             serde_json::from_str(&super::super::harpchart::serialize_harpchart(&state)).unwrap();
         assert_eq!(chart["instrument"]["strings"][5], "D2");
@@ -368,5 +385,41 @@ mod tests {
             assert_eq!(state.notes, before);
             assert_eq!(state.row_count(), count as u8);
         }
+    }
+}
+
+#[cfg(test)]
+mod bass_editor_tests {
+    use super::*;
+    #[test]
+    fn bass_custom_tuning_and_positions_round_trip_as_bass() {
+        let mut state = super::super::document_picker::fresh(
+            super::super::instrument_ui::InstrumentKind::Bass.selection(),
+        );
+        assert_eq!(state.row_count(), 4);
+        super::super::guitar_note::place(&mut state, 4, 0, 12);
+        assert_eq!(state.notes.len(), 1);
+        let mut bass = current(&state).unwrap();
+        bass.strings[3] = 26;
+        assert!(configure(&mut state, bass));
+        assert_eq!(state.notes[0].target.sounding_pitch(&state.effective_instrument()), Some(26.0));
+        let json = super::super::harpchart::serialize_harpchart(&state);
+        super::super::harpchart::validated_harpchart(&json).unwrap();
+        let value: serde_json::Value = serde_json::from_str(&json).unwrap();
+        assert_eq!(value["instrument"]["type"], "bass");
+        assert_eq!(value["instrument"]["strings"][3], "D1");
+        let mut reopened = EditorState::default();
+        super::super::harpchart::load_harpchart(
+            &value,
+            &mut reopened,
+            &mut super::super::state::Scroll::default(),
+        );
+        assert_eq!(reopened.effective_instrument(), state.effective_instrument());
+        assert_eq!(reopened.notes.len(), 1);
+        assert_eq!(reopened.row_count(), 4);
+        assert_eq!(
+            reopened.notes[0].target.sounding_pitch(&reopened.effective_instrument()),
+            Some(26.0)
+        );
     }
 }

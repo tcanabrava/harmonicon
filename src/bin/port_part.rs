@@ -151,7 +151,7 @@ fn port(source: &Path, target: Target) -> Result<(PathBuf, usize, usize, i32), S
         })
         .collect();
     let voicings = match &instrument {
-        Instrument::Guitar(guitar) => {
+        Instrument::Fretted(guitar) => {
             // An onset the solver can't voice is retried as its top note.
             let onsets = |items: &[Vec<u8>]| -> Vec<Onset> {
                 items
@@ -220,7 +220,7 @@ fn port(source: &Path, target: Target) -> Result<(PathBuf, usize, usize, i32), S
     let kept = items.len();
 
     let spec = match &instrument {
-        Instrument::Guitar(guitar) => ChartInstrument::from_guitar(guitar),
+        Instrument::Fretted(guitar) => ChartInstrument::from_guitar(guitar),
         Instrument::Flute(flute) => ChartInstrument::from_flute(flute),
         Instrument::Piano(piano) => ChartInstrument::from_piano(piano),
         Instrument::Harmonica(_) => unreachable!("the target is a guitar, flute or piano"),

@@ -47,7 +47,9 @@ pub fn substitute_chart(chart: &HarpChart, played: &Instrument) -> Vec<Vec<Optio
             .into_iter()
             .map(|item| item.into_iter().map(|p| p.and_then(|p| onto_flute(flute, p))).collect())
             .collect(),
-        (Instrument::Guitar(from), Instrument::Guitar(to)) => onto_guitar(from, to, &decoded),
+        (Instrument::Fretted(from), Instrument::Fretted(to)) if from.kind == to.kind => {
+            onto_guitar(from, to, &decoded)
+        }
         // A smaller keyboard keeps every key it has.
         (Instrument::Piano(_), Instrument::Piano(piano)) => decoded
             .into_iter()

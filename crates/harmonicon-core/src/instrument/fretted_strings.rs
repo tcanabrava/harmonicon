@@ -7,6 +7,33 @@
 //! fields while other instruments can compose the same mechanics. String IDs
 //! are one-based in the setup's order; tuning need not be monotonic.
 
+/// Identity is separate from the shared string/fret mechanics.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum FrettedKind {
+    Guitar,
+    Bass,
+}
+
+impl FrettedKind {
+    pub const fn instrument_kind(self) -> super::InstrumentKind {
+        match self {
+            Self::Guitar => super::InstrumentKind::Guitar,
+            Self::Bass => super::InstrumentKind::Bass,
+        }
+    }
+}
+
+/// Owned setup shared by fretted instruments. Technique and teaching policies
+/// use `kind`; the geometry view below is independent of those policies.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct FrettedInstrument {
+    pub kind: FrettedKind,
+    pub strings: Vec<u8>,
+    pub frets: u8,
+    pub capo: u8,
+    pub body: super::guitar::GuitarBody,
+}
+
 #[derive(Clone, Copy, Debug)]
 pub struct FrettedStrings<'a> {
     pub strings: &'a [u8],

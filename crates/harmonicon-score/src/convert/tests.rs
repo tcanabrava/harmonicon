@@ -432,7 +432,7 @@ fn a_converted_guitar_chart_is_a_valid_one() {
     let (chart, _) =
         to_chart(&score, 0, &suggested_guitar(&score.tracks()[0]).into(), "A").unwrap();
     assert!(chart.harmonica.is_none());
-    assert!(matches!(chart.instrument(), Some(Instrument::Guitar(_))));
+    assert!(matches!(chart.instrument(), Some(Instrument::Fretted(_))));
     assert_eq!(harmonicon_core::chart_check::instrument_problems(&chart), Vec::<String>::new());
     let json = serde_json::to_value(&chart).unwrap();
     let back: HarpChart = serde_json::from_value(json).unwrap();

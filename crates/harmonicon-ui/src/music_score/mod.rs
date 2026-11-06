@@ -584,6 +584,27 @@ struct MusicScoreNotesLayer;
 /// [`choose_clef`] picks a different one for the newly loaded notes.
 #[derive(Component)]
 struct MusicScoreClef;
+
+/// Instrument-specific notation remains independent of sounding MIDI targets.
+#[derive(Component, Clone, Copy)]
+pub struct InstrumentScoreClef(pub Clef);
+
+pub fn instrument_clef(kind: harmonicon_core::instrument::InstrumentKind) -> Option<Clef> {
+    match kind {
+        harmonicon_core::instrument::InstrumentKind::Bass => Some(Clef::Bass8vb),
+        _ => None,
+    }
+}
+
+pub fn apply_instrument_clef(
+    parent: &mut ChildSpawnerCommands,
+    score: Entity,
+    kind: harmonicon_core::instrument::InstrumentKind,
+) {
+    if let Some(clef) = instrument_clef(kind) {
+        parent.commands().entity(score).insert(InstrumentScoreClef(clef));
+    }
+}
 #[derive(Component)]
 struct MusicScoreReference;
 
@@ -857,7 +878,10 @@ fn rebuild_score_notes(
     sections: Res<MusicScoreSections>,
     selection: Res<MusicScoreSelection>,
     playhead: Res<MusicScorePlayhead>,
-    panels: Query<(&ComputedNode, Option<&PianoGrandStaff>), With<MusicScorePanel>>,
+    panels: Query<
+        (&ComputedNode, Option<&PianoGrandStaff>, Option<Ref<InstrumentScoreClef>>),
+        With<MusicScorePanel>,
+    >,
     mut layers: Query<(Entity, &mut Node), (With<MusicScoreNotesLayer>, Without<MusicScoreClef>)>,
     existing: Query<(Entity, &ChildOf), With<MusicScoreNoteGlyph>>,
     meter: Res<MusicScoreMeter>,
@@ -880,7 +904,7 @@ fn rebuild_score_notes(
     // conversion `gameplay_2d::size_note_ribbons` already applies for the
     // same reason.
     let Some(panel_width) =
-        panels.iter().next().map(|(n, _)| n.size().x * n.inverse_scale_factor())
+        panels.iter().next().map(|(n, _, _)| n.size().x * n.inverse_scale_factor())
     else {
         return;
     };
@@ -904,6 +928,7 @@ fn rebuild_score_notes(
         || meter.is_changed()
         || bar_map.is_changed()
         || spacing.is_changed()
+        || panels.iter().any(|(_, _, clef)| clef.is_some_and(|clef| clef.is_changed()))
     {
         let span = beats_behind + beats_ahead;
         let lo = now - beats_behind - span;
@@ -923,7 +948,8 @@ fn rebuild_score_notes(
             &existing,
             &mut clefs,
             &mut time_sigs,
-            panels.iter().next().is_some_and(|(_, grand)| grand.is_some()),
+            panels.iter().next().is_some_and(|(_, grand, _)| grand.is_some()),
+            panels.iter().next().and_then(|(_, _, clef)| clef.map(|clef| clef.0)),
         );
         commands.entity(layer).with_children(|parent| {
             for section in &sections.0 {
@@ -961,7 +987,7 @@ fn rebuild_score_notes(
         });
         if let Some((start, end)) = selection.0 {
             let height = PANEL_HEIGHT
-                * if panels.iter().next().is_some_and(|(_, grand)| grand.is_some()) {
+                * if panels.iter().next().is_some_and(|(_, grand, _)| grand.is_some()) {
                     2.0
                 } else {
                     1.0
@@ -1036,6 +1062,7 @@ fn spawn_window(
     clefs: &mut Query<(&mut Text, &mut Node), With<MusicScoreClef>>,
     time_sigs: &mut Query<(&MusicScoreTimeSig, &mut Text), Without<MusicScoreClef>>,
     grand: bool,
+    forced: Option<Clef>,
 ) {
     for (glyph, parent) in existing {
         if parent.parent() == layer {
@@ -1107,7 +1134,7 @@ fn spawn_window(
             hi,
             clefs,
             time_sigs,
-            None,
+            forced,
             true,
         );
     }
@@ -1130,7 +1157,7 @@ fn spawn_staff_window(
     update_clef: bool,
 ) {
     // One clef for the whole song, from its own range — see `choose_clef`.
-    let clef = forced.unwrap_or_else(|| choose_clef(notes));
+    let clef = notation::resolve_clef(notes, forced);
     for (mut text, mut node) in clefs.iter_mut().filter(|_| update_clef) {
         let glyph = clef.glyph();
         if text.0 != glyph {
@@ -1483,7 +1510,7 @@ fn rebuild_full_score(
     existing: Query<(Entity, &ChildOf), With<MusicScoreNoteGlyph>>,
     mut clefs: Query<(&mut Text, &mut Node), With<MusicScoreClef>>,
     mut signatures: Query<(&MusicScoreTimeSig, &mut Text), Without<MusicScoreClef>>,
-    mut roots: Query<&mut Node, Without<MusicScoreClef>>,
+    mut roots: Query<(&mut Node, Option<&InstrumentScoreClef>), Without<MusicScoreClef>>,
 ) {
     let (Some(bravura), Some(tie)) = (bravura, tie) else { return };
     for (layer, mut full) in &mut layers {
@@ -1495,7 +1522,8 @@ fn rebuild_full_score(
         }
         full.dirty = false;
         let end = notes.0.iter().map(|n| n.start_beat + n.duration_beats).fold(full.end, f64::max);
-        if let Ok(mut root) = roots.get_mut(full.root) {
+        let forced = roots.get(full.root).ok().and_then(|(_, clef)| clef.map(|clef| clef.0));
+        if let Ok((mut root, _)) = roots.get_mut(full.root) {
             root.width = Val::Px(score_beat_x(end, spacing.0) + 80.0);
             root.flex_shrink = 0.0;
         }
@@ -1515,6 +1543,7 @@ fn rebuild_full_score(
             &mut clefs,
             &mut signatures,
             full.grand,
+            forced,
         );
         commands.entity(layer).with_children(|parent| {
             for (index, beat) in std::iter::once(0.0).chain(bars.beats(0.0, end)).enumerate() {

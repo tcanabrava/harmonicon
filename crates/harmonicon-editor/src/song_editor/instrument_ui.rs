@@ -18,15 +18,23 @@ use harmonicon_ui::dialogs::button;
 pub(super) enum InstrumentKind {
     Harmonica,
     Guitar,
+    Bass,
     Piano,
     Flute,
 }
 impl InstrumentKind {
-    pub const ALL: [Self; 4] = [Self::Harmonica, Self::Guitar, Self::Piano, Self::Flute];
+    pub const ALL: [Self; 5] =
+        [Self::Harmonica, Self::Guitar, Self::Bass, Self::Piano, Self::Flute];
     pub fn of(instrument: &Instrument) -> Self {
         match instrument {
             Instrument::Harmonica(_) => Self::Harmonica,
-            Instrument::Guitar(_) => Self::Guitar,
+            Instrument::Fretted(guitar) => {
+                if guitar.kind == harmonicon_core::instrument::fretted_strings::FrettedKind::Bass {
+                    Self::Bass
+                } else {
+                    Self::Guitar
+                }
+            }
             Instrument::Piano(_) => Self::Piano,
             Instrument::Flute(_) => Self::Flute,
         }
@@ -35,6 +43,7 @@ impl InstrumentKind {
         match self {
             Self::Harmonica => "editor-instrument-harmonica",
             Self::Guitar => "editor-instrument-guitar",
+            Self::Bass => "editor-instrument-bass",
             Self::Piano => "editor-instrument-piano",
             Self::Flute => "editor-instrument-flute",
         }
@@ -45,6 +54,7 @@ impl InstrumentKind {
                 return InstrumentSelection::HarmonicaPreset(HarmonicaKind::Diatonic);
             }
             Self::Guitar => Guitar::standard(GuitarBody::Electric).into(),
+            Self::Bass => Guitar::bass().into(),
             Self::Piano => Piano::grand().into(),
             Self::Flute => Flute::default().into(),
         };

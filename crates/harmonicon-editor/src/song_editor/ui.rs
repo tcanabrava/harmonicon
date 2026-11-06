@@ -441,7 +441,7 @@ pub(super) fn row_labels(
     use harmonicon_core::instrument::Instrument;
     use harmonicon_gameplay::gameplay::guitar_visuals::string_color;
     match instrument {
-        Instrument::Guitar(guitar) => (1..=row_count)
+        Instrument::Fretted(guitar) => (1..=row_count)
             .zip(guitar.string_labels())
             .map(|(string, text)| RowLabel { text, swatch: Some(string_color(string)) })
             .collect(),
@@ -957,15 +957,16 @@ pub(super) fn sync_editor_score(
     state: Res<EditorState>,
     bravura: Option<Res<harmonicon_ui::music_score::BravuraFont>>,
     slots: Query<(Entity, Option<&Children>), With<EditorScoreSlot>>,
-    mut last: Local<Option<(Entity, bool)>>,
+    mut last: Local<Option<(Entity, harmonicon_core::instrument::InstrumentKind)>>,
 ) {
     let Some(bravura) = bravura else { return };
     let Ok((slot, children)) = slots.single() else { return };
+    let kind = state.effective_instrument().kind();
     let piano = super::piano_note::is_piano(&state);
-    if *last == Some((slot, piano)) {
+    if *last == Some((slot, kind)) {
         return;
     }
-    *last = Some((slot, piano));
+    *last = Some((slot, kind));
     if let Some(children) = children {
         for &child in children {
             commands.entity(child).despawn();
@@ -989,7 +990,8 @@ pub(super) fn sync_editor_score(
             if piano {
                 harmonicon_ui::music_score::spawn_piano_score(parent, &bravura);
             } else {
-                harmonicon_ui::music_score::spawn_music_score(parent, &bravura);
+                let score = harmonicon_ui::music_score::spawn_music_score(parent, &bravura);
+                harmonicon_ui::music_score::apply_instrument_clef(parent, score, kind);
             }
         });
 }

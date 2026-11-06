@@ -44,6 +44,8 @@ pub(crate) fn setup(
             "note-trainer-flute-title"
         } else if trainer.piano().is_some() {
             "note-trainer-piano-title"
+        } else if trainer.instrument.kind() == harmonicon_core::instrument::InstrumentKind::Bass {
+            "note-trainer-bass-title"
         } else {
             "note-trainer-guitar-title"
         }))))
@@ -278,7 +280,7 @@ pub(crate) fn setup(
                         ..default()
                     })
                     .with_children(|score| {
-                        if trainer.guitar().is_some() {
+                        if trainer.offers_chords() {
                             chords::spawn_diagram(score);
                         }
                         score
@@ -297,6 +299,7 @@ pub(crate) fn setup(
                                         staff,
                                         font,
                                         trainer.piano().is_some(),
+                                        Some(trainer.instrument.kind()),
                                         &loc,
                                     );
                                 }

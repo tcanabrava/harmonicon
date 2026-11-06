@@ -247,7 +247,7 @@ impl NoteTrainer {
     pub fn for_instrument(instrument: Instrument) -> Self {
         let kind = instrument.techniques().first().copied().unwrap_or(TechniqueKind::Target);
         let mut practice = Practice::new(drills(&instrument, kind));
-        practice.auto_advance = !matches!(instrument, Instrument::Guitar(_));
+        practice.auto_advance = !matches!(instrument, Instrument::Fretted(_));
         Self { instrument, kind, practice, chord: None, reference_remaining: 0.0 }
     }
 
@@ -275,7 +275,9 @@ impl NoteTrainer {
 
     fn offers_chords(&self) -> bool {
         self.guitar().is_some_and(|g| {
-            g.strings == harmonicon_core::instrument::guitar::STANDARD_TUNING && g.capo == 0
+            g.kind == harmonicon_core::instrument::fretted_strings::FrettedKind::Guitar
+                && g.strings == harmonicon_core::instrument::guitar::STANDARD_TUNING
+                && g.capo == 0
         })
     }
 
@@ -289,7 +291,7 @@ impl NoteTrainer {
 
     fn guitar(&self) -> Option<&Guitar> {
         match &self.instrument {
-            Instrument::Guitar(guitar) => Some(guitar),
+            Instrument::Fretted(guitar) => Some(guitar),
             Instrument::Harmonica(_) | Instrument::Flute(_) | Instrument::Piano(_) => None,
         }
     }
@@ -304,15 +306,15 @@ impl NoteTrainer {
     fn flute(&self) -> Option<&Flute> {
         match &self.instrument {
             Instrument::Flute(flute) => Some(flute),
-            Instrument::Harmonica(_) | Instrument::Guitar(_) | Instrument::Piano(_) => None,
+            Instrument::Harmonica(_) | Instrument::Fretted(_) | Instrument::Piano(_) => None,
         }
     }
 
     /// Where the profile keeps this instrument's progress on its current
     /// kind. `None` for a harmonica, which keeps the Bending Trainer's.
     fn record_key(&self) -> Option<String> {
-        let instrument = match self.instrument {
-            Instrument::Guitar(_) => "guitar",
+        let instrument = match &self.instrument {
+            Instrument::Fretted(setup) => setup.kind.instrument_kind().slug(),
             Instrument::Flute(_) => "flute",
             Instrument::Piano(_) => "piano",
             Instrument::Harmonica(_) => return None,
@@ -429,7 +431,7 @@ fn kind_key(instrument: &Instrument, kind: TechniqueKind) -> &'static str {
 /// What to play, in words, on whichever instrument the trainer has.
 fn instruction(loc: &Localization, instrument: &Instrument, drill: &Drill) -> String {
     match instrument {
-        Instrument::Guitar(guitar) => guitar_instruction(loc, guitar, drill),
+        Instrument::Fretted(guitar) => guitar_instruction(loc, guitar, drill),
         Instrument::Flute(_) => flute_instruction(loc, drill),
         // A key is its note: there is nothing to say but which.
         Instrument::Piano(_) => String::from(
@@ -936,7 +938,7 @@ mod bend_progress_tests {
     use super::*;
     #[test]
     fn a_bend_must_begin_at_its_unbent_pitch_before_the_target_counts() {
-        let instrument = Instrument::Guitar(Guitar::standard(GuitarBody::Electric));
+        let instrument = Instrument::Fretted(Guitar::standard(GuitarBody::Electric));
         let mut practice = Practice::new(drills(&instrument, TechniqueKind::Glide));
         practice.auto_advance = false;
         let drill = *practice.drill().unwrap();
@@ -984,5 +986,23 @@ mod reference_tests {
         let trainer = app.world().resource::<NoteTrainer>();
         assert_eq!(trainer.practice.landed, 0);
         assert_eq!(trainer.practice.held, 0.0);
+    }
+}
+
+#[cfg(test)]
+mod bass_session_tests {
+    use super::*;
+    #[test]
+    fn bass_has_separate_progress_and_never_offers_guitar_chord_shapes() {
+        let bass = NoteTrainer::for_instrument(Guitar::bass().into());
+        let guitar = NoteTrainer::default();
+        assert_eq!(bass.record_key().as_deref(), Some("bass:target"));
+        assert_eq!(guitar.record_key().as_deref(), Some("guitar:target"));
+        assert!(!bass.offers_chords());
+        assert!(!bass.kinds().contains(&TechniqueKind::Glide));
+        assert!(bass.guitar().is_some(), "both use the shared fretted controls");
+        let mut retuned = Guitar::bass();
+        retuned.strings = harmonicon_core::instrument::guitar::STANDARD_TUNING.to_vec();
+        assert!(!NoteTrainer::for_instrument(retuned.into()).offers_chords());
     }
 }

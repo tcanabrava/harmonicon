@@ -9,7 +9,7 @@ without writing JSON directly.
 ## Choosing an instrument
 
 Opening a fresh editor asks you to choose **Harmonica**, **Guitar**, **Piano**,
-or **Flute**. Returning to an existing draft keeps its instrument and notes.
+**Bass**, or **Flute**. Returning to an existing draft keeps its instrument and notes.
 **New** opens the chooser again; replacing a document with content asks for
 confirmation. Save first to retain that draft. Cancelling keeps it intact.
 In an empty document, **Details → Instrument** can also change the instrument.
@@ -580,3 +580,22 @@ files are written through temporary files before replacement. If a lesson's
 chart or a MIDI backing file cannot be written, the status bar reports a save
 failure. A save involving several files is not a single transaction: some
 companion files may already have been replaced when a later write fails.
+
+## Bass documents
+
+Choose **Bass** when starting a new document. Its tab grid and editing tools
+reuse the fretted-string editor: click a string to add a note, choose its fret,
+and use the string controls to move it while preserving pitch. The score uses
+octave-transposing bass clef; the chart stores sounding pitches.
+
+**Details → Bass setup** accepts custom pitches for individual strings. The
+tuning combobox offers standard four-, five- and six-string setups and Drop D.
+Retuning keeps authored fret positions and updates their sounding pitches;
+setup edits are rejected atomically if existing notes would become unplayable.
+Saved documents retain the distinct `bass` identity and appear under Bass in
+the song list's instrument filter.
+
+Bass charts use song format **1.11.0**. Bass lesson manifests require lesson
+format **3**; existing curricula using format 2 remain supported. Selecting
+Bass in Lessons loads only its namespace and shows an empty state when no
+bass curriculum is installed.

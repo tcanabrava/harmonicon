@@ -23,7 +23,7 @@ fn chart(instrument: &str, events: &str) -> HarpChart {
 #[test]
 fn a_guitar_chart_reads_its_strings_as_the_guitar_it_names() {
     let chart = chart(GUITAR, r#"{"position":{"string":3,"fret":2},"note":"A3"}"#);
-    let Some(Instrument::Guitar(guitar)) = chart.instrument() else {
+    let Some(Instrument::Fretted(guitar)) = chart.instrument() else {
         panic!("a guitar chart is played on a guitar");
     };
     assert_eq!(guitar.strings, crate::instrument::guitar::STANDARD_TUNING);

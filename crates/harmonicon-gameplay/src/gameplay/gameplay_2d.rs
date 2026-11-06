@@ -125,7 +125,7 @@ pub fn setup(
     *render_assets = NoteRenderAssets { play_mode_tags };
 
     let compact = display.compact.0;
-    let is_guitar = matches!(instrument, Some(harmonicon_core::instrument::Instrument::Guitar(_)));
+    let is_guitar = matches!(instrument, Some(harmonicon_core::instrument::Instrument::Fretted(_)));
     let is_flute = matches!(instrument, Some(harmonicon_core::instrument::Instrument::Flute(_)));
     let aural = display.lesson.is_some_and(|lesson| lesson.aural);
     let modifiers = used_modifiers(chart);
@@ -251,7 +251,7 @@ pub fn setup(
                     if !aural {
                         super::flute_visuals::spawn_flute_stage(left, &flute, &loc);
                     }
-                } else if let Some(harmonicon_core::instrument::Instrument::Guitar(guitar)) =
+                } else if let Some(harmonicon_core::instrument::Instrument::Fretted(guitar)) =
                     instrument.clone()
                 {
                     if !aural {
@@ -322,8 +322,10 @@ pub fn setup(
             })
             .with_children(|right| {
                 if !aural
-                    && let Some(harmonicon_core::instrument::Instrument::Guitar(guitar)) =
+                    && let Some(harmonicon_core::instrument::Instrument::Fretted(guitar)) =
                         &instrument
+                    && guitar.kind
+                        == harmonicon_core::instrument::fretted_strings::FrettedKind::Guitar
                 {
                     super::guitar_visuals::spawn_chord_diagram(right, guitar);
                 }
@@ -364,7 +366,12 @@ pub fn setup(
 
     let staff = panels.notation_staff && display.bravura.is_some();
     if staff && let Some(bravura) = &display.bravura {
-        spawn_gameplay_music_score(&mut commands, bravura, piano_roll.is_some());
+        spawn_gameplay_music_score(
+            &mut commands,
+            bravura,
+            piano_roll.is_some(),
+            instrument.as_ref().map(|instrument| instrument.kind()),
+        );
     }
     if panels.lyrics {
         super::karaoke::spawn_karaoke(
@@ -390,6 +397,7 @@ pub(super) fn spawn_gameplay_music_score(
     commands: &mut Commands,
     bravura: &BravuraFont,
     piano: bool,
+    kind: Option<harmonicon_core::instrument::InstrumentKind>,
 ) {
     commands
         .spawn((
@@ -408,7 +416,10 @@ pub(super) fn spawn_gameplay_music_score(
             GameplayRoot,
         ))
         .with_children(|panel| {
-            music_score::spawn_sectioned_score(panel, bravura, piano);
+            let score = music_score::spawn_sectioned_score(panel, bravura, piano);
+            if let Some(kind) = kind {
+                music_score::apply_instrument_clef(panel, score, kind);
+            }
         });
 }
 

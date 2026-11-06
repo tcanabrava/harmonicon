@@ -28,6 +28,7 @@ pub(crate) fn spawn_staff(
     parent: &mut ChildSpawnerCommands,
     font: &BravuraFont,
     piano: bool,
+    kind: Option<harmonicon_core::instrument::InstrumentKind>,
     loc: &Localization,
 ) {
     parent
@@ -58,7 +59,10 @@ pub(crate) fn spawn_staff(
                     if piano {
                         harmonicon_ui::music_score::spawn_piano_score(staff, font);
                     } else {
-                        harmonicon_ui::music_score::spawn_music_score(staff, font);
+                        let score = harmonicon_ui::music_score::spawn_music_score(staff, font);
+                        if let Some(kind) = kind {
+                            harmonicon_ui::music_score::apply_instrument_clef(staff, score, kind);
+                        }
                     }
                 });
         });

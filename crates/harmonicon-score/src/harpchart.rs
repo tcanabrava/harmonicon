@@ -38,7 +38,7 @@ impl HarpChartScore {
         // need no special case, not because there is a choice to make.
         let note_count = chart.track.iter().map(|item| item.events.len()).sum();
         let tuning = match chart.instrument() {
-            Some(harmonicon_core::instrument::Instrument::Guitar(guitar)) => Some(guitar.strings),
+            Some(harmonicon_core::instrument::Instrument::Fretted(guitar)) => Some(guitar.strings),
             _ => None,
         };
         let tracks =

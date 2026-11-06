@@ -49,6 +49,12 @@ pub struct Metadata {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "lowercase")]
 pub enum ChartInstrument {
+    Bass {
+        strings: Vec<String>,
+        frets: u8,
+        #[serde(default, skip_serializing_if = "is_zero")]
+        capo: u8,
+    },
     Guitar {
         strings: Vec<String>,
         frets: u8,
@@ -82,6 +88,17 @@ fn is_zero(value: &u8) -> bool {
 impl ChartInstrument {
     /// How a chart writes `guitar`: its open strings by note name.
     pub fn from_guitar(guitar: &Guitar) -> Self {
+        if guitar.kind == crate::instrument::fretted_strings::FrettedKind::Bass {
+            return Self::Bass {
+                strings: guitar
+                    .strings
+                    .iter()
+                    .map(|&m| crate::midi::midi_to_note(i32::from(m)))
+                    .collect(),
+                frets: guitar.frets,
+                capo: guitar.capo,
+            };
+        }
         Self::Guitar {
             strings: guitar
                 .strings
@@ -108,6 +125,22 @@ impl ChartInstrument {
     /// no real note.
     pub fn to_instrument(&self) -> Option<Instrument> {
         match self {
+            Self::Bass { strings, frets, capo } => {
+                let strings = strings
+                    .iter()
+                    .map(|s| u8::try_from(note_to_midi(s)?).ok())
+                    .collect::<Option<Vec<u8>>>()?;
+                Some(
+                    Guitar {
+                        kind: crate::instrument::fretted_strings::FrettedKind::Bass,
+                        strings,
+                        frets: *frets,
+                        capo: *capo,
+                        body: GuitarBody::Electric,
+                    }
+                    .into(),
+                )
+            }
             Self::Flute { foot } => Some(Flute::new(*foot).into()),
             Self::Piano { keys } => {
                 crate::instrument::piano::Piano::with_keys(*keys).map(Into::into)
@@ -117,7 +150,16 @@ impl ChartInstrument {
                     .iter()
                     .map(|s| u8::try_from(note_to_midi(s)?).ok())
                     .collect::<Option<Vec<u8>>>()?;
-                Some(Guitar { strings, frets: *frets, capo: *capo, body: *body }.into())
+                Some(
+                    Guitar {
+                        kind: crate::instrument::fretted_strings::FrettedKind::Guitar,
+                        strings,
+                        frets: *frets,
+                        capo: *capo,
+                        body: *body,
+                    }
+                    .into(),
+                )
             }
         }
     }
@@ -163,7 +205,7 @@ impl HarpChart {
 /// spec than this build supports up front, with a clear error, instead of
 /// failing on some confusing downstream `additionalProperties` schema
 /// rejection or (worse) silently misreading a field whose meaning changed.
-pub const CURRENT_FORMAT_VERSION: &str = "1.10.0";
+pub const CURRENT_FORMAT_VERSION: &str = "1.11.0";
 
 /// Parses a `"MAJOR.MINOR.PATCH"` version string into a comparable tuple.
 /// `None` for anything that isn't exactly three dot-separated integers.

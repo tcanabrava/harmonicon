@@ -369,6 +369,7 @@ pub(super) fn populate_from_lesson_manifest(manifest: &LessonManifest, state: &m
             state.instrument = match manifest.instrument {
                 Family::Harmonica => EditorKind::Harmonica,
                 Family::Guitar => EditorKind::Guitar,
+                Family::Bass => EditorKind::Bass,
                 Family::Piano => EditorKind::Piano,
                 Family::Flute => EditorKind::Flute,
             }

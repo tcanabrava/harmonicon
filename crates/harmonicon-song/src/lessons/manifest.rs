@@ -17,7 +17,7 @@ const SCHEMA: &str = include_str!("../../../../assets/lesson_schema.dtd.json");
 /// Bump it whenever `lesson.json` gains something an older build cannot
 /// parse — a new `widgets` or `pass_criteria` type, a new required field —
 /// in the same change that adds it.
-pub const LESSON_FORMAT_VERSION: u32 = 2;
+pub const LESSON_FORMAT_VERSION: u32 = 3;
 
 /// How a lesson is judged. `Accuracy`/`Technique` are judged when a
 /// chart-backed run reaches the results screen; `None` on [`LessonManifest`]
@@ -744,7 +744,7 @@ mod instrument_tests {
     fn legacy_lessons_are_harmonica_and_other_instruments_are_explicit() {
         let old = br#"{"id":"old","unit":"u","title_key":"t","body_key":"b"}"#;
         assert_eq!(parse_lesson(old).unwrap().instrument, InstrumentKind::Harmonica);
-        for kind in ["guitar", "piano", "flute"] {
+        for kind in ["guitar", "bass", "piano", "flute"] {
             let value = format!(
                 r#"{{"id":"new","unit":"u","title_key":"t","body_key":"b","instrument":"{kind}"}}"#
             );

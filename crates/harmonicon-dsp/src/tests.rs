@@ -563,3 +563,32 @@ fn pitch_range_from_freqs_ignores_non_positive_and_non_finite_input() {
     assert_eq!(range, PitchRange { min_freq: 440.0, max_freq: 440.0 });
     assert_eq!(PitchRange::from_freqs([0.0, f32::NAN], 1.0), PitchRange::default());
 }
+
+#[test]
+fn bass_low_b_and_e_are_detectable_in_the_live_window_with_a_bass_range() {
+    // A deterministic low-register check, not a claim about real pickup/mic
+    // recordings. The same 4096-sample window as live capture at 44.1/48 kHz.
+    let range = PitchRange::from_freqs([30.8677, 130.8128], 1.0);
+    for sr in [44_100, 48_000] {
+        for (hz, midi) in [(30.8677, 23), (41.2034, 28)] {
+            let samples: Vec<_> = (0..CHUNK_SIZE)
+                .map(|i| {
+                    let t = i as f32 / sr as f32;
+                    let phase = 2.0 * PI * hz * t;
+                    (-2.0 * t).exp()
+                        * (0.6 * phase.sin()
+                            + 0.2 * (2.0 * phase).sin()
+                            + 0.1 * (3.0 * phase).sin())
+                })
+                .collect();
+            for &algorithm in PitchAlgorithm::all() {
+                let result = analyze(&samples, sr, &mut FftState::default(), algorithm, range);
+                assert!(
+                    result.pitches.iter().any(|pitch| pitch.midi == midi),
+                    "{algorithm:?}, {sr} Hz, {hz} Hz: {:?}",
+                    result.pitches
+                );
+            }
+        }
+    }
+}

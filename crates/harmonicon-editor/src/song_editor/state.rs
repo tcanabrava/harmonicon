@@ -695,7 +695,7 @@ impl EditorState {
     /// How many rows the grid has: a harmonica's holes, a guitar's strings.
     pub(super) fn row_count(&self) -> u8 {
         match self.effective_instrument() {
-            harmonicon_core::instrument::Instrument::Guitar(guitar) => {
+            harmonicon_core::instrument::Instrument::Fretted(guitar) => {
                 return guitar.string_count();
             }
             harmonicon_core::instrument::Instrument::Flute(flute) => {

@@ -29,17 +29,9 @@ pub enum GuitarBody {
     Acoustic,
 }
 
-/// One guitar as tuned and set up: its strings, neck length and capo.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Guitar {
-    /// Each string's open pitch as a MIDI number, string 1 (highest) first.
-    pub strings: Vec<u8>,
-    /// Frets on the neck, counted from the nut.
-    pub frets: u8,
-    /// The fret the capo sits on, `0` for none.
-    pub capo: u8,
-    pub body: GuitarBody,
-}
+/// Legacy name for the shared fretted setup. Serialized guitar charts retain
+/// their original instrument type; runtime identity is explicit in `kind`.
+pub type Guitar = super::fretted_strings::FrettedInstrument;
 
 /// Standard tuning, string 1 first: E4 B3 G3 D3 A2 E2.
 pub const STANDARD_TUNING: [u8; 6] = [64, 59, 55, 50, 45, 40];
@@ -50,17 +42,17 @@ pub struct Tuning {
     /// Stable name, also the localization key's suffix (`guitar-tuning-…`).
     pub id: &'static str,
     /// Open strings, string 1 (the highest) first, as MIDI.
-    pub strings: [u8; 6],
+    pub strings: &'static [u8],
 }
 
 /// The common six-string tunings, standard first.
 pub const TUNINGS: &[Tuning] = &[
-    Tuning { id: "standard", strings: STANDARD_TUNING },
-    Tuning { id: "drop-d", strings: [64, 59, 55, 50, 45, 38] },
-    Tuning { id: "half-step-down", strings: [63, 58, 54, 49, 44, 39] },
-    Tuning { id: "dadgad", strings: [62, 57, 55, 50, 45, 38] },
-    Tuning { id: "open-g", strings: [62, 59, 55, 50, 43, 38] },
-    Tuning { id: "open-d", strings: [62, 57, 54, 50, 45, 38] },
+    Tuning { id: "standard", strings: &STANDARD_TUNING },
+    Tuning { id: "drop-d", strings: &[64, 59, 55, 50, 45, 38] },
+    Tuning { id: "half-step-down", strings: &[63, 58, 54, 49, 44, 39] },
+    Tuning { id: "dadgad", strings: &[62, 57, 55, 50, 45, 38] },
+    Tuning { id: "open-g", strings: &[62, 59, 55, 50, 43, 38] },
+    Tuning { id: "open-d", strings: &[62, 57, 54, 50, 45, 38] },
 ];
 
 /// The named tuning `strings` are in, if any.
@@ -123,7 +115,13 @@ impl Guitar {
             GuitarBody::Electric => 22,
             GuitarBody::Acoustic => 20,
         };
-        Self { strings: STANDARD_TUNING.to_vec(), frets, capo: 0, body }
+        Self {
+            kind: super::fretted_strings::FrettedKind::Guitar,
+            strings: STANDARD_TUNING.to_vec(),
+            frets,
+            capo: 0,
+            body,
+        }
     }
 
     /// Shared neck geometry; guitar techniques and teaching remain here.
@@ -189,6 +187,15 @@ impl Guitar {
         self.neck().range()
     }
 
+    /// Conservative editor/solver policy, not a measurement of the player's
+    /// hand. Bass does not inherit the guitar's four-fret chord reach.
+    pub fn hand_span_frets(&self) -> u8 {
+        match self.kind {
+            super::fretted_strings::FrettedKind::Guitar => HAND_SPAN_FRETS,
+            super::fretted_strings::FrettedKind::Bass => 3,
+        }
+    }
+
     /// Whether `a` and `b` can be held at once: different strings, and
     /// fretted notes within a hand's reach of each other. An open string or
     /// a harmonic needs no fretting finger held down for the span to count.
@@ -197,7 +204,7 @@ impl Guitar {
             return false;
         }
         let fretted = |x: &FretAssignment| x.fret > 0 && x.technique != StringTechnique::Harmonic;
-        !(fretted(a) && fretted(b)) || a.fret.abs_diff(b.fret) <= HAND_SPAN_FRETS
+        !(fretted(a) && fretted(b)) || a.fret.abs_diff(b.fret) <= self.hand_span_frets()
     }
 
     /// Re-voices `others` so they can be held with `anchor` and with each

@@ -202,7 +202,7 @@ fn a_guitar_or_flute_reports_what_the_players_instrument_changes() {
     seed_choice(&mut choice, &guitar, &MyInstruments::default());
     let own = choice.played.clone().expect("seeded with the chart's guitar");
     assert_eq!(substitution_cost(&guitar, &own), (0, 0));
-    let Instrument::Guitar(standard) = own else { panic!("a guitar") };
+    let Instrument::Fretted(standard) = own else { panic!("a guitar") };
     let drop_d = TUNINGS.iter().find(|t| t.id == "drop-d").unwrap();
     let played: Instrument = Guitar { strings: drop_d.strings.to_vec(), ..standard }.into();
     let (moved, unreachable) = substitution_cost(&guitar, &played);
@@ -226,7 +226,7 @@ fn a_remembered_tuning_or_foot_joint_is_what_the_page_opens_on() {
     assert_eq!(played_for(own.clone(), &unknown), own);
 
     let drop_d = MyInstruments { guitar_tuning: Some("drop-d".into()), ..default() };
-    let Some(Instrument::Guitar(played)) = played_for(own, &drop_d) else { panic!("a guitar") };
+    let Some(Instrument::Fretted(played)) = played_for(own, &drop_d) else { panic!("a guitar") };
     assert_eq!(tuning_of(&played.strings).map(|t| t.id), Some("drop-d"));
 
     let flute = fixture("flute-scale");
@@ -243,12 +243,33 @@ fn a_remembered_tuning_or_foot_joint_is_what_the_page_opens_on() {
 fn a_remembered_capo_is_put_on_the_charts_guitar() {
     let guitar = fixture("guitar-highway");
     let capo_3 = MyInstruments { guitar_capo: Some(3), ..default() };
-    let Some(Instrument::Guitar(played)) = played_for(guitar.instrument(), &capo_3) else {
+    let Some(Instrument::Fretted(played)) = played_for(guitar.instrument(), &capo_3) else {
         panic!("a guitar")
     };
     assert_eq!(played.capo, 3);
-    let Some(Instrument::Guitar(own)) = guitar.instrument() else { panic!("a guitar") };
+    let Some(Instrument::Fretted(own)) = guitar.instrument() else { panic!("a guitar") };
     assert_eq!(own.capo, 0);
     let (_, unreachable) = substitution_cost(&guitar, &played.into());
     assert!(unreachable > 0, "the open low E is below a capo at 3");
+}
+
+#[test]
+fn bass_and_guitar_remember_independent_tunings() {
+    let mine = MyInstruments {
+        guitar_tuning: Some("drop-d".into()),
+        bass_tuning: Some("bass-five".into()),
+        ..default()
+    };
+    let Some(Instrument::Fretted(bass)) = played_for(Some(Guitar::bass().into()), &mine) else {
+        panic!("bass setup")
+    };
+    assert_eq!(bass.kind, harmonicon_core::instrument::fretted_strings::FrettedKind::Bass);
+    assert_eq!(bass.strings, [43, 38, 33, 28, 23]);
+    let Some(Instrument::Fretted(guitar)) = played_for(
+        Some(Guitar::standard(harmonicon_core::instrument::guitar::GuitarBody::Electric).into()),
+        &mine,
+    ) else {
+        panic!("guitar setup")
+    };
+    assert_eq!(guitar.strings, [64, 59, 55, 50, 45, 38]);
 }

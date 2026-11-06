@@ -2,7 +2,7 @@
 
 **Play → Note Trainer** asks which instrument you're practising.
 **Harmonica** opens the [Bending Trainer](bending-trainer.md); **Guitar**,
-**Flute**, and **Piano** open the Note Trainer described here. Like the Bending Trainer
+**Bass**, **Flute**, and **Piano** open the Note Trainer described here. Like the Bending Trainer
 it is practice, not a lesson: there is no song and nothing to fail.
 
 ![Note Trainer for the guitar](images/note-trainer-guitar.png)
@@ -124,3 +124,23 @@ tabs. Reference playback temporarily pauses assessment so hearing the app's
 own reference through the microphone cannot complete an attempt.
 
 ![Chord selection and fingering](images/note-trainer-guitar-chords.png)
+
+## Bass
+
+Choose **Bass** for fretted electric bass. It shares the clickable fretboard
+and pitch/position selectors with Guitar, with separate saved progress. The
+tabs offer notes, natural harmonics and alternate string positions; guitar
+chord shapes and guitar bend drills are not offered.
+
+Markers show **fret numbers**, with 0 meaning an open string. They do not
+prescribe a one-finger-per-fret stretch. Use a comfortable hand position and
+shift as needed. The microphone checks sounding pitch, not the string or
+finger used.
+
+The score uses bass clef with an octave-below indication: the written notes
+sit an octave above their sounding pitch. High-register targets use treble
+clef with the same octave relationship to keep them readable. Note names and
+audition audio use the sounding pitch. Standard four-, five- and six-string tunings and Drop D
+are available under **Options → My instruments → Bass tuning**. This tuning
+is saved separately from Guitar's and is used when opening the bass trainer.
+Use a clean microphone or pickup input and mute unused strings.

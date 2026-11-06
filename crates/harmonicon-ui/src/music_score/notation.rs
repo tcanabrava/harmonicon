@@ -114,6 +114,10 @@ pub enum Clef {
     Treble8va,
     /// Bass. Bottom line G2 — for low harps and the bass harmonica.
     Bass,
+    /// Bass clef written an octave above sounding pitch (electric bass).
+    Bass8vb,
+    /// Treble clef with notes sounding an octave below their notation.
+    Treble8vb,
 }
 
 impl Clef {
@@ -126,6 +130,8 @@ impl Clef {
         match self {
             Clef::Treble => 64,    // E4
             Clef::Treble8va => 76, // E5 — drawn an octave below its sound
+            Clef::Treble8vb => 52, // E3 sounds where written E4 sits
+            Clef::Bass8vb => 31,   // G1 sounds where written G2 sits
             Clef::Bass => 43,      // G2
         }
     }
@@ -136,6 +142,8 @@ impl Clef {
             Clef::Treble => glyph::G_CLEF,
             Clef::Treble8va => glyph::G_CLEF_8VA,
             Clef::Bass => glyph::F_CLEF,
+            Clef::Treble8vb => "\u{E052}", // SMuFL gClef8vb
+            Clef::Bass8vb => "\u{E064}",   // SMuFL fClef8vb
         }
     }
 
@@ -144,8 +152,8 @@ impl Clef {
     /// clef's two dots straddle the F line, the 4th line up (step 6).
     pub fn anchor_step(self) -> i32 {
         match self {
-            Clef::Treble | Clef::Treble8va => 2,
-            Clef::Bass => 6,
+            Clef::Treble | Clef::Treble8va | Clef::Treble8vb => 2,
+            Clef::Bass | Clef::Bass8vb => 6,
         }
     }
 }
@@ -1453,5 +1461,42 @@ mod tests {
     fn split_at_bar_lines_on_a_note_starting_exactly_on_a_bar_line_needs_no_split() {
         let segments = split_at_bar_lines(note(4.0, 4.0), 4.0);
         assert_eq!(segments, vec![note(4.0, 4.0)]);
+    }
+}
+
+/// Keep bass's octave convention while allowing high-register trainer targets
+/// to use treble instead of disappearing above many ledger lines. A whole
+/// song chooses once from its median, so the moving score keeps a stable clef.
+pub fn resolve_clef(notes: &[NotationNote], forced: Option<Clef>) -> Clef {
+    if forced == Some(Clef::Bass8vb) && !notes.is_empty() {
+        let mut pitches: Vec<_> = notes.iter().map(|note| note.midi).collect();
+        pitches.sort_unstable();
+        if pitches[pitches.len() / 2] >= 60 {
+            return Clef::Treble8vb;
+        }
+    }
+    forced.unwrap_or_else(|| choose_clef(notes))
+}
+
+#[cfg(test)]
+mod bass_notation_tests {
+    use super::*;
+    #[test]
+    fn bass_notation_is_an_octave_above_sound_without_changing_the_target() {
+        for sounding in [23, 28, 33, 38, 43, 48, 60] {
+            assert_eq!(staff_step(sounding, Clef::Bass8vb), staff_step(sounding + 12, Clef::Bass));
+        }
+        assert_eq!(staff_step(67, Clef::Treble8vb), staff_step(79, Clef::Treble));
+        let high = NotationNote {
+            start_beat: 0.0,
+            duration_beats: 1.0,
+            midi: 67,
+            tied_from_previous: false,
+            highlighted: true,
+        };
+        assert_eq!(resolve_clef(&[high], Some(Clef::Bass8vb)), Clef::Treble8vb);
+        assert_eq!(resolve_clef(&[], Some(Clef::Bass8vb)), Clef::Bass8vb);
+        assert_eq!(Clef::Bass8vb.glyph(), "\u{E064}");
+        assert_eq!(Clef::Bass8vb.anchor_step(), Clef::Bass.anchor_step());
     }
 }

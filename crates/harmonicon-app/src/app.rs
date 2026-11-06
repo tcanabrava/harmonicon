@@ -199,8 +199,12 @@ impl EffectiveHarmonica {
         }
         let own = chart.instrument()?;
         Some(match (&own, &self.instrument) {
-            (Instrument::Guitar(_), Some(played @ Instrument::Guitar(_)))
-            | (Instrument::Flute(_), Some(played @ Instrument::Flute(_))) => played.clone(),
+            (Instrument::Fretted(from), Some(played @ Instrument::Fretted(to)))
+                if from.kind == to.kind =>
+            {
+                played.clone()
+            }
+            (Instrument::Flute(_), Some(played @ Instrument::Flute(_))) => played.clone(),
             _ => own,
         })
     }

@@ -64,7 +64,7 @@ pub fn instrument_problems(chart: &HarpChart) -> Vec<String> {
             let at = format!("track[{item_index}].events[{event_index}]");
             let problem = match &instrument {
                 Instrument::Harmonica(_) => harmonica_event_problem(event),
-                Instrument::Guitar(guitar) => guitar_event_problem(guitar, event),
+                Instrument::Fretted(guitar) => guitar_event_problem(guitar, event),
                 Instrument::Flute(flute) => flute_event_problem(flute, event),
                 Instrument::Piano(piano) => piano_event_problem(piano, event),
             };

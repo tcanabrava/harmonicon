@@ -108,5 +108,21 @@ Each independently reviewable part receives a commit and relevant validation.
   techniques and ergonomic policy. Four-/seven-string, re-entrant tuning and
   capo/boundary cases covered; core suite: 429 tests passed.
 - Clippy passed for core and menu, all targets, with warnings denied.
-- Steps 2–7 remain planned; no new instrument identity is enabled yet. Next:
-  fretted electric bass using the shared model and presentation infrastructure.
+- Step 2 complete: fretted electric bass identity, four-/five-/six-string and
+  Drop D presets, custom string tuning, shared editor/trainer/gameplay, independent
+  saved tuning and trainer progress, catalog and curriculum selection.
+  Runtime `Instrument::Fretted(FrettedInstrument)` separates the shared physical
+  family from `InstrumentKind::{Guitar,Bass}`. Legacy guitar chart JSON is retained.
+- Bass uses octave-transposing bass notation, with a treble fallback for high
+  targets. Scoring and audition pitches remain sounding pitches. Guitar chord
+  dictionaries and finger suggestions are not applied to bass.
+- Bass validation: 2,100 relevant library tests passed; final editor/menu/UI
+  checks passed, workspace Clippy passed with warnings denied, dev build and
+  documentation build passed. Low B0/E1 synthetic signals with harmonics and
+  decay detected by all five algorithms at 44.1/48 kHz. Physical bass pickup/mic
+  recordings remain a separate evaluation.
+- Live UI checked: low/high trainer targets, catalog filtering, pre-song setup,
+  gameplay, and the editor including changing to the five-string preset.
+- Bass charts use song format 1.11.0; bass lesson manifests require lesson format
+  3. Older charts/curricula remain supported; no bass curriculum is bundled yet.
+- Next: step 3, cavaquinho. Steps 4–7 remain planned.

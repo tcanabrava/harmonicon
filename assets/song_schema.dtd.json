@@ -243,6 +243,41 @@
         },
         {
           "type": "object",
+          "description": "A fretted electric bass (format 1.11.0). Strings are note names, string 1 (the highest) first; frets count from the nut and capo is the fret the capo sits on.",
+          "required": ["type", "strings", "frets"],
+          "additionalProperties": false,
+
+          "properties": {
+            "type": {
+              "type": "string",
+              "enum": ["bass"]
+            },
+
+            "strings": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 12,
+              "items": {
+                "type": "string",
+                "pattern": "^[A-G][#b]?[0-9]$"
+              }
+            },
+
+            "frets": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 36
+            },
+
+            "capo": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 24
+            }
+          }
+        },
+        {
+          "type": "object",
           "description": "A Boehm flute (format 1.9.0). foot is its foot joint: c reaches C4, b reaches B3. Defaults to c.",
           "required": ["type"],
           "additionalProperties": false,

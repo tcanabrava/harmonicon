@@ -671,12 +671,15 @@ fn spawn_neck(
             ..default()
         })
         .with_children(|panel| {
-            let caption = if guitar.capo == 0 {
-                loc.msg("gameplay-guitar-neck").to_string()
-            } else {
-                loc.msg_args("gameplay-guitar-neck-capo", &[("capo", guitar.capo.to_string())])
-                    .to_string()
-            };
+            let caption =
+                if guitar.kind == harmonicon_core::instrument::fretted_strings::FrettedKind::Bass {
+                    loc.msg("gameplay-bass-neck").to_string()
+                } else if guitar.capo == 0 {
+                    loc.msg("gameplay-guitar-neck").to_string()
+                } else {
+                    loc.msg_args("gameplay-guitar-neck-capo", &[("capo", guitar.capo.to_string())])
+                        .to_string()
+                };
             panel.spawn((
                 Text::new(caption),
                 TextFont { font_size: FontSize::Px(13.0), ..default() },
@@ -880,13 +883,16 @@ pub(super) fn update_neck_overview(
         let group = if dot.next { &next_positions } else { &now_positions };
         if let Some(position) = group.iter().find(|p| p.string == dot.string) {
             node.display = Display::Flex;
-            text.0 = if position.fret == 0 {
-                "0".into()
-            } else {
-                suggested_finger(position, group, &now_positions)
-                    .map(|finger| finger.to_string())
-                    .unwrap_or_default()
-            };
+            text.0 =
+                if guitar.kind == harmonicon_core::instrument::fretted_strings::FrettedKind::Bass {
+                    position.fret.to_string()
+                } else if position.fret == 0 {
+                    "0".into()
+                } else {
+                    suggested_finger(position, group, &now_positions)
+                        .map(|finger| finger.to_string())
+                        .unwrap_or_default()
+                };
             node.left =
                 Val::Percent((f32::from(position.fret + guitar.capo) + 0.5) * 100.0 / columns);
             node.top = Val::Percent(
@@ -1030,13 +1036,16 @@ pub(super) fn update_trainer_neck(
             node.top = Val::Percent(
                 (f32::from(position.string) - 0.5) * 100.0 / f32::from(guitar.string_count()),
             );
-            text.0 = if position.fret == 0 {
-                "0".into()
-            } else {
-                suggested_finger(position, &positions, &positions)
-                    .map(|n| n.to_string())
-                    .unwrap_or_default()
-            };
+            text.0 =
+                if guitar.kind == harmonicon_core::instrument::fretted_strings::FrettedKind::Bass {
+                    position.fret.to_string()
+                } else if position.fret == 0 {
+                    "0".into()
+                } else {
+                    suggested_finger(position, &positions, &positions)
+                        .map(|n| n.to_string())
+                        .unwrap_or_default()
+                };
         }
     }
     for (region, mut node) in &mut regions {

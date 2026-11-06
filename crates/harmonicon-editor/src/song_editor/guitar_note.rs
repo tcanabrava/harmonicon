@@ -14,7 +14,7 @@ use harmonicon_core::instrument::{Instrument, InstrumentModel, PlayPosition};
 use harmonicon_core::note_target::NoteTarget;
 
 pub(super) fn is_guitar(state: &EditorState) -> bool {
-    matches!(state.effective_instrument(), Instrument::Guitar(_))
+    matches!(state.effective_instrument(), Instrument::Fretted(_))
 }
 
 fn fret_of(note: &GridNote) -> Option<FretAssignment> {
@@ -118,7 +118,7 @@ fn same_pitch_on(
 /// the next placed note gets and Vibrato arms its expression.
 pub(super) fn apply_modifier(state: &mut EditorState, kind: ModButton) {
     let instrument = state.effective_instrument();
-    let Instrument::Guitar(guitar) = &instrument else { return };
+    let Instrument::Fretted(guitar) = &instrument else { return };
     let Some(anchor) = state.selected_note().copied() else {
         match kind {
             ModButton::FretUp => {

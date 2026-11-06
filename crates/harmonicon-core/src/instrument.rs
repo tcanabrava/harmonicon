@@ -10,7 +10,8 @@
 //! three questions, so gameplay, the Song Editor and the detection filter
 //! can ask them without naming a harmonica.
 //!
-//! Guitar, piano, flute and harmonica each supply their physical guidance.
+//! Fretted strings (guitar and bass), piano, flute and harmonica each supply
+//! their physical guidance.
 //! The harmonica adapter delegates to [`crate::pitch_map`] and
 //! [`crate::harmonica`], which remain the source of its reed layout.
 //!
@@ -18,6 +19,7 @@
 //! pitch, not which hole or string made it, so the judge only ever compares
 //! [`InstrumentModel::pitch_of`]'s answer.
 
+pub mod bass;
 pub mod flute;
 pub mod fretted_strings;
 pub mod guitar;
@@ -28,10 +30,11 @@ use crate::chart::Action;
 use crate::harmonica::Harmonica;
 use crate::pitch_map::{HoleAssignment, Technique, playable_assignments};
 use flute::{FingeringAssignment, Flute};
-use guitar::{FretAssignment, Guitar, StringTechnique};
+use fretted_strings::FrettedInstrument;
+use guitar::{FretAssignment, StringTechnique};
 use piano::Piano;
 
-/// Instrument family used to select curricula independently of tuning or setup.
+/// Instrument identity used to select curricula independently of tuning or setup.
 #[derive(
     Clone,
     Copy,
@@ -50,16 +53,19 @@ pub enum InstrumentKind {
     #[default]
     Harmonica,
     Guitar,
+    Bass,
     Piano,
     Flute,
 }
 
 impl InstrumentKind {
-    pub const ALL: [Self; 4] = [Self::Harmonica, Self::Guitar, Self::Piano, Self::Flute];
+    pub const ALL: [Self; 5] =
+        [Self::Harmonica, Self::Guitar, Self::Bass, Self::Piano, Self::Flute];
     pub const fn slug(self) -> &'static str {
         match self {
             Self::Harmonica => "harmonica",
             Self::Guitar => "guitar",
+            Self::Bass => "bass",
             Self::Piano => "piano",
             Self::Flute => "flute",
         }
@@ -71,11 +77,12 @@ impl InstrumentKind {
 
 /// The instrument a chart part is played on. A closed enum rather than a
 /// trait object, so a chart can name its instrument in JSON and every UI
-/// `match` breaks at compile time when a new one is added.
+/// `match` breaks at compile time when a new physical family is added.
+/// Instrument identity is separate: fretted guitar and bass share one model.
 #[derive(Clone, Debug, PartialEq)]
 pub enum Instrument {
     Harmonica(Harmonica),
-    Guitar(Guitar),
+    Fretted(FrettedInstrument),
     Flute(Flute),
     Piano(Piano),
 }
@@ -90,7 +97,7 @@ impl Instrument {
     pub const fn kind(&self) -> InstrumentKind {
         match self {
             Self::Harmonica(_) => InstrumentKind::Harmonica,
-            Self::Guitar(_) => InstrumentKind::Guitar,
+            Self::Fretted(setup) => setup.kind.instrument_kind(),
             Self::Piano(_) => InstrumentKind::Piano,
             Self::Flute(_) => InstrumentKind::Flute,
         }
@@ -99,7 +106,7 @@ impl Instrument {
     pub fn synth_voice(&self) -> crate::synth::Voice {
         match self {
             Self::Harmonica(_) => crate::synth::Voice::Harmonica,
-            Self::Guitar(_) => crate::synth::Voice::PluckedString,
+            Self::Fretted(_) => crate::synth::Voice::PluckedString,
             Self::Flute(_) => crate::synth::Voice::Flute,
             Self::Piano(_) => crate::synth::Voice::Piano,
         }
@@ -118,9 +125,9 @@ impl From<Flute> for Instrument {
     }
 }
 
-impl From<Guitar> for Instrument {
-    fn from(guitar: Guitar) -> Self {
-        Self::Guitar(guitar)
+impl From<FrettedInstrument> for Instrument {
+    fn from(guitar: FrettedInstrument) -> Self {
+        Self::Fretted(guitar)
     }
 }
 
@@ -488,7 +495,7 @@ impl InstrumentModel for Harmonica {
     }
 }
 
-impl InstrumentModel for Guitar {
+impl InstrumentModel for FrettedInstrument {
     fn range(&self) -> Option<(u8, u8)> {
         let pitches = self.valid_pitches();
         Some((*pitches.iter().min()?, *pitches.iter().max()?))
@@ -529,7 +536,7 @@ impl InstrumentModel for Guitar {
         let PlayPosition::Fret(a) = position else {
             return None;
         };
-        Guitar::pitch_of(self, a)
+        FrettedInstrument::pitch_of(self, a)
     }
 
     fn can_sound_together(&self, a: &PlayPosition, b: &PlayPosition) -> bool {
@@ -550,7 +557,7 @@ impl InstrumentModel for Guitar {
                 PlayPosition::Hole(_) | PlayPosition::Fingering(_) | PlayPosition::Key(_) => None,
             })
             .collect();
-        Guitar::reconcile(self, anchor, &mut frets);
+        FrettedInstrument::reconcile(self, anchor, &mut frets);
         let mut frets = frets.into_iter();
         for other in others {
             if let PlayPosition::Fret(a) = other
@@ -562,12 +569,17 @@ impl InstrumentModel for Guitar {
     }
 
     fn techniques(&self) -> &'static [TechniqueKind] {
-        &[
-            TechniqueKind::Target,
-            TechniqueKind::Glide,
-            TechniqueKind::Register,
-            TechniqueKind::Position,
-        ]
+        match self.kind {
+            fretted_strings::FrettedKind::Guitar => &[
+                TechniqueKind::Target,
+                TechniqueKind::Glide,
+                TechniqueKind::Register,
+                TechniqueKind::Position,
+            ],
+            fretted_strings::FrettedKind::Bass => {
+                &[TechniqueKind::Target, TechniqueKind::Register, TechniqueKind::Position]
+            }
+        }
     }
 
     fn expression_scope(&self) -> ExpressionScope {
@@ -708,7 +720,7 @@ impl InstrumentModel for Instrument {
     fn range(&self) -> Option<(u8, u8)> {
         match self {
             Self::Harmonica(harp) => harp.range(),
-            Self::Guitar(guitar) => InstrumentModel::range(guitar),
+            Self::Fretted(guitar) => InstrumentModel::range(guitar),
             Self::Flute(flute) => InstrumentModel::range(flute),
             Self::Piano(piano) => InstrumentModel::range(piano),
         }
@@ -717,7 +729,7 @@ impl InstrumentModel for Instrument {
     fn positions_for(&self, midi: u8) -> Vec<PlayPosition> {
         match self {
             Self::Harmonica(harp) => harp.positions_for(midi),
-            Self::Guitar(guitar) => InstrumentModel::positions_for(guitar, midi),
+            Self::Fretted(guitar) => InstrumentModel::positions_for(guitar, midi),
             Self::Flute(flute) => InstrumentModel::positions_for(flute, midi),
             Self::Piano(piano) => InstrumentModel::positions_for(piano, midi),
         }
@@ -726,7 +738,7 @@ impl InstrumentModel for Instrument {
     fn valid_pitches(&self) -> std::collections::HashSet<u8> {
         match self {
             Self::Harmonica(harp) => harp.valid_pitches(),
-            Self::Guitar(guitar) => InstrumentModel::valid_pitches(guitar),
+            Self::Fretted(guitar) => InstrumentModel::valid_pitches(guitar),
             Self::Flute(flute) => InstrumentModel::valid_pitches(flute),
             Self::Piano(piano) => InstrumentModel::valid_pitches(piano),
         }
@@ -735,7 +747,7 @@ impl InstrumentModel for Instrument {
     fn pitch_of(&self, position: &PlayPosition) -> Option<u8> {
         match self {
             Self::Harmonica(harp) => harp.pitch_of(position),
-            Self::Guitar(guitar) => InstrumentModel::pitch_of(guitar, position),
+            Self::Fretted(guitar) => InstrumentModel::pitch_of(guitar, position),
             Self::Flute(flute) => InstrumentModel::pitch_of(flute, position),
             Self::Piano(piano) => InstrumentModel::pitch_of(piano, position),
         }
@@ -744,7 +756,7 @@ impl InstrumentModel for Instrument {
     fn can_sound_together(&self, a: &PlayPosition, b: &PlayPosition) -> bool {
         match self {
             Self::Harmonica(harp) => harp.can_sound_together(a, b),
-            Self::Guitar(guitar) => InstrumentModel::can_sound_together(guitar, a, b),
+            Self::Fretted(guitar) => InstrumentModel::can_sound_together(guitar, a, b),
             Self::Flute(flute) => InstrumentModel::can_sound_together(flute, a, b),
             Self::Piano(piano) => InstrumentModel::can_sound_together(piano, a, b),
         }
@@ -753,7 +765,7 @@ impl InstrumentModel for Instrument {
     fn reconcile(&self, anchor: &PlayPosition, others: &mut [PlayPosition]) {
         match self {
             Self::Harmonica(harp) => harp.reconcile(anchor, others),
-            Self::Guitar(guitar) => InstrumentModel::reconcile(guitar, anchor, others),
+            Self::Fretted(guitar) => InstrumentModel::reconcile(guitar, anchor, others),
             Self::Flute(flute) => InstrumentModel::reconcile(flute, anchor, others),
             Self::Piano(piano) => InstrumentModel::reconcile(piano, anchor, others),
         }
@@ -762,7 +774,7 @@ impl InstrumentModel for Instrument {
     fn techniques(&self) -> &'static [TechniqueKind] {
         match self {
             Self::Harmonica(harp) => harp.techniques(),
-            Self::Guitar(guitar) => InstrumentModel::techniques(guitar),
+            Self::Fretted(guitar) => InstrumentModel::techniques(guitar),
             Self::Flute(flute) => InstrumentModel::techniques(flute),
             Self::Piano(piano) => InstrumentModel::techniques(piano),
         }
@@ -771,7 +783,7 @@ impl InstrumentModel for Instrument {
     fn expression_scope(&self) -> ExpressionScope {
         match self {
             Self::Harmonica(harp) => harp.expression_scope(),
-            Self::Guitar(guitar) => InstrumentModel::expression_scope(guitar),
+            Self::Fretted(guitar) => InstrumentModel::expression_scope(guitar),
             Self::Flute(flute) => InstrumentModel::expression_scope(flute),
             Self::Piano(piano) => InstrumentModel::expression_scope(piano),
         }
@@ -780,7 +792,7 @@ impl InstrumentModel for Instrument {
     fn envelope(&self) -> Envelope {
         match self {
             Self::Harmonica(harp) => harp.envelope(),
-            Self::Guitar(guitar) => InstrumentModel::envelope(guitar),
+            Self::Fretted(guitar) => InstrumentModel::envelope(guitar),
             Self::Flute(flute) => InstrumentModel::envelope(flute),
             Self::Piano(piano) => InstrumentModel::envelope(piano),
         }
@@ -789,7 +801,7 @@ impl InstrumentModel for Instrument {
     fn lane_layout(&self) -> LaneLayout {
         match self {
             Self::Harmonica(harp) => harp.lane_layout(),
-            Self::Guitar(guitar) => InstrumentModel::lane_layout(guitar),
+            Self::Fretted(guitar) => InstrumentModel::lane_layout(guitar),
             Self::Flute(flute) => InstrumentModel::lane_layout(flute),
             Self::Piano(piano) => InstrumentModel::lane_layout(piano),
         }

@@ -347,7 +347,7 @@ pub(super) fn serialize_harpchart_notes(state: &EditorState, notes: &[GridNote])
     });
 
     let spec = match &instrument {
-        harmonicon_core::instrument::Instrument::Guitar(guitar) => {
+        harmonicon_core::instrument::Instrument::Fretted(guitar) => {
             Some(harmonicon_core::chart::ChartInstrument::from_guitar(guitar))
         }
         harmonicon_core::instrument::Instrument::Flute(flute) => {

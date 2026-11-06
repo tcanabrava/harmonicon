@@ -45,7 +45,7 @@ pub fn drills(instrument: &Instrument, kind: TechniqueKind) -> Vec<Drill> {
     }
     let candidates = match instrument {
         Instrument::Harmonica(harp) => harmonica_candidates(harp, kind),
-        Instrument::Guitar(guitar) => guitar_candidates(guitar, kind),
+        Instrument::Fretted(guitar) => guitar_candidates(guitar, kind),
         Instrument::Flute(flute) => flute_candidates(flute, kind),
         Instrument::Piano(piano) => piano_candidates(piano),
     };

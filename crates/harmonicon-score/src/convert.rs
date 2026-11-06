@@ -224,7 +224,7 @@ pub fn to_chart(
             let (items, report) = harmonica_items(&notes, harp);
             (items, report, detected_harmonica_key(harp))
         }
-        Instrument::Guitar(guitar) => {
+        Instrument::Fretted(guitar) => {
             let (items, report) = guitar_items(&notes, guitar);
             (items, report, likely_key(&notes))
         }
@@ -240,7 +240,7 @@ pub fn to_chart(
     let mut chart = chart_shell(score, artist, key, items);
     match instrument {
         Instrument::Harmonica(harp) => chart.harmonica = Some(harp.clone()),
-        Instrument::Guitar(guitar) => {
+        Instrument::Fretted(guitar) => {
             chart.instrument_spec = Some(ChartInstrument::from_guitar(guitar));
         }
         Instrument::Flute(flute) => {
@@ -447,6 +447,7 @@ fn piano_items(
 /// count isn't read yet.
 pub fn suggested_guitar(track: &ScoreTrack) -> Guitar {
     Guitar {
+        kind: harmonicon_core::instrument::fretted_strings::FrettedKind::Guitar,
         strings: track.tuning.clone().unwrap_or_else(|| STANDARD_TUNING.to_vec()),
         frets: 24,
         capo: 0,
