@@ -20,6 +20,7 @@
 //! [`InstrumentModel::pitch_of`]'s answer.
 
 pub mod bass;
+pub mod bowed_strings;
 pub mod cavaquinho;
 pub mod clarinet;
 pub mod flute;

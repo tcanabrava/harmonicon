@@ -183,4 +183,14 @@ Each independently reviewable part receives a commit and relevant validation.
   register exercises, B♭/A setup changes, reach warnings, editor range, and
   horizontal Play. Synthetic model checks do not replace real-instrument audio
   evaluation. Song format 1.13.0 / lesson format 5; no clarinet curriculum bundled.
-- Steps 6–7 remain planned.
+- Step 6 foundation: reusable bowed-string geometry and independent left-hand
+  placement / bow direction / articulation metadata. Standard violin tuning and
+  a bounded two-octave stopped range per string; higher targets do not inherit
+  invented first-position finger numbers. Diagrams can use continuous stopping
+  fractions rather than frets. Adjacent-string bow contact is distinguished from
+  ergonomic certification of arbitrary double stops.
+- Model checks cover tuning, alternate strings, first-position guidance,
+  fractional stopping geometry, boundary validation and bow metadata round trips.
+  Core: 453 tests passed; core Clippy passed with warnings denied.
+- Step 6 continues with violin chart, editor, trainer and Play integration.
+  Step 7 (viola and alto clef) remains planned.
