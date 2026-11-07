@@ -125,13 +125,13 @@ mod tests {
     use harmonicon_ui::music_score::rests_between_notes;
 
     fn note(tick: usize, len: usize) -> GridNote {
-        GridNote {
-            id: 1,
+        GridNote::new(
+            1,
             tick,
             len,
-            expr: Expr::None,
-            target: GridNote::harmonica_target(4, Dir::Blow, HarpTechnique::Normal),
-        }
+            Expr::None,
+            GridNote::harmonica_target(4, Dir::Blow, HarpTechnique::Normal),
+        )
     }
 
     #[test]

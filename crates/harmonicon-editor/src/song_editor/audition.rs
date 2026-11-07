@@ -82,13 +82,7 @@ mod tests {
     use harmonicon_core::harmonica::richter_harp;
 
     fn note(hole: u8, dir: Dir, pitch: HarpTechnique) -> GridNote {
-        GridNote {
-            id: 1,
-            tick: 0,
-            len: 4,
-            expr: Expr::None,
-            target: GridNote::harmonica_target(hole, dir, pitch),
-        }
+        GridNote::new(1, 0, 4, Expr::None, GridNote::harmonica_target(hole, dir, pitch))
     }
 
     #[test]

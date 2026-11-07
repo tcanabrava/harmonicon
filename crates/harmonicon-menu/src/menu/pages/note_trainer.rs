@@ -93,6 +93,19 @@ pub(crate) fn setup_note_trainer_menu(
             state.set(AppState::NoteTrainer);
         },
     );
+    spawn_button(
+        &mut commands,
+        root,
+        &loc.msg("instrument-violin"),
+        |_: On<Activate>,
+         mut trainer: ResMut<NoteTrainer>,
+         mut state: ResMut<NextState<AppState>>| {
+            trainer.choose(
+                harmonicon_core::instrument::bowed_strings::BowedKind::Violin.standard().into(),
+            );
+            state.set(AppState::NoteTrainer);
+        },
+    );
     spawn_back_button(
         &mut commands,
         header,

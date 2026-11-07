@@ -404,13 +404,7 @@ fn spawn_open_note(
     secs_per_tick: f32,
 ) -> GridNote {
     let tick = (start_secs / secs_per_tick).round() as usize;
-    GridNote {
-        id,
-        tick,
-        len: 1,
-        expr: Expr::None,
-        target: GridNote::harmonica_target(hole, dir, pitch),
-    }
+    GridNote::new(id, tick, 1, Expr::None, GridNote::harmonica_target(hole, dir, pitch))
 }
 
 /// Extends every currently-sounding note's length to reflect `t` — called
@@ -457,17 +451,13 @@ mod tests {
     // ── grow_open_notes ──────────────────────────────────────────────────────
 
     fn note(id: u32, tick: usize, len: usize) -> GridNote {
-        GridNote {
+        GridNote::new(
             id,
             tick,
             len,
-            expr: Expr::None,
-            target: GridNote::harmonica_target(
-                1,
-                super::super::state::Dir::Blow,
-                HarpTechnique::Normal,
-            ),
-        }
+            Expr::None,
+            GridNote::harmonica_target(1, super::super::state::Dir::Blow, HarpTechnique::Normal),
+        )
     }
 
     #[test]

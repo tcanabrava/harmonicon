@@ -23,9 +23,10 @@ pub(super) enum InstrumentKind {
     Piano,
     Flute,
     Clarinet,
+    Violin,
 }
 impl InstrumentKind {
-    pub const ALL: [Self; 7] = [
+    pub const ALL: [Self; 8] = [
         Self::Harmonica,
         Self::Guitar,
         Self::Bass,
@@ -33,6 +34,7 @@ impl InstrumentKind {
         Self::Piano,
         Self::Flute,
         Self::Clarinet,
+        Self::Violin,
     ];
     pub fn of(instrument: &Instrument) -> Self {
         match instrument {
@@ -47,6 +49,7 @@ impl InstrumentKind {
             Instrument::Piano(_) => Self::Piano,
             Instrument::Flute(_) => Self::Flute,
             Instrument::Clarinet(_) => Self::Clarinet,
+            Instrument::Bowed(_) => Self::Violin,
         }
     }
     pub fn label(self) -> &'static str {
@@ -58,6 +61,7 @@ impl InstrumentKind {
             Self::Piano => "editor-instrument-piano",
             Self::Flute => "editor-instrument-flute",
             Self::Clarinet => "instrument-clarinet",
+            Self::Violin => "instrument-violin",
         }
     }
     pub fn selection(self) -> InstrumentSelection {
@@ -71,6 +75,9 @@ impl InstrumentKind {
             Self::Piano => Piano::grand().into(),
             Self::Flute => Flute::default().into(),
             Self::Clarinet => harmonicon_core::instrument::clarinet::Clarinet::default().into(),
+            Self::Violin => {
+                harmonicon_core::instrument::bowed_strings::BowedKind::Violin.standard().into()
+            }
         };
         InstrumentSelection::Configured { instrument, harmonica_origin: None }
     }

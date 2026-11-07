@@ -66,6 +66,16 @@ pub(crate) fn update_active_targets(
     }
 }
 
+/// A short articulated stroke must not gain extra credit for being held long.
+fn held_note_points(note: &ScheduledNote) -> u32 {
+    match note.performance.sustain_policy() {
+        harmonicon_core::note_performance::SustainPolicy::OnsetOnly => 0,
+        harmonicon_core::note_performance::SustainPolicy::TrackHold => {
+            sustain_points(note.held, note.duration)
+        }
+    }
+}
+
 /// Vibrato and wah are hand/throat articulations sustained *through* the
 /// note, not a pitch shift validated by the onset alone (unlike a bend, whose
 /// `expected_pitch` already encodes the bent target). Their style bonus is
@@ -358,7 +368,7 @@ pub fn score_notes(
                     note.amp_samples.push((clock.get(), level));
                 }
             } else {
-                score.points += sustain_points(note.held, note.duration);
+                score.points += held_note_points(note);
 
                 let sustained: Vec<Modifier> =
                     note.modifiers.iter().filter(|&x| is_sustained_technique(x)).cloned().collect();
@@ -512,5 +522,35 @@ pub fn score_notes(
                 scored.write(NoteScored { judgment: Some(judgment) });
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod bowed_sustain_tests {
+    use super::*;
+    use harmonicon_core::instrument::bowed_strings::{BowArticulation, BowDirection, BowGesture};
+    #[test]
+    fn staccato_does_not_reward_overholding_and_bow_direction_is_not_assessed() {
+        let mut note = ScheduledNote { held: 1.0, duration: 1.0, ..default() };
+        let normal = held_note_points(&note);
+        assert!(normal > 0);
+        note.performance =
+            harmonicon_core::note_performance::PerformanceInstructions::Bowed(BowGesture {
+                direction: Some(BowDirection::Down),
+                articulation: BowArticulation::Detache,
+            });
+        assert_eq!(held_note_points(&note), normal);
+        if let harmonicon_core::note_performance::PerformanceInstructions::Bowed(ref mut bow) =
+            note.performance
+        {
+            bow.direction = Some(BowDirection::Up);
+        }
+        assert_eq!(held_note_points(&note), normal);
+        if let harmonicon_core::note_performance::PerformanceInstructions::Bowed(ref mut bow) =
+            note.performance
+        {
+            bow.articulation = BowArticulation::Staccato;
+        }
+        assert_eq!(held_note_points(&note), 0);
     }
 }

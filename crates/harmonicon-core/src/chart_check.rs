@@ -81,14 +81,65 @@ pub fn instrument_problems(chart: &HarpChart) -> Vec<String> {
     for (item_index, item) in chart.track.iter().enumerate() {
         for (event_index, event) in item.events.iter().enumerate() {
             let at = format!("track[{item_index}].events[{event_index}]");
+            if !matches!(instrument, Instrument::Bowed(_))
+                && (event.bow.is_some() || event.fingerboard.is_some())
+            {
+                problems.push(format!(
+                    "{at}: fingerboard placement and bow gestures require a bowed instrument"
+                ));
+                continue;
+            }
             let problem = match &instrument {
                 Instrument::Harmonica(_) => harmonica_event_problem(event),
                 Instrument::Fretted(guitar) => guitar_event_problem(guitar, event),
                 Instrument::Flute(flute) => wind_event_problem(flute, "flute", event),
                 Instrument::Clarinet(clarinet) => wind_event_problem(clarinet, "clarinet", event),
+                Instrument::Bowed(_) => crate::note_event_codec::decode(chart, event)
+                    .err()
+                    .map(|_| "invalid bowed-string placement or technique".to_string()),
                 Instrument::Piano(piano) => piano_event_problem(piano, event),
             };
             problems.extend(problem.map(|p| format!("{at}: {p}")));
+        }
+    }
+    if matches!(instrument, Instrument::Bowed(_)) {
+        let mut active: Vec<(f64, PlayPosition)> = Vec::new();
+        let mut items: Vec<_> = chart
+            .track
+            .iter()
+            .enumerate()
+            .map(|(index, item)| {
+                let time = item.tick.map_or_else(
+                    || item.time.unwrap_or_default(),
+                    |tick| {
+                        crate::chart::tick_to_seconds(
+                            tick,
+                            chart.timing.resolution,
+                            &chart.timing.tempo_map,
+                        )
+                    },
+                );
+                (time, index, item)
+            })
+            .collect();
+        items.sort_by(|a, b| a.0.total_cmp(&b.0));
+        for (time, index, item) in items {
+            active.retain(|&(end, _)| end > time + 1e-6);
+            for event in &item.events {
+                let Some(position) = crate::note_event_codec::decode(chart, event)
+                    .ok()
+                    .and_then(|target| target.position())
+                else {
+                    continue;
+                };
+                if active
+                    .iter()
+                    .any(|&(_, other)| !instrument.can_sound_together(&position, &other))
+                {
+                    problems.push(format!("track[{index}]: simultaneous bowed targets require distinct adjacent strings"));
+                }
+                active.push((time + item.duration, position));
+            }
         }
     }
     if matches!(instrument, Instrument::Clarinet(_)) {

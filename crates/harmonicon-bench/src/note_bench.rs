@@ -578,6 +578,7 @@ mod tests {
             fingering: None,
             note: Some("E4".into()),
             modifiers: None,
+            ..Default::default()
         });
         let chart = flat_chart(vec![item]);
         let notes = expected_notes_from_chart(&chart);

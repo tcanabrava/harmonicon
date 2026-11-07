@@ -27,6 +27,7 @@ pub(super) fn decode_note(
     let event: NoteEvent = serde_json::from_value(value.clone()).ok()?;
     let midi = harmonicon_core::midi::note_to_midi(event.note.as_deref()?)? as f32;
     let position = match instrument {
+        Instrument::Bowed(_) => PlayPosition::Fingerboard(event.fingerboard?.at(midi as u8)),
         Instrument::Piano(_) => PlayPosition::Key(midi as u8),
         Instrument::Flute(_) | Instrument::Clarinet(_) => {
             PlayPosition::Fingering(FingeringAssignment {
@@ -76,7 +77,9 @@ pub(super) fn decode_note(
     {
         state.expression_intensities.insert(id, intensity.to_string());
     }
-    Some(GridNote { id, tick, len, expr, target })
+    Some(GridNote::new(id, tick, len, expr, target).with_performance(
+        harmonicon_core::note_performance::PerformanceInstructions::from_bow(event.bow),
+    ))
 }
 
 pub(super) fn encode_note(
@@ -96,12 +99,14 @@ pub(super) fn encode_note(
         super::state::Expr::None => None,
     };
     let original = NoteEvent {
+        bow: note.performance.bowed(),
         hole: None,
         action: None,
         position: None,
         fingering: None,
         note: None,
         modifiers,
+        ..Default::default()
     };
     serde_json::to_value(
         harmonicon_core::note_event_codec::encode(instrument, note.target, &original)

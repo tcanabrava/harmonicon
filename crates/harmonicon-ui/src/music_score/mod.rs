@@ -598,7 +598,7 @@ pub struct InstrumentScoreClef(pub Clef);
 pub fn instrument_clef(kind: harmonicon_core::instrument::InstrumentKind) -> Option<Clef> {
     match kind {
         harmonicon_core::instrument::InstrumentKind::Bass => Some(Clef::Bass),
-        harmonicon_core::instrument::InstrumentKind::Guitar | harmonicon_core::instrument::InstrumentKind::Clarinet => Some(Clef::Treble),
+        harmonicon_core::instrument::InstrumentKind::Guitar | harmonicon_core::instrument::InstrumentKind::Clarinet | harmonicon_core::instrument::InstrumentKind::Violin => Some(Clef::Treble),
         _ => None,
     }
 }

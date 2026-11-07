@@ -60,6 +60,10 @@ pub(super) fn select_or_add(state: &mut EditorState, hole: u8, tick: usize) {
 
     // On a guitar the row is a string, and everything below this is about
     // breath and reeds.
+    if super::bowed_note::is_bowed(state) {
+        super::bowed_note::place(state, hole, tick, len);
+        return;
+    }
     if super::guitar_note::is_guitar(state) {
         super::guitar_note::place(state, hole, tick, len);
         return;
@@ -100,13 +104,13 @@ pub(super) fn select_or_add(state: &mut EditorState, hole: u8, tick: usize) {
 
     let id = state.next_id;
     state.next_id += 1;
-    state.notes.push(GridNote {
+    state.notes.push(GridNote::new(
         id,
         tick,
         len,
         expr,
-        target: GridNote::harmonica_target(hole, dir, pitch),
-    });
+        GridNote::harmonica_target(hole, dir, pitch),
+    ));
     state.select_only(id);
     // A chord note whose direction was forced (above), or that's carrying
     // an armed sticky expr, must pull any simultaneous notes on other
@@ -191,6 +195,10 @@ pub(super) fn apply_modifier(state: &mut EditorState, kind: ModButton) {
             return;
         }
         _ => {}
+    }
+    if super::bowed_note::is_bowed(state) {
+        super::bowed_note::apply_modifier(state, kind);
+        return;
     }
     if super::guitar_note::is_guitar(state) {
         super::guitar_note::apply_modifier(state, kind);
@@ -405,7 +413,9 @@ pub(super) fn report_technique_skips(
 ) {
     if state.unplayable_notice {
         state.bypass_change_detection().unplayable_notice = false;
-        feedback.set(loc.msg(if super::flute_note::is_wind(&state) {
+        feedback.set(loc.msg(if super::bowed_note::is_bowed(&state) {
+            "bowed-invalid"
+        } else if super::flute_note::is_wind(&state) {
             "editor-wind-invalid"
         } else if super::piano_note::is_piano(&state) {
             "editor-piano-invalid"

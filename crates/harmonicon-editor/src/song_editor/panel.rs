@@ -352,6 +352,7 @@ pub(super) enum NoteButtons {
     Diatonic,
     Chromatic,
     Guitar,
+    Bowed,
     Flute,
     Piano,
 }
@@ -384,11 +385,8 @@ pub(super) fn note_button_visible(kind: ModButton, set: NoteButtons) -> bool {
         ModButton::Bend => matches!(set, NoteButtons::Diatonic | NoteButtons::Guitar),
         ModButton::Fingering => set == NoteButtons::Flute,
         ModButton::Slide => set == NoteButtons::Chromatic,
-        ModButton::FretDown
-        | ModButton::FretUp
-        | ModButton::StringUp
-        | ModButton::StringDown
-        | ModButton::Harmonic => guitar,
+        ModButton::StringUp | ModButton::StringDown => guitar || set == NoteButtons::Bowed,
+        ModButton::FretDown | ModButton::FretUp | ModButton::Harmonic => guitar,
         ModButton::Vibrato
         | ModButton::Depth
         | ModButton::Call
@@ -412,7 +410,8 @@ pub(super) fn update_technique_button_visibility(
     theme: Res<LoadedTheme>,
 ) {
     let colors = theme.song_editor_colors();
-    let flute = matches!(state.effective_instrument(), harmonicon_core::instrument::Instrument::Flute(_));
+    let flute =
+        matches!(state.effective_instrument(), harmonicon_core::instrument::Instrument::Flute(_));
     for (mut node, mut bg) in &mut flute_view {
         let want = if flute { Display::Flex } else { Display::None };
         if node.display != want {
@@ -421,7 +420,9 @@ pub(super) fn update_technique_button_visibility(
         let on = flute && state.flute_view == super::state::FluteView::Fingering;
         bg.0 = if on { colors.btn_active } else { colors.btn_bg };
     }
-    let set = if super::guitar_note::is_guitar(&state) {
+    let set = if super::bowed_note::is_bowed(&state) {
+        NoteButtons::Bowed
+    } else if super::guitar_note::is_guitar(&state) {
         NoteButtons::Guitar
     } else if super::flute_note::is_wind(&state) {
         NoteButtons::Flute
@@ -474,7 +475,9 @@ pub(super) fn update_harmonica_kind_text(
     let kind = super::instrument_ui::InstrumentKind::of(&state.effective_instrument());
     let key = if kind == super::instrument_ui::InstrumentKind::Harmonica {
         harmonica_kind_key(state.harmonica_kind())
-    } else { kind.label() };
+    } else {
+        kind.label()
+    };
     let label = String::from(loc.msg(key));
     for mut text in &mut texts {
         **text = label.clone();
@@ -578,7 +581,7 @@ mod tests {
     use harmonicon_audio::pitch_detect::PitchAlgorithm;
 
     fn note(dir: Dir, pitch: HarpTechnique, expr: Expr) -> GridNote {
-        GridNote { id: 1, tick: 0, len: 1, expr, target: GridNote::harmonica_target(4, dir, pitch) }
+        GridNote::new(1, 0, 1, expr, GridNote::harmonica_target(4, dir, pitch))
     }
 
     #[test]

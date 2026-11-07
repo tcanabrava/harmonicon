@@ -27,7 +27,7 @@ impl NoteTarget {
         }
     }
 
-    pub fn sounding_pitch(self, instrument: &impl InstrumentModel) -> Option<f32> {
+    pub fn sounding_pitch(self, instrument: &(impl InstrumentModel + ?Sized)) -> Option<f32> {
         match self {
             Self::Sounding { midi, .. } => {
                 (midi.is_finite() && (0.0..=127.0).contains(&midi)).then_some(midi)
@@ -41,7 +41,7 @@ impl NoteTarget {
     /// alternatives. A sequence solver can then account for held voices.
     pub fn candidates(
         self,
-        instrument: &impl InstrumentModel,
+        instrument: &(impl InstrumentModel + ?Sized),
     ) -> Result<Vec<PlayPosition>, PlacementError> {
         if let Some(position) = self.position() {
             self.with_placement(instrument, position)?;
@@ -62,7 +62,7 @@ impl NoteTarget {
     /// Used on explicit fingering edits, not while painting a view.
     pub fn with_placement(
         self,
-        instrument: &impl InstrumentModel,
+        instrument: &(impl InstrumentModel + ?Sized),
         position: PlayPosition,
     ) -> Result<Self, PlacementError> {
         if matches!(self, Self::Sounding { .. }) && self.sounding_pitch(instrument).is_none() {
@@ -81,7 +81,10 @@ impl NoteTarget {
 
 /// Keep fractional bends for synthesis; core's integer mapping intentionally
 /// rounds for detection and scoring.
-fn position_pitch(instrument: &impl InstrumentModel, position: PlayPosition) -> Option<f32> {
+fn position_pitch(
+    instrument: &(impl InstrumentModel + ?Sized),
+    position: PlayPosition,
+) -> Option<f32> {
     use crate::instrument::guitar::StringTechnique;
     // Reject invalid authored positions instead of repairing them implicitly.
     instrument.pitch_of(&position)?;

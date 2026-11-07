@@ -44,6 +44,36 @@ pub struct FingerboardPosition {
     pub hand_position: Option<u8>,
 }
 
+/// Placement stored alongside an event's sounding note, without duplicating it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct BowedPlacement {
+    pub string: u8,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub finger: Option<u8>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub hand_position: Option<u8>,
+}
+impl BowedPlacement {
+    pub fn at(self, note: u8) -> FingerboardPosition {
+        FingerboardPosition {
+            string: self.string,
+            note,
+            finger: self.finger,
+            hand_position: self.hand_position,
+        }
+    }
+}
+impl FingerboardPosition {
+    pub fn placement(self) -> BowedPlacement {
+        BowedPlacement {
+            string: self.string,
+            finger: self.finger,
+            hand_position: self.hand_position,
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum BowDirection {
@@ -121,9 +151,9 @@ impl BowedStrings {
                 let stopped = note.checked_sub(self.open_pitch(string)?)?;
                 let finger = match stopped {
                     0 => Some(0),
-                    2 => Some(1),
-                    4 => Some(2),
-                    5 => Some(3),
+                    1 | 2 => Some(1),
+                    3 | 4 => Some(2),
+                    5 | 6 => Some(3),
                     7 => Some(4),
                     _ => None,
                 };
@@ -156,6 +186,52 @@ impl BowedStrings {
         (0.0..=f32::from(self.stopped_semitones))
             .contains(&interval)
             .then(|| 1.0 - 2.0_f32.powf(-interval / 12.0))
+    }
+}
+
+impl super::InstrumentModel for BowedStrings {
+    fn range(&self) -> Option<(u8, u8)> {
+        BowedStrings::range(self)
+    }
+    fn positions_for(&self, midi: u8) -> Vec<super::PlayPosition> {
+        BowedStrings::positions_for(self, midi)
+            .into_iter()
+            .map(super::PlayPosition::Fingerboard)
+            .collect()
+    }
+    fn valid_pitches(&self) -> std::collections::HashSet<u8> {
+        (0..=127).filter(|&pitch| !BowedStrings::positions_for(self, pitch).is_empty()).collect()
+    }
+    fn pitch_of(&self, position: &super::PlayPosition) -> Option<u8> {
+        let super::PlayPosition::Fingerboard(at) = position else { return None };
+        BowedStrings::pitch_of(self, *at)
+    }
+    fn can_sound_together(&self, a: &super::PlayPosition, b: &super::PlayPosition) -> bool {
+        let (super::PlayPosition::Fingerboard(a), super::PlayPosition::Fingerboard(b)) = (a, b)
+        else {
+            return false;
+        };
+        BowedStrings::can_sound_together(self, *a, *b)
+    }
+    fn reconcile(&self, _: &super::PlayPosition, _: &mut [super::PlayPosition]) {}
+    fn techniques(&self) -> &'static [super::TechniqueKind] {
+        &[super::TechniqueKind::Target, super::TechniqueKind::Position]
+    }
+    fn expression_scope(&self) -> super::ExpressionScope {
+        super::ExpressionScope::PerVoice
+    }
+    fn envelope(&self) -> super::Envelope {
+        super::Envelope::Sustained
+    }
+    fn lane_layout(&self) -> super::LaneLayout {
+        super::LaneLayout {
+            axis: super::ScrollAxis::Horizontal,
+            lanes: self
+                .strings
+                .iter()
+                .map(|&pitch| super::Lane::new(crate::midi::midi_to_note(i32::from(pitch)), None))
+                .collect(),
+        }
     }
 }
 

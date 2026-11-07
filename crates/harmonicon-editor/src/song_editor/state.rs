@@ -109,6 +109,7 @@ pub(super) fn cycle_next(options: &[&str], current: &str) -> String {
 
 #[derive(Resource)]
 pub(super) struct EditorState {
+    pub(super) bowed: super::bowed_note::NewNoteSettings,
     pub(super) notes: Vec<GridNote>,
     pub(super) next_id: u32,
     /// Dev-only benchmark ground truth — see `expected_notes`'s docs.
@@ -311,6 +312,7 @@ impl FluteView {
 impl Default for EditorState {
     fn default() -> Self {
         Self {
+            bowed: Default::default(),
             notes: Vec::new(),
             next_id: 0,
             expected_notes: Vec::new(),
@@ -695,6 +697,9 @@ impl EditorState {
     /// How many rows the grid has: a harmonica's holes, a guitar's strings.
     pub(super) fn row_count(&self) -> u8 {
         match self.effective_instrument() {
+            harmonicon_core::instrument::Instrument::Bowed(strings) => {
+                return strings.strings.len() as u8;
+            }
             harmonicon_core::instrument::Instrument::Fretted(guitar) => {
                 return guitar.string_count();
             }

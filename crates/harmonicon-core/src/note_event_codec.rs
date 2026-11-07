@@ -11,6 +11,11 @@ use crate::pitch_map::{HoleAssignment, Technique};
 
 pub fn decode(chart: &HarpChart, event: &NoteEvent) -> Result<NoteTarget, PlacementError> {
     let instrument = chart.instrument().ok_or(PlacementError::Unplayable)?;
+    if !matches!(instrument, Instrument::Bowed(_))
+        && (event.bow.is_some() || event.fingerboard.is_some())
+    {
+        return Err(PlacementError::Unplayable);
+    }
     let modifiers = event.modifiers.as_deref().unwrap_or(&[]);
     let pitch_modifiers = modifiers
         .iter()
@@ -76,6 +81,22 @@ pub fn decode(chart: &HarpChart, event: &NoteEvent) -> Result<NoteTarget, Placem
             NoteTarget::Sounding { midi: f32::from(midi), placement: None }
                 .with_placement(&instrument, position)
         }
+        Instrument::Bowed(_) => {
+            if event.hole.is_some()
+                || event.action.is_some()
+                || event.position.is_some()
+                || event.fingering.is_some()
+                || modifiers.iter().any(|modifier| !matches!(modifier, Modifier::Vibrato { .. }))
+            {
+                return Err(PlacementError::Unplayable);
+            }
+            let midi = chart.event_pitch(event).ok_or(PlacementError::Unplayable)?;
+            let position = PlayPosition::Fingerboard(
+                event.fingerboard.ok_or(PlacementError::Unplayable)?.at(midi),
+            );
+            NoteTarget::Sounding { midi: f32::from(midi), placement: None }
+                .with_placement(&instrument, position)
+        }
         Instrument::Piano(_) => {
             if event.hole.is_some()
                 || event.action.is_some()
@@ -105,6 +126,10 @@ pub fn encode(
     target.with_placement(instrument, position)?;
     let mut result = original.clone();
     result.fingering = None;
+    result.fingerboard = None;
+    if !matches!(instrument, Instrument::Bowed(_)) {
+        result.bow = None;
+    }
     let mut modifiers: Vec<_> = original
         .modifiers
         .as_deref()
@@ -169,6 +194,14 @@ pub fn encode(
             // expression.
             modifiers.retain(|m| matches!(m, Modifier::Vibrato { .. }));
             result.note = Some(crate::midi::midi_to_note(i32::from(at.note)));
+        }
+        PlayPosition::Fingerboard(at) => {
+            result.hole = None;
+            result.action = None;
+            result.position = None;
+            result.fingerboard = Some(at.placement());
+            result.note = Some(crate::midi::midi_to_note(i32::from(at.note)));
+            modifiers.retain(|modifier| matches!(modifier, Modifier::Vibrato { .. }));
         }
         PlayPosition::Key(note) => {
             result.hole = None;

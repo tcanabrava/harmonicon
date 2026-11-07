@@ -9,7 +9,9 @@ pub(crate) struct PitchChoice(u8);
 
 impl NoteTrainer {
     fn select_flute_pitch(&mut self, midi: u8) -> bool {
-        if self.instrument.fingering_chart().is_none() {
+        if self.instrument.fingering_chart().is_none()
+            && !matches!(self.instrument, Instrument::Bowed(_))
+        {
             return false;
         }
         let Some(index) = self.practice.drills.iter().position(|d| d.target.round() as u8 == midi)
@@ -60,7 +62,9 @@ pub(super) fn spawn_for_instrument(
     let mut rows: Vec<Vec<(u8, u8)>> = Vec::new();
     for pitch in low..=high {
         let written = instrument.notation().transposition.written_semitone(pitch) as u8;
-        if rows.is_empty() || (written.is_multiple_of(12) && pitch != high && pitch > low.saturating_add(1)) {
+        if rows.is_empty()
+            || (written.is_multiple_of(12) && pitch != high && pitch > low.saturating_add(1))
+        {
             rows.push(Vec::new());
         }
         rows.last_mut().unwrap().push((pitch, written));

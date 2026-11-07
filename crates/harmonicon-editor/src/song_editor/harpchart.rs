@@ -356,21 +356,7 @@ pub(super) fn serialize_harpchart_notes(state: &EditorState, notes: &[GridNote])
         "scoring": scoring
     });
 
-    let spec = match &instrument {
-        harmonicon_core::instrument::Instrument::Fretted(guitar) => {
-            Some(harmonicon_core::chart::ChartInstrument::from_fretted(guitar))
-        }
-        harmonicon_core::instrument::Instrument::Clarinet(clarinet) => {
-            Some(harmonicon_core::chart::ChartInstrument::Clarinet { key: clarinet.key })
-        }
-        harmonicon_core::instrument::Instrument::Flute(flute) => {
-            Some(harmonicon_core::chart::ChartInstrument::from_flute(flute))
-        }
-        harmonicon_core::instrument::Instrument::Piano(piano) => {
-            Some(harmonicon_core::chart::ChartInstrument::from_piano(piano))
-        }
-        harmonicon_core::instrument::Instrument::Harmonica(_) => None,
-    };
+    let spec = harmonicon_core::chart::ChartInstrument::from_instrument(&instrument);
     if let Some(spec) = spec {
         chart.as_object_mut().unwrap().remove("harmonica");
         chart["instrument"] = serde_json::to_value(spec).unwrap();
@@ -705,13 +691,13 @@ pub(super) fn load_harpchart(v: &serde_json::Value, state: &mut EditorState, scr
                 {
                     state.expression_intensities.insert(next_id, intensity.to_string());
                 }
-                notes.push(GridNote {
-                    id: next_id,
-                    tick: start_tick,
+                notes.push(GridNote::new(
+                    next_id,
+                    start_tick,
                     len,
                     expr,
-                    target: GridNote::harmonica_target(hole, dir, pitch),
-                });
+                    GridNote::harmonica_target(hole, dir, pitch),
+                ));
                 next_id += 1;
             }
         }

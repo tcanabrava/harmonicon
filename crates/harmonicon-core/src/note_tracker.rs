@@ -88,24 +88,17 @@ pub enum VoiceFilter {
 
 impl VoiceFilter {
     pub fn for_instrument(instrument: &Instrument, config: &NoteTrackerConfig) -> Self {
-        match instrument {
-            Instrument::Harmonica(harp) => Self::Breath {
+        if let Some(harp) = instrument.adapter().breath_model() {
+            Self::Breath {
                 reach: Box::new(direction_table(harp)),
                 direction: BreathDirectionTracker::with_change_frames(
                     config.direction_change_frames,
                 ),
-            },
-            Instrument::Fretted(guitar) => {
-                Self::Strings { pitches: guitar.valid_pitches(), strings: guitar.strings.len() }
             }
-            // One voice: the same rule as a one-string guitar, the
-            // strongest pitch the flute can play.
-            Instrument::Flute(_) | Instrument::Clarinet(_) => {
-                Self::Strings { pitches: instrument.valid_pitches(), strings: 1 }
-            }
-            // Ten fingers: any keys at once, the ten strongest heard.
-            Instrument::Piano(piano) => {
-                Self::Strings { pitches: InstrumentModel::valid_pitches(piano), strings: 10 }
+        } else {
+            Self::Strings {
+                pitches: instrument.valid_pitches(),
+                strings: instrument.adapter().max_voices(),
             }
         }
     }

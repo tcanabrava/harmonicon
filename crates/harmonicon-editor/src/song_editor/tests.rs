@@ -1084,13 +1084,7 @@ fn left_edge_moves_start_and_resizes_inversely() {
 }
 
 fn note(hole: u8, dir: Dir, pitch: HarpTechnique) -> GridNote {
-    GridNote {
-        id: 0,
-        tick: 0,
-        len: 4,
-        expr: Expr::None,
-        target: GridNote::harmonica_target(hole, dir, pitch),
-    }
+    GridNote::new(0, 0, 4, Expr::None, GridNote::harmonica_target(hole, dir, pitch))
 }
 
 #[test]
@@ -2935,13 +2929,13 @@ fn describe_tick_matches_the_ruler_after_a_change() {
 // ── resize_grip_position ──────────────────────────────────────────────────────
 
 fn grid_note(tick: usize, len: usize) -> GridNote {
-    GridNote {
-        id: 1,
+    GridNote::new(
+        1,
         tick,
         len,
-        expr: Expr::None,
-        target: GridNote::harmonica_target(1, Dir::Blow, HarpTechnique::Normal),
-    }
+        Expr::None,
+        GridNote::harmonica_target(1, Dir::Blow, HarpTechnique::Normal),
+    )
 }
 
 #[test]
@@ -4355,7 +4349,7 @@ fn visual_rows_do_not_change_guitar_pitch_or_fingering() {
     let target = NoteTarget::Sounding { midi: 64.0, placement: None }
         .with_placement(&guitar, position)
         .unwrap();
-    let note = GridNote { id: 1, tick: 12, len: 4, expr: Expr::None, target };
+    let note = GridNote::new(1, 12, 4, Expr::None, target);
     let tab = note_rect(&note, 1, 6);
     let piano = note_rect(&note, 24, 6);
     assert_eq!((tab.0, tab.2, tab.3), (piano.0, piano.2, piano.3));

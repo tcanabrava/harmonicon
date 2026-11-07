@@ -202,6 +202,7 @@ mod tests {
                     fingering: None,
                     note: None,
                     modifiers: None,
+                    ..Default::default()
                 })
                 .collect(),
         }

@@ -32,6 +32,8 @@ mod details_fields;
 mod document_picker;
 // Dev-only ("--features dev") benchmark-authoring workflow — see its own
 // module docs. Same gating as `debug_record` above.
+mod bowed_controls;
+mod bowed_note;
 mod clarinet_setup;
 #[cfg(feature = "dev")]
 mod expected_notes;
@@ -392,7 +394,13 @@ impl Plugin for SongEditor2Plugin {
             )
             .add_systems(
                 Update,
-                (guitar_setup::sync_tuning, guitar_setup::sync, clarinet_setup::sync, clarinet_setup::sync_hint)
+                (
+                    guitar_setup::sync_tuning,
+                    guitar_setup::sync,
+                    bowed_controls::sync,
+                    clarinet_setup::sync,
+                    clarinet_setup::sync_hint,
+                )
                     .chain()
                     .in_set(EditorPass)
                     .run_if(in_state(AppState::SongEditor2)),

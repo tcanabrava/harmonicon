@@ -441,6 +441,15 @@ pub(super) fn row_labels(
     use harmonicon_core::instrument::Instrument;
     use harmonicon_gameplay::gameplay::guitar_visuals::string_color;
     match instrument {
+        Instrument::Bowed(strings) => strings
+            .strings
+            .iter()
+            .enumerate()
+            .map(|(index, &pitch)| RowLabel {
+                text: harmonicon_core::midi::midi_to_note(i32::from(pitch)),
+                swatch: Some(string_color(index as u8 + 1)),
+            })
+            .collect(),
         Instrument::Fretted(guitar) => (1..=row_count)
             .zip(guitar.string_labels())
             .map(|(string, text)| RowLabel { text, swatch: Some(string_color(string)) })
@@ -771,7 +780,30 @@ fn on_editor_tab_select(
 /// the `ScrollArea` — see [`setup`]'s own comment for why. The tool palette
 /// is the left sidebar beside it (`mod_panel::spawn_mod_panel`).
 fn spawn_fixed_chrome(root: &mut ChildSpawnerCommands, colors: SongEditorColors, hole_count: u8) {
-    root.spawn((super::clarinet_setup::PitchConvention, Text::new(""), TextFont { font_size: FontSize::Px(13.0), ..default() }, TextColor(colors.label), Node { display: Display::None, flex_shrink: 0.0, padding: UiRect::all(Val::Px(4.0)), ..default() }));
+    root.spawn((
+        super::bowed_controls::BowedControls,
+        Node {
+            display: Display::None,
+            width: Val::Percent(100.0),
+            flex_wrap: FlexWrap::Wrap,
+            row_gap: Val::Px(6.0),
+            column_gap: Val::Px(8.0),
+            flex_shrink: 0.0,
+            ..default()
+        },
+    ));
+    root.spawn((
+        super::clarinet_setup::PitchConvention,
+        Text::new(""),
+        TextFont { font_size: FontSize::Px(13.0), ..default() },
+        TextColor(colors.label),
+        Node {
+            display: Display::None,
+            flex_shrink: 0.0,
+            padding: UiRect::all(Val::Px(4.0)),
+            ..default()
+        },
+    ));
     root.spawn((
         GridRowContainer,
         Node {

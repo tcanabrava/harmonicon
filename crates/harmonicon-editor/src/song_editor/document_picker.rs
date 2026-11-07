@@ -224,13 +224,13 @@ mod tests {
             let pitch =
                 instrument.valid_pitches().into_iter().min().expect("a playable instrument");
             let position = instrument.positions_for(pitch)[0];
-            state.notes.push(super::super::state::GridNote {
-                id: 1,
-                tick: 0,
-                len: super::super::TICKS_PER_BEAT,
-                expr: super::super::state::Expr::None,
-                target: harmonicon_core::note_target::NoteTarget::Positioned(position),
-            });
+            state.notes.push(super::super::state::GridNote::new(
+                1,
+                0,
+                super::super::TICKS_PER_BEAT,
+                super::super::state::Expr::None,
+                harmonicon_core::note_target::NoteTarget::Positioned(position),
+            ));
             let mut value: serde_json::Value =
                 serde_json::from_str(&super::super::harpchart::serialize_harpchart(&state))
                     .unwrap();

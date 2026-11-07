@@ -13,6 +13,7 @@ pub mod autoplay;
 mod bars;
 mod beat_guides;
 mod bending_trainer;
+mod bowed_visuals;
 mod call_response;
 mod clock;
 pub mod coaching;

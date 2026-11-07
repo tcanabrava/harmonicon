@@ -126,9 +126,17 @@ pub fn setup(
 
     let compact = display.compact.0;
     let is_guitar = matches!(instrument, Some(harmonicon_core::instrument::Instrument::Fretted(_)));
-    let is_clarinet = matches!(instrument, Some(harmonicon_core::instrument::Instrument::Clarinet(_)));
+    let score_led = matches!(
+        instrument,
+        Some(
+            harmonicon_core::instrument::Instrument::Clarinet(_)
+                | harmonicon_core::instrument::Instrument::Bowed(_)
+        )
+    );
     let is_flute = matches!(instrument, Some(harmonicon_core::instrument::Instrument::Flute(_)));
-    if is_clarinet { highway_lanes.0 = None; }
+    if score_led {
+        highway_lanes.0 = None;
+    }
     let aural = display.lesson.is_some_and(|lesson| lesson.aural);
     let modifiers = used_modifiers(chart);
     let lyrics = harmonicon_core::lyrics::lyric_lines(chart);
@@ -269,12 +277,40 @@ pub fn setup(
                             TextColor(Color::WHITE),
                         ));
                     }
+                } else if let Some(harmonicon_core::instrument::Instrument::Bowed(setup)) =
+                    &instrument
+                {
+                    readout_parent = left
+                        .spawn(Node {
+                            width: Val::Percent(100.0),
+                            height: Val::Px(72.0),
+                            flex_shrink: 0.0,
+                            ..default()
+                        })
+                        .id();
+                    if !aural {
+                        left.spawn(Node {
+                            width: Val::Percent(100.0),
+                            flex_grow: 1.0,
+                            justify_content: JustifyContent::Center,
+                            align_items: AlignItems::Center,
+                            ..default()
+                        })
+                        .with_children(|stage| super::bowed_visuals::spawn(stage, setup, &loc));
+                    }
                 } else if let Some(harmonicon_core::instrument::Instrument::Clarinet(setup)) =
                     instrument
                 {
                     // A score-led stage: no NoteHighway or falling note entities.
                     // This transparent footer only anchors score and judgment text.
-                    readout_parent = left.spawn(Node { width: Val::Percent(100.0), height: Val::Px(72.0), flex_shrink: 0.0, ..default() }).id();
+                    readout_parent = left
+                        .spawn(Node {
+                            width: Val::Percent(100.0),
+                            height: Val::Px(72.0),
+                            flex_shrink: 0.0,
+                            ..default()
+                        })
+                        .id();
                     if !aural {
                         left.spawn(Node {
                             flex_direction: FlexDirection::Column,
@@ -367,7 +403,9 @@ pub fn setup(
         });
 
     // Beat/downbeat guides scroll inside the highway, behind the notes.
-    if !is_clarinet { beat_guides::spawn_beat_guides(&mut commands, readout_parent); }
+    if !score_led {
+        beat_guides::spawn_beat_guides(&mut commands, readout_parent);
+    }
 
     // The wait-for-note coaching card, just clear of the hit band so the
     // frozen note's head stays visible beneath it.
@@ -383,8 +421,15 @@ pub fn setup(
     spawn_score_readout(
         &mut commands,
         readout_parent,
-        if is_clarinet { ScoreReadoutAnchor { left: Val::Percent(0.0), width: Val::Percent(100.0), bottom: Val::Px(4.0) } }
-        else { score_anchor(highway_lanes.0.as_ref().map_or(ScrollAxis::Vertical, |l| l.axis)) },
+        if score_led {
+            ScoreReadoutAnchor {
+                left: Val::Percent(0.0),
+                width: Val::Percent(100.0),
+                bottom: Val::Px(4.0),
+            }
+        } else {
+            score_anchor(highway_lanes.0.as_ref().map_or(ScrollAxis::Vertical, |l| l.axis))
+        },
     );
 
     let staff = panels.notation_staff && display.bravura.is_some();
@@ -984,6 +1029,7 @@ pub(super) fn head_text(judged: Option<bool>, note: &ScheduledNote, show_numbers
 fn note_head_label(note: &ScheduledNote, show_numbers: bool) -> String {
     match &note.position {
         PlayPosition::Fret(a) => a.tab_label(),
+        PlayPosition::Fingerboard(at) => harmonicon_core::midi::midi_to_note(i32::from(at.note)),
         PlayPosition::Fingering(a) => harmonicon_core::midi::midi_to_note(i32::from(a.note)),
         PlayPosition::Key(note) => harmonicon_core::midi::midi_to_note(i32::from(*note)),
         position => HoleTab::of(position)

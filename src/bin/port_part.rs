@@ -225,13 +225,7 @@ fn port(source: &Path, target: Target) -> Result<(PathBuf, usize, usize, i32), S
     }
     let kept = items.len();
 
-    let spec = match &instrument {
-        Instrument::Fretted(guitar) => ChartInstrument::from_fretted(guitar),
-        Instrument::Flute(flute) => ChartInstrument::from_flute(flute),
-        Instrument::Clarinet(clarinet) => ChartInstrument::Clarinet { key: clarinet.key },
-        Instrument::Piano(piano) => ChartInstrument::from_piano(piano),
-        Instrument::Harmonica(_) => unreachable!("the target is a guitar, flute or piano"),
-    };
+    let spec = ChartInstrument::from_instrument(&instrument).expect("non-harmonica target");
     let object = out.as_object_mut().ok_or("the chart is not an object")?;
     object.remove("harmonica");
     object.insert("instrument".into(), serde_json::to_value(spec).map_err(|e| e.to_string())?);

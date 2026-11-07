@@ -223,6 +223,8 @@ pub(super) struct TimelineDrag {
 /// its pitch/placement intent; `id` survives timeline and visual edits.
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub(super) struct GridNote {
+    pub performance: harmonicon_core::note_performance::PerformanceInstructions,
+
     pub(super) id: u32,
     pub(super) tick: usize,
     pub(super) len: usize,
@@ -237,6 +239,27 @@ pub(super) const FLUTE_TOP_NOTE: u8 = 96;
 pub(super) const PIANO_TOP_NOTE: u8 = 108;
 
 impl GridNote {
+    /// Stable construction boundary for editor notes. Family-specific guidance
+    /// is optional and cannot become a required field in another family's UI.
+    pub(super) fn new(
+        id: u32,
+        tick: usize,
+        len: usize,
+        expr: Expr,
+        target: harmonicon_core::note_target::NoteTarget,
+    ) -> Self {
+        Self { id, tick, len, expr, target, performance: Default::default() }
+    }
+    pub(super) fn with_performance(
+        mut self,
+        performance: harmonicon_core::note_performance::PerformanceInstructions,
+    ) -> Self {
+        self.performance = performance;
+        self
+    }
+}
+
+impl GridNote {
     /// The grid row the note sits on, counted from 1 at the top: a
     /// harmonica's hole, a guitar's string, a flute's pitch counted down
     /// from C7 ([`FLUTE_TOP_NOTE`]). Everything that lays notes out
@@ -246,6 +269,7 @@ impl GridNote {
         match self.target.position() {
             Some(harmonicon_core::instrument::PlayPosition::Hole(a)) => a.hole,
             Some(harmonicon_core::instrument::PlayPosition::Fret(a)) => a.string,
+            Some(harmonicon_core::instrument::PlayPosition::Fingerboard(a)) => a.string,
             Some(harmonicon_core::instrument::PlayPosition::Fingering(a)) => {
                 FLUTE_TOP_NOTE.saturating_sub(a.note) + 1
             }
@@ -280,6 +304,12 @@ impl GridNote {
                 })
             }
             Some(PlayPosition::Key(_)) => PlayPosition::Key(PIANO_TOP_NOTE + 1 - row),
+            Some(PlayPosition::Fingerboard(mut at)) => {
+                at.string = row;
+                at.finger = None;
+                at.hand_position = None;
+                PlayPosition::Fingerboard(at)
+            }
             None => return,
         };
         self.target = NoteTarget::Positioned(moved);
@@ -290,13 +320,13 @@ impl GridNote {
 impl GridNote {
     /// A C-style harmonica tab instruction for existing view tests.
     pub(super) fn plain(id: u32, hole: u8, tick: usize, len: usize) -> Self {
-        Self {
+        Self::new(
             id,
             tick,
             len,
-            expr: Expr::None,
-            target: GridNote::harmonica_target(hole, Dir::Blow, HarpTechnique::Normal),
-        }
+            Expr::None,
+            GridNote::harmonica_target(hole, Dir::Blow, HarpTechnique::Normal),
+        )
     }
 }
 

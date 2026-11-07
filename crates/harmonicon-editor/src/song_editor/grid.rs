@@ -698,6 +698,10 @@ pub(super) const FLUTE_NOTE_COLOR: Color = Color::srgb(0.55, 0.65, 0.80);
 /// `7b9`, `<12>`) on its string's colour, the same as the highway draws it.
 pub(super) fn note_face(note: &GridNote) -> (Color, String) {
     match note.target.position() {
+        Some(PlayPosition::Fingerboard(at)) => (
+            harmonicon_gameplay::gameplay::guitar_visuals::string_color(at.string),
+            harmonicon_core::midi::midi_to_note(i32::from(at.note)),
+        ),
         Some(PlayPosition::Fret(fret)) => (
             harmonicon_gameplay::gameplay::guitar_visuals::string_color(fret.string),
             fret.tab_label(),

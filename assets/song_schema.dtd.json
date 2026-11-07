@@ -323,6 +323,16 @@
         },
         {
           "type": "object",
+          "description": "A bowed fretless violin (format 1.14.0), sounding pitches. String 1 is first. Standard E5 A4 D4 G3 when omitted; supported stopped range is two octaves above each open string.",
+          "required": ["type"],
+          "additionalProperties": false,
+          "properties": {
+            "type": { "type": "string", "enum": ["violin"] },
+            "strings": { "type": "array", "minItems": 1, "maxItems": 8, "items": { "type": "string", "pattern": "^[A-G][#b]?[0-9]$" } }
+          }
+        },
+        {
+          "type": "object",
           "description": "A Boehm soprano clarinet (format 1.13.0). key defaults to bb. Notes are sounding pitches; the score transposes to written notation. Supported written range E3–C6.",
           "required": ["type"],
           "additionalProperties": false,
@@ -586,6 +596,24 @@
                   }
                 },
 
+                "fingerboard": {
+                  "type": "object",
+                  "required": ["string"],
+                  "additionalProperties": false,
+                  "properties": {
+                    "string": { "type": "integer", "minimum": 1, "maximum": 8 },
+                    "finger": { "type": "integer", "minimum": 0, "maximum": 4 },
+                    "hand_position": { "type": "integer", "minimum": 1, "maximum": 7 }
+                  }
+                },
+                "bow": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "direction": { "type": "string", "enum": ["down", "up"] },
+                    "articulation": { "type": "string", "enum": ["detache", "legato", "staccato"] }
+                  }
+                },
                 "fingering": {
                   "type": "integer",
                   "minimum": 0,

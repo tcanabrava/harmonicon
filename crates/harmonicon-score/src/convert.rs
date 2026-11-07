@@ -231,6 +231,10 @@ pub fn to_chart(
             let (items, report) = wind_items(&notes, flute);
             (items, report, likely_key(&notes))
         }
+        Instrument::Bowed(strings) => {
+            let (items, report) = bowed_items(&notes, strings);
+            (items, report, likely_key(&notes))
+        }
         Instrument::Clarinet(clarinet) => {
             let (items, report) = wind_items(&notes, clarinet);
             (items, report, likely_key(&notes))
@@ -241,21 +245,10 @@ pub fn to_chart(
         }
     };
     let mut chart = chart_shell(score, artist, key, items);
-    match instrument {
-        Instrument::Harmonica(harp) => chart.harmonica = Some(harp.clone()),
-        Instrument::Fretted(guitar) => {
-            chart.instrument_spec = Some(ChartInstrument::from_fretted(guitar));
-        }
-        Instrument::Flute(flute) => {
-            chart.instrument_spec = Some(ChartInstrument::from_flute(flute));
-        }
-        Instrument::Clarinet(clarinet) => {
-            chart.instrument_spec = Some(ChartInstrument::Clarinet { key: clarinet.key });
-        }
-        Instrument::Piano(piano) => {
-            chart.instrument_spec = Some(ChartInstrument::from_piano(piano));
-        }
+    if let Instrument::Harmonica(harp) = instrument {
+        chart.harmonica = Some(harp.clone());
     }
+    chart.instrument_spec = ChartInstrument::from_instrument(instrument);
     Ok((chart, report))
 }
 
@@ -427,6 +420,44 @@ fn wind_items(
             note.duration_secs = note.duration_secs.min(next.start_secs - note.start_secs);
         }
         items.push(item(&note, NoteEvent::fingered(midi_to_note(i32::from(note.midi)), 0)));
+    }
+    (items, report)
+}
+
+fn bowed_items(
+    notes: &[ScoreNote],
+    strings: &harmonicon_core::instrument::bowed_strings::BowedStrings,
+) -> (Vec<TrackItem>, ConversionReport) {
+    let mut report = ConversionReport { total: notes.len(), ..Default::default() };
+    let mut line: Vec<ScoreNote> = Vec::new();
+    for note in notes {
+        match line.last_mut() {
+            Some(last) if (last.start_secs - note.start_secs).abs() < 1e-6 => {
+                if note.midi > last.midi {
+                    *last = *note;
+                }
+                report.unreachable += 1;
+            }
+            _ => line.push(*note),
+        }
+    }
+    let mut items = Vec::new();
+    for (i, note) in line.iter().enumerate() {
+        if strings.positions_for(note.midi).is_empty() {
+            report.unreachable += 1;
+            continue;
+        }
+        report.natural += 1;
+        let mut note = *note;
+        if let Some(next) = line.get(i + 1) {
+            note.duration_secs = note.duration_secs.min(next.start_secs - note.start_secs);
+        }
+        items.push(item(&note, {
+            let at = strings.positions_for(note.midi)[0];
+            let mut event = NoteEvent::keyed(midi_to_note(i32::from(note.midi)));
+            event.fingerboard = Some(at.placement());
+            event
+        }));
     }
     (items, report)
 }

@@ -7,9 +7,8 @@
 //! note (`Target`), slide from a plain note to a bent one (`Glide`), jump
 //! from a plain note to an overblow or a harmonic (`Register`), or find a
 //! pitch in one particular place among several (`Position`). Which drills
-//! exist is per instrument, so [`drills`] matches on the closed
-//! [`Instrument`] enum: a new instrument fails to compile until it says
-//! what it drills. An instrument only gets the kinds its
+//! exist is supplied by the instrument family adapter, keeping generic
+//! drill validation independent of the list of supported families. An instrument only gets the kinds its
 //! [`InstrumentModel::techniques`] lists.
 //!
 //! Pitches are fractional MIDI numbers, as [`NoteTarget::sounding_pitch`]
@@ -45,13 +44,14 @@ pub fn drills(instrument: &Instrument, kind: TechniqueKind) -> Vec<Drill> {
     if !instrument.techniques().contains(&kind) {
         return Vec::new();
     }
-    let candidates = match instrument {
-        Instrument::Harmonica(harp) => harmonica_candidates(harp, kind),
-        Instrument::Fretted(guitar) => guitar_candidates(guitar, kind),
-        Instrument::Flute(flute) => return wind_drills(flute, kind),
-        Instrument::Clarinet(clarinet) => return wind_drills(clarinet, kind),
-        Instrument::Piano(piano) => piano_candidates(piano),
-    };
+    instrument.adapter().practice_drills(kind)
+}
+
+pub(crate) fn candidate_drills(
+    instrument: &(impl InstrumentModel + ?Sized),
+    kind: TechniqueKind,
+    candidates: Vec<(PlayPosition, Option<PlayPosition>)>,
+) -> Vec<Drill> {
     let pitch = |p: PlayPosition| NoteTarget::Positioned(p).sounding_pitch(instrument);
     candidates
         .into_iter()
@@ -69,7 +69,7 @@ pub fn drills(instrument: &Instrument, kind: TechniqueKind) -> Vec<Drill> {
 /// `(position, the plain position it starts from)` for each harmonica
 /// drill of `kind`. Candidates the harp can't play are dropped by
 /// [`drills`], which asks the harp for each pitch.
-fn harmonica_candidates(
+pub(crate) fn harmonica_candidates(
     harp: &Harmonica,
     kind: TechniqueKind,
 ) -> Vec<(PlayPosition, Option<PlayPosition>)> {
@@ -104,7 +104,7 @@ fn harmonica_candidates(
 /// bent. A harmonic starts from its open string, the fundamental it sits
 /// above. A `Position` drill is every fretted place a pitch can be found
 /// in more than one.
-fn guitar_candidates(
+pub(crate) fn guitar_candidates(
     guitar: &Guitar,
     kind: TechniqueKind,
 ) -> Vec<(PlayPosition, Option<PlayPosition>)> {
@@ -147,7 +147,7 @@ fn guitar_candidates(
 /// A piano's drills: every key from C3 to C6 that the keyboard has, lowest
 /// first. The extremes of a keyboard are where a microphone hears a piano
 /// least reliably, and they teach nothing the middle doesn't.
-fn piano_candidates(
+pub(crate) fn piano_candidates(
     piano: &crate::instrument::piano::Piano,
 ) -> Vec<(PlayPosition, Option<PlayPosition>)> {
     (48..=84).filter(|&m| piano.has(m)).map(|m| (PlayPosition::Key(m), None)).collect()

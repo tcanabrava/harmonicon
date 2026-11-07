@@ -78,7 +78,8 @@ impl Snapshot {
                             harmonicon_core::instrument::Instrument::Fretted(guitar) => {
                                 guitar.strings.capacity()
                             }
-                            harmonicon_core::instrument::Instrument::Flute(_)
+                            harmonicon_core::instrument::Instrument::Bowed(_)
+                            | harmonicon_core::instrument::Instrument::Flute(_)
                             | harmonicon_core::instrument::Instrument::Clarinet(_)
                             | harmonicon_core::instrument::Instrument::Piano(_) => 0,
                         }
@@ -400,13 +401,7 @@ mod tests {
             })),
         };
         let mut state = EditorState {
-            notes: vec![GridNote {
-                id: 1,
-                tick: 0,
-                len: 4,
-                expr: super::super::state::Expr::None,
-                target: first,
-            }],
+            notes: vec![GridNote::new(1, 0, 4, super::super::state::Expr::None, first)],
             ..Default::default()
         };
         let snapshot = Snapshot::capture(&state);

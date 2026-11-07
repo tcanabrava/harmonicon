@@ -41,6 +41,7 @@ pub struct NoteVisual {
 /// have a live entity at all.
 #[derive(Clone)]
 pub struct ScheduledNote {
+    pub performance: harmonicon_core::note_performance::PerformanceInstructions,
     pub time: f64,
     /// Note length in seconds; long notes reward sustaining the pitch.
     pub duration: f64,
@@ -123,6 +124,7 @@ pub struct ScheduledNote {
 impl Default for ScheduledNote {
     fn default() -> Self {
         Self {
+            performance: Default::default(),
             time: 0.0,
             duration: 0.0,
             position: PlayPosition::Hole(HoleAssignment {
@@ -329,101 +331,114 @@ pub fn build_scheduled_notes(
         // (position, modifiers, expected pitch, playable). Only the pitch
         // and modifiers move for an ordinary chart; hole and action change
         // only under `HarpMapping::Transpose`.
-        let event_data: Vec<(PlayPosition, Vec<Modifier>, Option<u8>, bool)> = item
-            .events
-            .iter()
-            .enumerate()
-            .filter_map(|(event_index, event)| {
-                let mut modifiers = event.modifiers.clone().unwrap_or_default();
-                // Any instrument but the harmonica: the event names where it
-                // is played and its sounding note, and there is no
-                // substitute instrument to remap onto.
-                // Where that is comes from core's codec, the one reading of
-                // an event per instrument (a string and fret, a fingering).
-                let Some(chart_harp) = chart.harmonica.as_ref() else {
-                    let charted =
-                        harmonicon_core::note_event_codec::decode(chart, event).ok()?.position()?;
-                    let Some(placed) = &substituted else {
-                        return Some((charted, modifiers, chart.event_pitch(event), true));
-                    };
-                    // Out of the player's reach (a B3 on a C foot): shown
-                    // where charted, not judged.
-                    let Some(position) = placed[item_index][event_index] else {
-                        return Some((charted, modifiers, chart.event_pitch(event), false));
-                    };
-                    // A harmonic replayed as a fretted note is no harmonic.
-                    if let PlayPosition::Fret(at) = position
-                        && at.technique
-                            == harmonicon_core::instrument::guitar::StringTechnique::Fretted
-                    {
-                        modifiers.retain(|m| !matches!(m, Modifier::Harmonic));
-                    }
-                    return Some((position, modifiers, chart.event_pitch(event), true));
-                };
-                // Validation guarantees every event of a harmonica chart
-                // names a hole and breath.
-                let (hole, action) = event.hole_action()?;
-                let hole_position = |hole, action, modifiers: &[Modifier]| {
-                    let technique = technique_of(modifiers);
-                    PlayPosition::Hole(HoleAssignment { hole, action, technique })
-                };
-                match &effective.harp {
-                    // The overwhelmingly common case, kept on exactly the
-                    // path it has always taken. A chart played on its own
-                    // harmonica must not change behaviour because this
-                    // feature exists, and routing it through the remapper
-                    // "for consistency" would risk precisely that — the
-                    // chart's explicit `note` is authoritative here and
-                    // encodes pitches (an overblow's, a slide's) that a
-                    // blow/draw layout lookup cannot reproduce.
-                    None => {
-                        let natural_pitch = event
-                            .note
-                            .clone()
-                            .unwrap_or_else(|| chart_harp.wind_direction_label(hole, &action));
-                        let expected_pitch = target_pitch(&natural_pitch, &modifiers);
-                        Some((
-                            hole_position(hole, action, &modifiers),
-                            modifiers,
-                            expected_pitch,
-                            true,
-                        ))
-                    }
-                    Some(target) => {
-                        let r = harp_remap::remap_event(
-                            hole,
-                            action,
-                            event.note.as_deref(),
-                            &modifiers,
-                            chart_harp,
-                            target,
-                            effective.mapping,
-                        );
-                        let position = hole_position(r.hole, r.action, &r.modifiers);
-                        Some((position, r.modifiers, r.midi, r.playable))
-                    }
-                }
-            })
-            .collect();
+        let event_data: Vec<(
+            PlayPosition,
+            Vec<Modifier>,
+            Option<u8>,
+            bool,
+            Option<harmonicon_core::instrument::bowed_strings::BowGesture>,
+        )> =
+            item.events
+                .iter()
+                .enumerate()
+                .filter_map(|(event_index, event)| {
+                    (|| {
+                        let mut modifiers = event.modifiers.clone().unwrap_or_default();
+                        // Any instrument but the harmonica: the event names where it
+                        // is played and its sounding note, and there is no
+                        // substitute instrument to remap onto.
+                        // Where that is comes from core's codec, the one reading of
+                        // an event per instrument (a string and fret, a fingering).
+                        let Some(chart_harp) = chart.harmonica.as_ref() else {
+                            let charted = harmonicon_core::note_event_codec::decode(chart, event)
+                                .ok()?
+                                .position()?;
+                            let Some(placed) = &substituted else {
+                                return Some((charted, modifiers, chart.event_pitch(event), true));
+                            };
+                            // Out of the player's reach (a B3 on a C foot): shown
+                            // where charted, not judged.
+                            let Some(position) = placed[item_index][event_index] else {
+                                return Some((charted, modifiers, chart.event_pitch(event), false));
+                            };
+                            // A harmonic replayed as a fretted note is no harmonic.
+                            if let PlayPosition::Fret(at) = position
+                                && at.technique
+                                    == harmonicon_core::instrument::guitar::StringTechnique::Fretted
+                            {
+                                modifiers.retain(|m| !matches!(m, Modifier::Harmonic));
+                            }
+                            return Some((position, modifiers, chart.event_pitch(event), true));
+                        };
+                        // Validation guarantees every event of a harmonica chart
+                        // names a hole and breath.
+                        let (hole, action) = event.hole_action()?;
+                        let hole_position = |hole, action, modifiers: &[Modifier]| {
+                            let technique = technique_of(modifiers);
+                            PlayPosition::Hole(HoleAssignment { hole, action, technique })
+                        };
+                        match &effective.harp {
+                            // The overwhelmingly common case, kept on exactly the
+                            // path it has always taken. A chart played on its own
+                            // harmonica must not change behaviour because this
+                            // feature exists, and routing it through the remapper
+                            // "for consistency" would risk precisely that — the
+                            // chart's explicit `note` is authoritative here and
+                            // encodes pitches (an overblow's, a slide's) that a
+                            // blow/draw layout lookup cannot reproduce.
+                            None => {
+                                let natural_pitch = event.note.clone().unwrap_or_else(|| {
+                                    chart_harp.wind_direction_label(hole, &action)
+                                });
+                                let expected_pitch = target_pitch(&natural_pitch, &modifiers);
+                                Some((
+                                    hole_position(hole, action, &modifiers),
+                                    modifiers,
+                                    expected_pitch,
+                                    true,
+                                ))
+                            }
+                            Some(target) => {
+                                let r = harp_remap::remap_event(
+                                    hole,
+                                    action,
+                                    event.note.as_deref(),
+                                    &modifiers,
+                                    chart_harp,
+                                    target,
+                                    effective.mapping,
+                                );
+                                let position = hole_position(r.hole, r.action, &r.modifiers);
+                                Some((position, r.modifiers, r.midi, r.playable))
+                            }
+                        }
+                    })()
+                    .map(|(position, modifiers, pitch, playable)| {
+                        (position, modifiers, pitch, playable, event.bow)
+                    })
+                })
+                .collect();
         // A real chord/octave-split needs every sibling pitch sounding at
         // once (see `ScheduledNote::chord_pitches`) — a `TrackItem` with
         // only one event stays an ordinary single note, untouched by this.
         let chord_pitches: Vec<u8> = if item.events.len() > 1 {
             event_data
                 .iter()
-                .filter(|(.., playable)| *playable)
-                .filter_map(|(_, _, p, _)| *p)
+                .filter(|(_, _, _, playable, _)| *playable)
+                .filter_map(|(_, _, p, _, _)| *p)
                 .collect()
         } else {
             Vec::new()
         };
-        for (position, modifiers, expected_pitch, playable) in event_data {
+        for (position, modifiers, expected_pitch, playable, bow) in event_data {
             let (unlocked, section) = flags.next().unwrap_or((true, 0));
             if !unlocked {
                 continue;
             }
             combined.push((
                 ScheduledNote {
+                    performance:
+                        harmonicon_core::note_performance::PerformanceInstructions::from_bow(bow),
                     time: t,
                     duration: item.duration,
                     position,

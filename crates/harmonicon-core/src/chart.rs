@@ -71,6 +71,10 @@ pub enum ChartInstrument {
     },
     /// A Boehm flute, from format 1.9.0. Its foot joint decides the lowest
     /// note; a C foot when not given.
+    Violin {
+        #[serde(default = "violin_strings")]
+        strings: Vec<String>,
+    },
     Clarinet {
         #[serde(default)]
         key: crate::instrument::clarinet::ClarinetKey,
@@ -87,6 +91,10 @@ pub enum ChartInstrument {
     },
 }
 
+fn violin_strings() -> Vec<String> {
+    vec!["E5".into(), "A4".into(), "D4".into(), "G3".into()]
+}
+
 fn grand_keys() -> u8 {
     88
 }
@@ -96,6 +104,26 @@ fn is_zero(value: &u8) -> bool {
 }
 
 impl ChartInstrument {
+    /// One serialization boundary shared by editor, importers and CLI tools.
+    /// Harmonica retains its legacy dedicated chart field.
+    pub fn from_instrument(instrument: &crate::instrument::Instrument) -> Option<Self> {
+        use crate::instrument::Instrument;
+        Some(match instrument {
+            Instrument::Harmonica(_) => return None,
+            Instrument::Fretted(model) => Self::from_fretted(model),
+            Instrument::Piano(model) => Self::from_piano(model),
+            Instrument::Flute(model) => Self::from_flute(model),
+            Instrument::Clarinet(model) => Self::Clarinet { key: model.key },
+            Instrument::Bowed(model) => Self::Violin {
+                strings: model
+                    .strings
+                    .iter()
+                    .map(|&pitch| crate::midi::midi_to_note(i32::from(pitch)))
+                    .collect(),
+            },
+        })
+    }
+
     /// How a chart writes `guitar`: its open strings by note name.
     pub fn from_guitar(guitar: &Guitar) -> Self {
         Self::from_fretted(guitar)
@@ -183,6 +211,14 @@ impl ChartInstrument {
                 )
             }
             Self::Flute { foot } => Some(Flute::new(*foot).into()),
+            Self::Violin { strings } => {
+                let mut setup = crate::instrument::bowed_strings::BowedKind::Violin.standard();
+                setup.strings = strings
+                    .iter()
+                    .map(|name| u8::try_from(note_to_midi(name)?).ok())
+                    .collect::<Option<_>>()?;
+                setup.is_valid().then_some(Instrument::Bowed(setup))
+            }
             Self::Clarinet { key } => {
                 Some(crate::instrument::clarinet::Clarinet { key: *key }.into())
             }
@@ -249,7 +285,7 @@ impl HarpChart {
 /// spec than this build supports up front, with a clear error, instead of
 /// failing on some confusing downstream `additionalProperties` schema
 /// rejection or (worse) silently misreading a field whose meaning changed.
-pub const CURRENT_FORMAT_VERSION: &str = "1.13.0";
+pub const CURRENT_FORMAT_VERSION: &str = "1.14.0";
 
 /// Parses a `"MAJOR.MINOR.PATCH"` version string into a comparable tuple.
 /// `None` for anything that isn't exactly three dot-separated integers.
@@ -715,8 +751,13 @@ pub enum PlayMode {
 /// `action`; any other instrument's names its `position` and must state its
 /// `note`, the pitch that is scored. The schema accepts either shape and
 /// validation checks it matches the chart's instrument.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct NoteEvent {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fingerboard: Option<crate::instrument::bowed_strings::BowedPlacement>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub bow: Option<crate::instrument::bowed_strings::BowGesture>,
+
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub hole: Option<u8>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -738,26 +779,16 @@ pub struct NoteEvent {
 impl NoteEvent {
     /// A harmonica event: a hole and breath with no other fields.
     pub fn hole(hole: u8, action: Action) -> Self {
-        Self {
-            hole: Some(hole),
-            action: Some(action),
-            position: None,
-            fingering: None,
-            note: None,
-            modifiers: None,
-        }
+        Self { hole: Some(hole), action: Some(action), ..Default::default() }
     }
 
     /// A stringed instrument's event: a string, a fret and the note they
     /// sound.
     pub fn fretted(string: u8, fret: u8, note: String) -> Self {
         Self {
-            hole: None,
-            action: None,
             position: Some(FretPosition { string, fret }),
-            fingering: None,
             note: Some(note),
-            modifiers: None,
+            ..Default::default()
         }
     }
 
@@ -765,12 +796,9 @@ impl NoteEvent {
     /// the standard one.
     pub fn fingered(note: String, alternate: u8) -> Self {
         Self {
-            hole: None,
-            action: None,
-            position: None,
             fingering: (alternate > 0).then_some(alternate),
             note: Some(note),
-            modifiers: None,
+            ..Default::default()
         }
     }
 

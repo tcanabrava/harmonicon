@@ -267,6 +267,7 @@ fn beat_ticks_treats_a_zero_beat_count_as_one_bar_per_beat() {
 /// `docs/gameplay_validation.md`).
 fn loop_test_note(time: f64) -> ScheduledNote {
     ScheduledNote {
+        performance: Default::default(),
         time,
         duration: 0.5,
         position: PlayPosition::natural_hole(1, Action::Blow),

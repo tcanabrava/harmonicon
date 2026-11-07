@@ -65,16 +65,16 @@ pub(super) fn place(state: &mut EditorState, row: u8, tick: usize, len: usize) {
     for n in state.notes.iter_mut().filter(|n| n.tick < tick && tick < n.tick + n.len) {
         n.len = tick - n.tick;
     }
-    let note = GridNote {
-        id: state.next_id,
+    let note = GridNote::new(
+        state.next_id,
         tick,
         len,
-        expr: state.sticky_expr,
-        target: NoteTarget::Positioned(PlayPosition::Fingering(FingeringAssignment {
+        state.sticky_expr,
+        NoteTarget::Positioned(PlayPosition::Fingering(FingeringAssignment {
             note: pitch,
             alternate: 0,
         })),
-    };
+    );
     state.notes.push(note);
     state.next_id += 1;
     state.select_only(note.id);

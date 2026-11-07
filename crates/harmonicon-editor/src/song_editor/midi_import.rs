@@ -308,13 +308,13 @@ pub(super) fn import_track_notes(
         let tick = seconds_to_tick(start_secs, TICKS_PER_BEAT as u32, &editor_map) as usize;
         let end_tick = seconds_to_tick(end_secs, TICKS_PER_BEAT as u32, &editor_map) as usize;
         let len = end_tick.saturating_sub(tick).max(1);
-        notes.push(GridNote {
-            id: id as u32,
+        notes.push(GridNote::new(
+            id as u32,
             tick,
             len,
-            expr: Expr::None,
-            target: GridNote::harmonica_target(hole, dir, pitch),
-        });
+            Expr::None,
+            GridNote::harmonica_target(hole, dir, pitch),
+        ));
     }
     let tempo_changes = editor_map[1..].iter().map(|p| (p.tick as usize, p.bpm)).collect();
     Ok(ImportedTrack {
@@ -746,12 +746,14 @@ mod tests {
 
     #[test]
     fn phrase_diagnostics_find_mixed_breath_and_duplicate_hole_chords() {
-        let note = |id, hole, dir| GridNote {
-            id,
-            tick: 0,
-            len: TICKS_PER_BEAT,
-            expr: Expr::None,
-            target: GridNote::harmonica_target(hole, dir, HarpTechnique::Normal),
+        let note = |id, hole, dir| {
+            GridNote::new(
+                id,
+                0,
+                TICKS_PER_BEAT,
+                Expr::None,
+                GridNote::harmonica_target(hole, dir, HarpTechnique::Normal),
+            )
         };
         let diagnostics = phrase_diagnostics(
             &[note(0, 1, Dir::Blow), note(1, 1, Dir::Draw), note(2, 2, Dir::Blow)],

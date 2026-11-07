@@ -58,17 +58,17 @@ pub(super) fn fits(
 /// play it alongside what is already sounding.
 pub(super) fn place(state: &mut EditorState, string: u8, tick: usize, len: usize) {
     let instrument = state.effective_instrument();
-    let note = GridNote {
-        id: state.next_id,
+    let note = GridNote::new(
+        state.next_id,
         tick,
         len,
-        expr: state.sticky_expr,
-        target: NoteTarget::Positioned(PlayPosition::Fret(FretAssignment {
+        state.sticky_expr,
+        NoteTarget::Positioned(PlayPosition::Fret(FretAssignment {
             string,
             fret: state.sticky_fret,
             technique: StringTechnique::Fretted,
         })),
-    };
+    );
     if !fits(&instrument, &state.notes, &note, &[]) {
         state.unplayable_notice = true;
         return;

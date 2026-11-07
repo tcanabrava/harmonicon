@@ -464,10 +464,14 @@ mod tests {
 
     #[test]
     fn clarinet_chart_validates_pitch_range_and_alternate_fingerings() {
-        let original: serde_json::Value = serde_json::from_str(include_str!("../../tests/fixtures/clarinet.harpchart")).unwrap();
+        let original: serde_json::Value =
+            serde_json::from_str(include_str!("../../tests/fixtures/clarinet.harpchart")).unwrap();
         let mut value = original.clone();
         let (_, chart) = validate_and_parse_chart(&mut value).unwrap();
-        assert_eq!(chart.instrument().unwrap().kind(), harmonicon_core::instrument::InstrumentKind::Clarinet);
+        assert_eq!(
+            chart.instrument().unwrap().kind(),
+            harmonicon_core::instrument::InstrumentKind::Clarinet
+        );
         assert_eq!(chart.event_pitch(&chart.track[0].events[0]), Some(50));
         value = original.clone();
         value["track"][0]["events"][0]["fingering"] = serde_json::json!(1);
@@ -479,6 +483,27 @@ mod tests {
         assert!(validate_and_parse_chart(&mut value).is_err());
         value = original;
         value["track"][0]["events"][0]["note"] = serde_json::json!("C3");
+        assert!(validate_and_parse_chart(&mut value).is_err());
+    }
+
+    #[test]
+    fn violin_requires_fretless_positions_and_rejects_non_adjacent_double_stops() {
+        let original: serde_json::Value =
+            serde_json::from_str(include_str!("../../tests/fixtures/violin.harpchart")).unwrap();
+        let mut value = original.clone();
+        validate_and_parse_chart(&mut value).unwrap();
+        value["track"][0]["events"][0]["fingerboard"]["finger"] = serde_json::json!(1);
+        assert!(
+            validate_and_parse_chart(&mut value).is_err(),
+            "open pitch cannot have a stopped finger"
+        );
+        value = original.clone();
+        value["track"][0]["events"][0]["fingerboard"] = serde_json::Value::Null;
+        assert!(validate_and_parse_chart(&mut value).is_err());
+        value = original;
+        let event = &mut value["track"][13]["events"][1];
+        event["note"] = serde_json::json!("D4");
+        event["fingerboard"]["string"] = serde_json::json!(3);
         assert!(validate_and_parse_chart(&mut value).is_err());
     }
 

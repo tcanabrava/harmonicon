@@ -1161,3 +1161,30 @@ clarinet-hold = Sustente · faltam { $seconds } s
 clarinet-play-now = Toque agora
 
 editor-wind-invalid = Este instrumento de sopro toca uma nota compatível por vez.
+
+# Cordas friccionadas sem trastes
+instrument-violin = Violino
+song-instrument-violin = Violino
+note-trainer-violin-title = Treino de notas — Violino
+bowed-kind-string = Escolha de corda
+bowed-target = Toque { $note } · corda { $string } · dedo { $finger }
+bowed-string-choice = Tocar esta nota na
+bowed-string-option = Corda { $string } · { $note }
+bowed-board-help = Dourado: alvo e dedo sugerido (0 = corda solta). Azul: altura ouvida projetada na corda pedida. A detecção não verifica corda, dedos ou arco. Não representa trastes.
+bowed-play-help = Cordas friccionadas sem trastes · a partitura indica o ritmo. Dourado: ponto de apoio; azul: altura ouvida. Arco e articulação são orientações, não técnicas detectadas. Até duas cordas adjacentes podem soar juntas.
+bowed-editor-help = Clique numa corda para colocar sua nota solta ou escolha uma altura antes. Dedo e posição são orientações opcionais. O arco é independente; o microfone não o verifica.
+bowed-pitch = Altura alvo
+bowed-open-clicked = Solta na corda escolhida
+bowed-finger = Dedo sugerido
+bowed-hand = Posição da mão
+bowed-direction = Direção do arco
+bowed-articulation = Articulação
+bowed-unspecified = Não especificado
+bowed-down = Arco para baixo
+bowed-up = Arco para cima
+bowed-detache = Golpes separados
+bowed-legato = Legato
+bowed-staccato = Staccato
+bowed-invalid = A altura ou digitação não cabe nesta corda ou se sobrepõe a uma corda incompatível. Selecione uma nota para editar dedo ou posição.
+bowed-cents = Afinação · { $cents } cents
+bowed-heard = Ouvindo { $note }

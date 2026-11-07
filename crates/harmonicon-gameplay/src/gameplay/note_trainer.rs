@@ -44,6 +44,8 @@ use harmonicon_ui::dialogs::tab_bar::{TabSelect, spawn_tab_bar};
 use super::GameplayRoot;
 use super::flute_visuals::{FluteDrawing, FluteKey, paint_flute_keys};
 mod bend;
+mod bowed;
+pub(super) use bowed::update as update_bowed;
 mod chords;
 mod clarinet;
 pub(super) use chords::update as update_chords;
@@ -293,6 +295,7 @@ impl NoteTrainer {
             Instrument::Harmonica(_)
             | Instrument::Flute(_)
             | Instrument::Clarinet(_)
+            | Instrument::Bowed(_)
             | Instrument::Piano(_) => None,
         }
     }
@@ -310,6 +313,7 @@ impl NoteTrainer {
             Instrument::Harmonica(_)
             | Instrument::Fretted(_)
             | Instrument::Clarinet(_)
+            | Instrument::Bowed(_)
             | Instrument::Piano(_) => None,
         }
     }
@@ -321,6 +325,7 @@ impl NoteTrainer {
             Instrument::Fretted(setup) => setup.kind.instrument_kind().slug(),
             Instrument::Flute(_) => "flute",
             Instrument::Clarinet(_) => "clarinet",
+            Instrument::Bowed(_) => "violin",
             Instrument::Piano(_) => "piano",
             Instrument::Harmonica(_) => return None,
         };
@@ -431,6 +436,9 @@ fn kind_key(instrument: &Instrument, kind: TechniqueKind) -> &'static str {
         }
         TechniqueKind::Register if flute => "note-trainer-kind-register-flute",
         TechniqueKind::Register => "note-trainer-kind-register",
+        TechniqueKind::Position if matches!(instrument, Instrument::Bowed(_)) => {
+            "bowed-kind-string"
+        }
         TechniqueKind::Position if instrument.fingering_chart().is_some() => {
             "note-trainer-kind-position-flute"
         }
@@ -443,6 +451,27 @@ fn instruction(loc: &Localization, instrument: &Instrument, drill: &Drill) -> St
     match instrument {
         Instrument::Fretted(guitar) => guitar_instruction(loc, guitar, drill),
         Instrument::Flute(_) => flute_instruction(loc, drill),
+        Instrument::Bowed(strings) => {
+            let PlayPosition::Fingerboard(at) = drill.position else { return String::new() };
+            loc.msg_args(
+                "bowed-target",
+                &[
+                    ("note", note_name(drill.target)),
+                    (
+                        "string",
+                        strings
+                            .open_pitch(at.string)
+                            .map(|pitch| note_name(f32::from(pitch)))
+                            .unwrap_or_default(),
+                    ),
+                    (
+                        "finger",
+                        at.finger.map(|finger| finger.to_string()).unwrap_or_else(|| "—".into()),
+                    ),
+                ],
+            )
+            .to_string()
+        }
         Instrument::Clarinet(clarinet) => {
             let written = |pitch: f32| {
                 midi_to_note(i32::from(

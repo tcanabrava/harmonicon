@@ -110,13 +110,13 @@ pub(super) fn place_or_select_expected(state: &mut EditorState, hole: u8, tick: 
 
     let id = state.expected_next_id;
     state.expected_next_id += 1;
-    state.expected_notes.push(GridNote {
+    state.expected_notes.push(GridNote::new(
         id,
         tick,
-        len: TICKS_PER_BEAT,
+        TICKS_PER_BEAT,
         expr,
-        target: GridNote::harmonica_target(hole, dir, pitch),
-    });
+        GridNote::harmonica_target(hole, dir, pitch),
+    ));
     state.expected_selected = Some(id);
 }
 

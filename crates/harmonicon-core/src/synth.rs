@@ -30,6 +30,8 @@ pub enum Voice {
     Flute,
     /// An original reed approximation with stronger odd partials.
     Clarinet,
+    /// A sustained bowed-string approximation, not a recorded instrument.
+    BowedString,
     /// A struck piano string: inharmonic partials decaying from the
     /// hammer, damped when the key lifts. Expression isn't modelled.
     Piano,
@@ -372,6 +374,11 @@ pub fn render_pcm_with(notes: &[PhraseNote], secs_per_tick: f32, voice: Voice) -
             // full bright harmonic stack as the hands open.
             let (bright, muffled) = match voice {
                 Voice::Flute => flute_wave(sin_x, cos_x),
+                Voice::BowedString => {
+                    let second = 2.0 * sin_x * cos_x;
+                    let third = 3.0 * sin_x - 4.0 * sin_x.powi(3);
+                    ((sin_x + 0.45 * second + 0.3 * third) / 1.75, sin_x)
+                }
                 Voice::Clarinet => {
                     let third = 3.0 * sin_x - 4.0 * sin_x.powi(3);
                     let fifth = 16.0 * sin_x.powi(5) - 20.0 * sin_x.powi(3) + 5.0 * sin_x;

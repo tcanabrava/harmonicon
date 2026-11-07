@@ -130,6 +130,10 @@ pub(super) fn transpose_notes(
 pub(super) fn transpose_selection(state: &mut EditorState, semitones: i32) {
     // Resolution here is onto harmonica holes. A flute's pitch rows move
     // directly; a guitar has no transposer.
+    if super::bowed_note::is_bowed(state) {
+        state.transpose_notice = Some(super::bowed_note::transpose(state, semitones));
+        return;
+    }
     if super::flute_note::is_wind(state) {
         let outcome = super::flute_note::transpose(state, semitones);
         state.transpose_notice = Some(outcome);

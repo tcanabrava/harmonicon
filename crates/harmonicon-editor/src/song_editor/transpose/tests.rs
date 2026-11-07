@@ -7,13 +7,7 @@ use super::super::state::{Dir, HarpTechnique};
 use super::*;
 
 fn note(id: u32, hole: u8, dir: Dir, pitch: HarpTechnique, tick: usize) -> GridNote {
-    GridNote {
-        id,
-        tick,
-        len: 6,
-        expr: Expr::None,
-        target: GridNote::harmonica_target(hole, dir, pitch),
-    }
+    GridNote::new(id, tick, 6, Expr::None, GridNote::harmonica_target(hole, dir, pitch))
 }
 
 fn c_harp() -> Harmonica {

@@ -163,6 +163,18 @@ impl Plugin for GameplayPlugin {
                 .chain()
                 .run_if(in_state(AppState::Playing)),
         )
+        .add_systems(
+            Update,
+            (super::bowed_visuals::update_song, super::bowed_visuals::paint)
+                .chain()
+                .run_if(in_state(AppState::Playing)),
+        )
+        .add_systems(
+            Update,
+            (note_trainer::update_bowed, super::bowed_visuals::paint)
+                .chain()
+                .run_if(in_state(AppState::NoteTrainer)),
+        )
         .add_systems(OnEnter(AppState::NoteTrainer), note_trainer::setup)
         .add_systems(
             OnExit(AppState::NoteTrainer),

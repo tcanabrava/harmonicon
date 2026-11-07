@@ -379,7 +379,10 @@ impl HoleTab {
             PlayPosition::Hole(a) => {
                 Some(Self { hole: a.hole, is_blow: matches!(a.action, Action::Blow) })
             }
-            PlayPosition::Fret(_) | PlayPosition::Fingering(_) | PlayPosition::Key(_) => None,
+            PlayPosition::Fret(_)
+            | PlayPosition::Fingering(_)
+            | PlayPosition::Key(_)
+            | PlayPosition::Fingerboard(_) => None,
         }
     }
 }

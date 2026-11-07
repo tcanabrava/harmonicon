@@ -41,13 +41,13 @@ fn key_of(note: &GridNote) -> Option<u8> {
 /// already sounding then.
 pub(super) fn place(state: &mut EditorState, row: u8, tick: usize, len: usize) {
     let instrument = state.effective_instrument();
-    let note = GridNote {
-        id: state.next_id,
+    let note = GridNote::new(
+        state.next_id,
         tick,
         len,
-        expr: super::state::Expr::None,
-        target: NoteTarget::Positioned(PlayPosition::Key(row_note(row))),
-    };
+        super::state::Expr::None,
+        NoteTarget::Positioned(PlayPosition::Key(row_note(row))),
+    );
     if !super::guitar_note::fits(&instrument, &state.notes, &note, &[]) {
         state.unplayable_notice = true;
         return;

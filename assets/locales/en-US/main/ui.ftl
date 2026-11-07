@@ -1164,3 +1164,30 @@ clarinet-hold = Hold · { $seconds } s remaining
 clarinet-play-now = Play now
 
 editor-wind-invalid = This wind instrument plays one supported note at a time.
+
+# Bowed fretless strings
+instrument-violin = Violin
+song-instrument-violin = Violin
+note-trainer-violin-title = Note Trainer — Violin
+bowed-kind-string = String choices
+bowed-target = Play { $note } · string { $string } · finger { $finger }
+bowed-string-choice = Play this note on
+bowed-string-option = String { $string } · { $note }
+bowed-board-help = Gold: target and suggested finger (0 = open). Blue: heard pitch projected onto the requested string. Pitch detection cannot verify your string, fingers or bow. No frets are implied.
+bowed-play-help = Fretless bowed strings · the score carries timing. Gold marks the stopping point; blue shows heard pitch. Bow direction and articulation are guidance, not detected technique. Up to two adjacent strings can sound together.
+bowed-editor-help = Click a string row to place its open note, or choose a pitch first. Finger and hand position are optional guidance. Bow controls are independent; the microphone cannot verify them.
+bowed-pitch = Target pitch
+bowed-open-clicked = Open on clicked string
+bowed-finger = Suggested finger
+bowed-hand = Hand position
+bowed-direction = Bow direction
+bowed-articulation = Articulation
+bowed-unspecified = Unspecified
+bowed-down = Down bow
+bowed-up = Up bow
+bowed-detache = Separate strokes
+bowed-legato = Legato
+bowed-staccato = Staccato
+bowed-invalid = That pitch or fingering does not fit this string, or overlaps an incompatible string. Select a note before editing its finger or hand position.
+bowed-cents = Intonation · { $cents } cents
+bowed-heard = Hearing { $note }

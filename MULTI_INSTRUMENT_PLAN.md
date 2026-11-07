@@ -194,3 +194,45 @@ Each independently reviewable part receives a commit and relevant validation.
   Core: 453 tests passed; core Clippy passed with warnings denied.
 - Step 6 continues with violin chart, editor, trainer and Play integration.
   Step 7 (viola and alto clef) remains planned.
+
+### Architecture correction after violin integration
+
+The first integration added optional `bow` fields to shared editor and gameplay
+note records. Although those fields were optional semantically, Rust struct
+literals forced piano, guitar and existing fixtures to initialize them. This was
+an incorrect extension boundary. Distributed exhaustive `Instrument` matches
+also made a new physical family require changes in generic consumers.
+
+The corrected boundaries are:
+
+- `GridNote::new` supplies stable defaults. `PerformanceInstructions` is a typed
+  optional instruction value, independent of pitch and physical placement.
+  Another family can add instructions without adding fields to every note
+  constructor. Existing family editors need a one-time constructor migration.
+- `Instrument::adapter` is the single runtime registration match for shared
+  model operations. `InstrumentAdapter` supplies identity, notation, synth,
+  detector voice policy, fingering-chart capability and practice drills. Generic
+  detection and trainer code do not enumerate instrument families.
+- `ChartInstrument::from_instrument` is the shared configuration encoder used
+  by the editor, score importer and porting CLI. Wire-format registration stays
+  explicit; no untyped extension bags or silent fallback serialization.
+- `NoteEvent` remains the backwards-compatible wire DTO. Optional wire fields
+  are defaulted at this boundary, rather than propagated as required fields in
+  editor/gameplay records. The judge consumes a sustain policy instead of
+  inspecting bow direction or articulation.
+
+Adding another bowed identity should reuse the bowed model, adapter and views.
+A genuinely new physical family still needs an explicit model/adapter, wire
+codec, registration and its own teaching UI. This correction does not claim a
+fully dynamic plugin system: editor and gameplay view registration still have
+explicit family branches. Existing piano/guitar algorithms must not be edited
+merely to initialize another family's metadata.
+
+Regression checks cover all eight registered identities, valid target drills,
+pitch mapping and configuration round trips, as well as optional performance
+instructions and existing family-specific suites.
+
+Validation for the correction: 2,361 workspace library tests passed (one
+existing ignored test); workspace Clippy passed with warnings denied; build-time
+UI/source enforcement passed. This is code-level validation, not a live visual
+review of the new violin screens.
