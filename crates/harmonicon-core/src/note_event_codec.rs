@@ -11,6 +11,23 @@ use crate::pitch_map::{HoleAssignment, Technique};
 
 pub fn decode(chart: &HarpChart, event: &NoteEvent) -> Result<NoteTarget, PlacementError> {
     let instrument = chart.instrument().ok_or(PlacementError::Unplayable)?;
+    decode_for(&instrument, event)
+}
+
+/// Decode a document event against its configured instrument. The editor and
+/// chart loader share this validation and pitch/placement interpretation.
+pub fn decode_for(
+    instrument: &Instrument,
+    event: &NoteEvent,
+) -> Result<NoteTarget, PlacementError> {
+    let declared_pitch = || {
+        event
+            .note
+            .as_deref()
+            .and_then(crate::midi::note_to_midi)
+            .and_then(|pitch| u8::try_from(pitch).ok())
+            .ok_or(PlacementError::Unplayable)
+    };
     if !matches!(instrument, Instrument::Bowed(_))
         && (event.bow.is_some() || event.fingerboard.is_some())
     {
@@ -24,9 +41,11 @@ pub fn decode(chart: &HarpChart, event: &NoteEvent) -> Result<NoteTarget, Placem
     if pitch_modifiers > 1 {
         return Err(PlacementError::Unplayable);
     }
-    match &instrument {
+    match instrument {
         Instrument::Harmonica(_) => {
-            if event.position.is_some() || modifiers.iter().any(|m| matches!(m, Modifier::Harmonic))
+            if event.position.is_some()
+                || event.fingering.is_some()
+                || modifiers.iter().any(|m| matches!(m, Modifier::Harmonic))
             {
                 return Err(PlacementError::Unplayable);
             }
@@ -37,12 +56,13 @@ pub fn decode(chart: &HarpChart, event: &NoteEvent) -> Result<NoteTarget, Placem
                 technique: crate::pitch_map::technique_of(modifiers),
             });
             let target = NoteTarget::Positioned(position);
-            target.candidates(&instrument)?;
+            target.candidates(instrument)?;
             Ok(target)
         }
         Instrument::Fretted(_) => {
             if event.hole.is_some()
                 || event.action.is_some()
+                || event.fingering.is_some()
                 || modifiers
                     .iter()
                     .any(|m| matches!(m, Modifier::Overblow | Modifier::Overdraw | Modifier::Slide))
@@ -55,15 +75,15 @@ pub fn decode(chart: &HarpChart, event: &NoteEvent) -> Result<NoteTarget, Placem
                 fret: at.fret,
                 technique: crate::chart_check::string_technique(modifiers),
             });
-            let midi = chart.event_pitch(event).ok_or(PlacementError::Unplayable)?;
+            let midi = declared_pitch()?;
             if instrument.pitch_of(&position) != Some(midi) {
                 return Err(PlacementError::PitchMismatch);
             }
             let acoustic = NoteTarget::Positioned(position)
-                .sounding_pitch(&instrument)
+                .sounding_pitch(instrument)
                 .ok_or(PlacementError::Unplayable)?;
             NoteTarget::Sounding { midi: acoustic, placement: None }
-                .with_placement(&instrument, position)
+                .with_placement(instrument, position)
         }
         Instrument::Flute(_) | Instrument::Clarinet(_) => {
             if event.hole.is_some()
@@ -73,13 +93,13 @@ pub fn decode(chart: &HarpChart, event: &NoteEvent) -> Result<NoteTarget, Placem
             {
                 return Err(PlacementError::Unplayable);
             }
-            let midi = chart.event_pitch(event).ok_or(PlacementError::Unplayable)?;
+            let midi = declared_pitch()?;
             let position = PlayPosition::Fingering(FingeringAssignment {
                 note: midi,
                 alternate: event.fingering.unwrap_or(0),
             });
             NoteTarget::Sounding { midi: f32::from(midi), placement: None }
-                .with_placement(&instrument, position)
+                .with_placement(instrument, position)
         }
         Instrument::Bowed(_) => {
             if event.hole.is_some()
@@ -90,12 +110,12 @@ pub fn decode(chart: &HarpChart, event: &NoteEvent) -> Result<NoteTarget, Placem
             {
                 return Err(PlacementError::Unplayable);
             }
-            let midi = chart.event_pitch(event).ok_or(PlacementError::Unplayable)?;
+            let midi = declared_pitch()?;
             let position = PlayPosition::Fingerboard(
                 event.fingerboard.ok_or(PlacementError::Unplayable)?.at(midi),
             );
             NoteTarget::Sounding { midi: f32::from(midi), placement: None }
-                .with_placement(&instrument, position)
+                .with_placement(instrument, position)
         }
         Instrument::Piano(_) => {
             if event.hole.is_some()
@@ -106,9 +126,9 @@ pub fn decode(chart: &HarpChart, event: &NoteEvent) -> Result<NoteTarget, Placem
             {
                 return Err(PlacementError::Unplayable);
             }
-            let midi = chart.event_pitch(event).ok_or(PlacementError::Unplayable)?;
+            let midi = declared_pitch()?;
             NoteTarget::Sounding { midi: f32::from(midi), placement: None }
-                .with_placement(&instrument, PlayPosition::Key(midi))
+                .with_placement(instrument, PlayPosition::Key(midi))
         }
     }
 }

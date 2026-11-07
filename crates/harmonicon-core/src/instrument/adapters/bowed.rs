@@ -18,11 +18,14 @@ impl InstrumentAdapter for bowed_strings::BowedStrings {
         }
         crate::note_trainer::candidate_drills(self, kind, candidates)
     }
+    fn score_picker(&self) -> bool {
+        true
+    }
     fn max_voices(&self) -> usize {
         2
     }
     fn kind(&self) -> InstrumentKind {
-        InstrumentKind::Violin
+        self.kind.instrument_kind()
     }
     fn synth_voice(&self) -> Voice {
         Voice::BowedString

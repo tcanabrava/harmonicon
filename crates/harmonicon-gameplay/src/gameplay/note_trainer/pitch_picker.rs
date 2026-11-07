@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-//! Select flute targets in notation, with the instrument's actual range.
+//! Select drill targets on a staff, using the family's practice range.
 use super::*;
 use bevy::ui::InteractionDisabled;
 use harmonicon_ui::music_score::{BravuraFont, PitchChoiceInk, spawn_written_pitch_choices};
@@ -8,12 +8,7 @@ use harmonicon_ui::music_score::{BravuraFont, PitchChoiceInk, spawn_written_pitc
 pub(crate) struct PitchChoice(u8);
 
 impl NoteTrainer {
-    fn select_flute_pitch(&mut self, midi: u8) -> bool {
-        if self.instrument.fingering_chart().is_none()
-            && !matches!(self.instrument, Instrument::Bowed(_))
-        {
-            return false;
-        }
+    fn select_pitch(&mut self, midi: u8) -> bool {
         let Some(index) = self.practice.drills.iter().position(|d| d.target.round() as u8 == midi)
         else {
             return false;
@@ -43,22 +38,18 @@ fn pitch_rows(flute: &Flute) -> Vec<Vec<u8>> {
     rows
 }
 
-pub(super) fn spawn(
-    parent: &mut ChildSpawnerCommands,
-    font: &BravuraFont,
-    flute: &Flute,
-    loc: &Localization,
-) {
-    spawn_for_instrument(parent, font, &Instrument::Flute(*flute), loc);
-}
-
 pub(super) fn spawn_for_instrument(
     parent: &mut ChildSpawnerCommands,
     font: &BravuraFont,
     instrument: &Instrument,
     loc: &Localization,
 ) {
-    let Some((low, high)) = instrument.range() else { return };
+    let targets = harmonicon_core::note_trainer::drills(
+        instrument,
+        harmonicon_core::instrument::TechniqueKind::Target,
+    );
+    let Some(low) = targets.iter().map(|drill| drill.target.round() as u8).min() else { return };
+    let high = targets.iter().map(|drill| drill.target.round() as u8).max().unwrap();
     let mut rows: Vec<Vec<(u8, u8)>> = Vec::new();
     for pitch in low..=high {
         let written = instrument.notation().transposition.written_semitone(pitch) as u8;
@@ -78,7 +69,7 @@ pub(super) fn spawn_for_instrument(
         })
         .with_children(|panel| {
             panel.spawn((
-                Text::new(loc.msg("trainer-flute-pick-help").to_string()),
+                Text::new(loc.msg("trainer-pitch-pick-help").to_string()),
                 TextFont { font_size: FontSize::Px(16.0), ..default() },
             ));
             let area = harmonicon_ui::dialogs::scroll_area::spawn_scroll_area_xy(
@@ -101,7 +92,7 @@ pub(super) fn spawn_for_instrument(
                         for (midi, entity) in spawn_written_pitch_choices(score, font, pitches) {
                             score.commands().entity(entity).insert(PitchChoice(midi)).observe(
                                 move |_: On<Activate>, mut trainer: ResMut<NoteTrainer>| {
-                                    trainer.select_flute_pitch(midi);
+                                    trainer.select_pitch(midi);
                                 },
                             );
                         }
@@ -215,11 +206,11 @@ mod tests {
             trainer.practice = Practice::new(drills(&trainer.instrument, kind));
             let pitches: Vec<_> = trainer.practice.drills.iter().map(|d| d.target as u8).collect();
             for midi in pitches {
-                assert!(trainer.select_flute_pitch(midi));
+                assert!(trainer.select_pitch(midi));
                 assert_eq!(trainer.practice.drill().unwrap().kind, kind);
                 assert_eq!(trainer.practice.drill().unwrap().target, f32::from(midi));
             }
-            assert!(!trainer.select_flute_pitch(60));
+            assert!(!trainer.select_pitch(60));
         }
     }
     #[test]
@@ -228,13 +219,13 @@ mod tests {
         let targets: Vec<_> = trainer.practice.drills.iter().map(|d| d.target as u8).collect();
         for midi in targets {
             trainer.practice.held = 0.4;
-            assert!(trainer.select_flute_pitch(midi));
+            assert!(trainer.select_pitch(midi));
             assert_eq!(trainer.practice.drill().unwrap().target, f32::from(midi));
             assert!(!trainer.practice.auto_advance);
             assert_eq!(trainer.practice.held, 0.0);
         }
         let index = trainer.practice.index;
-        assert!(!trainer.select_flute_pitch(0));
+        assert!(!trainer.select_pitch(0));
         assert_eq!(trainer.practice.index, index);
     }
 }

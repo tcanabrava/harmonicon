@@ -2,6 +2,9 @@
 use super::*;
 
 impl InstrumentAdapter for Piano {
+    fn setup_override(&self) -> bool {
+        false
+    }
     fn practice_drills(&self, kind: TechniqueKind) -> Vec<crate::note_trainer::Drill> {
         crate::note_trainer::candidate_drills(
             self,

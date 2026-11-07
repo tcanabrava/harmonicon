@@ -4,7 +4,7 @@
 //! `flute_note.rs`. A row is a key, C8 at the top
 //! ([`super::note_model::PIANO_TOP_NOTE`]), and a note is its key and
 //! nothing more. Any keys can sound together, so a note is refused only
-//! on top of the same key still sounding: `guitar_note::fits`, which asks
+//! on top of the same key still sounding: `note_edit::fits`, which asks
 //! the instrument, checks that for placing, dragging and pasting alike.
 //!
 //! A keyboard has far more rows than a screen can show at a readable
@@ -48,7 +48,7 @@ pub(super) fn place(state: &mut EditorState, row: u8, tick: usize, len: usize) {
         super::state::Expr::None,
         NoteTarget::Positioned(PlayPosition::Key(row_note(row))),
     );
-    if !super::guitar_note::fits(&instrument, &state.notes, &note, &[]) {
+    if !super::note_edit::fits(&instrument, &state.notes, &note, &[]) {
         state.unplayable_notice = true;
         return;
     }

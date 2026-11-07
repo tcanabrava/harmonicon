@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: MIT
 
+#[cfg(test)]
+use super::instrument_ui::EditorInstrumentKind;
 use bevy::input_focus::tab_navigation::TabGroup;
 use bevy::picking::Pickable;
 use bevy::picking::hover::Hovered;
@@ -430,57 +432,7 @@ pub(super) fn sync_chrome_height(
     }
 }
 
-/// The grid's row labels, top row first: a harmonica's zero-padded hole
-/// numbers on the theme's hole box, or a guitar's string names (`e B G D A
-/// E`) each on its string's own colour — the colour its notes are drawn in.
-pub(super) fn row_labels(
-    instrument: &harmonicon_core::instrument::Instrument,
-    row_count: u8,
-    row_offset: u8,
-) -> Vec<RowLabel> {
-    use harmonicon_core::instrument::Instrument;
-    use harmonicon_gameplay::gameplay::guitar_visuals::string_color;
-    match instrument {
-        Instrument::Bowed(strings) => strings
-            .strings
-            .iter()
-            .enumerate()
-            .map(|(index, &pitch)| RowLabel {
-                text: harmonicon_core::midi::midi_to_note(i32::from(pitch)),
-                swatch: Some(string_color(index as u8 + 1)),
-            })
-            .collect(),
-        Instrument::Fretted(guitar) => (1..=row_count)
-            .zip(guitar.string_labels())
-            .map(|(string, text)| RowLabel { text, swatch: Some(string_color(string)) })
-            .collect(),
-        // A pitch per row, C7 at the top; the accidentals' swatches dark, as
-        // a keyboard's black keys.
-        Instrument::Flute(_) | Instrument::Clarinet(_) => (1..=row_count)
-            .map(|row| {
-                let note = super::note_model::FLUTE_TOP_NOTE + 1 - row - row_offset;
-                let sharp = matches!(note % 12, 1 | 3 | 6 | 8 | 10);
-                RowLabel {
-                    text: harmonicon_core::midi::midi_to_note(i32::from(note)),
-                    swatch: sharp.then_some(Color::srgb(0.12, 0.12, 0.16)),
-                }
-            })
-            .collect(),
-        // The window's keys, from the top: drawn as a keyboard, but named
-        // here too, so a scrolled window reads as changed.
-        Instrument::Piano(_) => (1..=row_count)
-            .map(|row| RowLabel {
-                text: harmonicon_core::midi::midi_to_note(i32::from(super::piano_note::row_note(
-                    row + row_offset,
-                ))),
-                swatch: None,
-            })
-            .collect(),
-        Instrument::Harmonica(_) => (1..=row_count)
-            .map(|hole| RowLabel { text: format!("{hole:02}"), swatch: None })
-            .collect(),
-    }
-}
+pub(super) use super::instrument_adapter::row_labels;
 
 /// The keyboard a piano document draws in the row-label column, which the
 /// wheel scrolls through the keys (`view_scroll::scroll_keyboard`).

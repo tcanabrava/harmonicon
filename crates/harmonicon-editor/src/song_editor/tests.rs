@@ -3,8 +3,9 @@
 use super::clipboard::paste_targets_with_sources;
 use super::grid::{group_move_targets, group_move_valid, mix_srgba, note_in_scale, visible_beats};
 use super::harpchart::{
-    load_harpchart, parse_pitch_expr, safe_path_segment, serialize_harpchart, validated_harpchart,
+    load_harpchart, safe_path_segment, serialize_harpchart, validated_harpchart,
 };
+use super::instrument_ui::EditorInstrumentKind;
 use super::interaction::{
     apply_modifier, delete_selected, resize_grip_position, select_or_add, select_or_add_ctrl,
 };
@@ -2662,60 +2663,6 @@ fn safe_path_segment_of_all_punctuation_is_empty() {
     assert_eq!(safe_path_segment(""), "");
 }
 
-// ── parse_pitch_expr ──────────────────────────────────────────────────────────
-
-#[test]
-fn parse_pitch_expr_reads_bend_semitones_as_negative() {
-    let mods = vec![serde_json::json!({ "type": "bend", "semitones": -1.5 })];
-    let (pitch, expr) = parse_pitch_expr(&mods);
-    assert_eq!(pitch, HarpTechnique::Bend(1.5));
-    assert_eq!(expr, Expr::None);
-}
-
-#[test]
-fn parse_pitch_expr_reads_overblow_overdraw_vibrato_wah() {
-    assert_eq!(
-        parse_pitch_expr(&[serde_json::json!({ "type": "overblow" })]).0,
-        HarpTechnique::Overblow
-    );
-    assert_eq!(
-        parse_pitch_expr(&[serde_json::json!({ "type": "overdraw" })]).0,
-        HarpTechnique::Overdraw
-    );
-    // No `oscillation_hz` in the JSON (e.g. a chart saved before it was
-    // per-note) falls back to the default rate.
-    assert_eq!(parse_pitch_expr(&[serde_json::json!({ "type": "vibrato" })]).1, Expr::Vibrato(5.5));
-    assert_eq!(parse_pitch_expr(&[serde_json::json!({ "type": "wah-wah" })]).1, Expr::Wah(4.0));
-    assert_eq!(parse_pitch_expr(&[serde_json::json!({ "type": "slide" })]).0, HarpTechnique::Slide);
-}
-
-#[test]
-fn parse_pitch_expr_reads_custom_oscillation_hz() {
-    assert_eq!(
-        parse_pitch_expr(&[serde_json::json!({ "type": "vibrato", "oscillation_hz": 6.0 })]).1,
-        Expr::Vibrato(6.0)
-    );
-    assert_eq!(
-        parse_pitch_expr(&[serde_json::json!({ "type": "wah-wah", "oscillation_hz": 2.5 })]).1,
-        Expr::Wah(2.5)
-    );
-}
-
-#[test]
-fn parse_pitch_expr_clamps_a_nonpositive_oscillation_hz() {
-    assert_eq!(
-        parse_pitch_expr(&[serde_json::json!({ "type": "vibrato", "oscillation_hz": 0.0 })]).1,
-        Expr::Vibrato(0.5)
-    );
-}
-
-#[test]
-fn parse_pitch_expr_defaults_for_empty_or_unknown_modifiers() {
-    assert_eq!(parse_pitch_expr(&[]), (HarpTechnique::Normal, Expr::None));
-    let unknown = vec![serde_json::json!({ "type": "flutter" })];
-    assert_eq!(parse_pitch_expr(&unknown), (HarpTechnique::Normal, Expr::None));
-}
-
 // ── note_rect ─────────────────────────────────────────────────────────────────
 
 #[test]
@@ -4491,7 +4438,7 @@ fn switching_loading_and_undoing_back_to_flute_clear_piano_pitch_offsets() {
     history.record_if_changed(&flute);
     history.undo(&mut flute);
     assert_eq!(flute.row_offset, 0);
-    assert!(super::flute_note::is_wind(&flute));
+    assert!(flute.effective_instrument().fingering_chart().is_some());
     history.undo(&mut flute);
     assert!(flute.row_visible(flute.notes[0].row()));
 }

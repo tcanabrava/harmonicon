@@ -7,10 +7,11 @@
 //! is checked against the guitar's voice rules first and refused whole,
 //! never repaired by moving some other note.
 use super::interaction::next_expr;
+use super::note_edit::fits;
 use super::state::{DEFAULT_INTENSITY, EditorState, Expr, GridNote};
 use super::ui::ModButton;
 use harmonicon_core::instrument::guitar::{FretAssignment, Guitar, StringTechnique};
-use harmonicon_core::instrument::{Instrument, InstrumentModel, PlayPosition};
+use harmonicon_core::instrument::{Instrument, PlayPosition};
 use harmonicon_core::note_target::NoteTarget;
 
 pub(super) fn is_guitar(state: &EditorState) -> bool {
@@ -26,31 +27,6 @@ fn fret_of(note: &GridNote) -> Option<FretAssignment> {
 
 fn with_fret(note: GridNote, at: FretAssignment) -> GridNote {
     GridNote { target: NoteTarget::Positioned(PlayPosition::Fret(at)), ..note }
-}
-
-/// Whether `candidate` is playable, and playable alongside every note
-/// sounding at the same time — overlapping sustains, not only shared
-/// attacks, since a held string is still occupied. Notes in `moving` are
-/// ignored: they are being moved with it, as one shape.
-pub(super) fn fits(
-    instrument: &Instrument,
-    notes: &[GridNote],
-    candidate: &GridNote,
-    moving: &[u32],
-) -> bool {
-    let Some(position) = candidate.target.position() else { return false };
-    if candidate.target.with_placement(instrument, position).is_err() {
-        return false;
-    }
-    notes
-        .iter()
-        .filter(|n| {
-            n.id != candidate.id
-                && !moving.contains(&n.id)
-                && n.tick < candidate.tick.saturating_add(candidate.len)
-                && candidate.tick < n.tick.saturating_add(n.len)
-        })
-        .all(|n| n.target.position().is_some_and(|p| instrument.can_sound_together(&position, &p)))
 }
 
 /// Places a note on `string` at `tick` and the armed fret, with the armed

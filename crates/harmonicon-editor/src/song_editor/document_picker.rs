@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 //! New-document flow, independent of any instrument's note representation.
+use super::instrument_ui::EditorInstrumentKind;
 use super::instrument_ui::InstrumentKind;
 use super::state::{DocumentCommand, EditorState, FIELDS, Mode};
 use bevy::input_focus::tab_navigation::TabGroup;
@@ -123,7 +124,7 @@ pub(super) fn sync_picker(
                         TextColor(Color::WHITE),
                     ));
                     for kind in InstrumentKind::ALL {
-                        panel.spawn_empty().apply_scene(button::default(&loc.msg(kind.label()),
+                        panel.spawn_empty().apply_scene(button::default(&loc.msg(&kind.label()),
                     move |_: On<Activate>, state: Res<EditorState>,
                         mut picker: ResMut<DocumentPicker>, mut commands: Commands,
                         loc: Res<Localization>, mut confirm: MessageWriter<OpenConfirmDialog>| {

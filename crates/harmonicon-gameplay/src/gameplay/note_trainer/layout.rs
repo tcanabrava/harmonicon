@@ -40,26 +40,17 @@ pub(crate) fn setup(
         ))
         .id();
     let title = commands
-        .spawn_scene(title_column_scene(String::from(loc.msg(
-            if matches!(trainer.instrument, Instrument::Bowed(_)) {
-                "note-trainer-violin-title"
-            } else if matches!(trainer.instrument, Instrument::Clarinet(_)) {
-                "clarinet-trainer-title"
-            } else if trainer.flute().is_some() {
-                "note-trainer-flute-title"
-            } else if trainer.piano().is_some() {
-                "note-trainer-piano-title"
-            } else if trainer.instrument.kind()
-                == harmonicon_core::instrument::InstrumentKind::Cavaquinho
-            {
-                "note-trainer-cavaquinho-title"
-            } else if trainer.instrument.kind() == harmonicon_core::instrument::InstrumentKind::Bass
-            {
-                "note-trainer-bass-title"
-            } else {
-                "note-trainer-guitar-title"
-            },
-        ))))
+        .spawn_scene(title_column_scene(
+            loc.msg_args(
+                "note-trainer-instrument-title",
+                &[(
+                    "instrument",
+                    loc.msg(&format!("song-instrument-{}", trainer.instrument.kind().slug()))
+                        .to_string(),
+                )],
+            )
+            .to_string(),
+        ))
         .id();
     let header = commands.spawn_scene(header_scene()).id();
     commands.entity(header).add_child(title);
@@ -325,24 +316,13 @@ pub(crate) fn setup(
                                 ..default()
                             })
                             .with_children(|staff| {
-                                if let Instrument::Bowed(setup) = &trainer.instrument {
-                                    let mut beginner = setup.clone();
-                                    beginner.stopped_semitones = 7;
-                                    flute_picker::spawn_for_instrument(
-                                        staff,
-                                        font,
-                                        &Instrument::Bowed(beginner),
-                                        &loc,
-                                    );
-                                } else if matches!(trainer.instrument, Instrument::Clarinet(_)) {
-                                    flute_picker::spawn_for_instrument(
+                                if trainer.instrument.adapter().score_picker() {
+                                    pitch_picker::spawn_for_instrument(
                                         staff,
                                         font,
                                         &trainer.instrument,
                                         &loc,
                                     );
-                                } else if let Some(flute) = trainer.flute() {
-                                    flute_picker::spawn(staff, font, flute, &loc);
                                 } else {
                                     teaching::spawn_staff(
                                         staff,

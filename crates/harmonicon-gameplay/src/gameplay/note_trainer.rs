@@ -50,9 +50,9 @@ mod chords;
 mod clarinet;
 pub(super) use chords::update as update_chords;
 pub(super) use clarinet::update as update_clarinet;
-mod flute_picker;
 mod flute_setup;
-pub(super) use flute_picker::update as update_flute_picker;
+mod pitch_picker;
+pub(super) use pitch_picker::update as update_pitch_picker;
 mod layout;
 mod piano;
 mod selection;
@@ -292,11 +292,7 @@ impl NoteTrainer {
     fn guitar(&self) -> Option<&Guitar> {
         match &self.instrument {
             Instrument::Fretted(guitar) => Some(guitar),
-            Instrument::Harmonica(_)
-            | Instrument::Flute(_)
-            | Instrument::Clarinet(_)
-            | Instrument::Bowed(_)
-            | Instrument::Piano(_) => None,
+            _ => None,
         }
     }
 
@@ -310,25 +306,17 @@ impl NoteTrainer {
     fn flute(&self) -> Option<&Flute> {
         match &self.instrument {
             Instrument::Flute(flute) => Some(flute),
-            Instrument::Harmonica(_)
-            | Instrument::Fretted(_)
-            | Instrument::Clarinet(_)
-            | Instrument::Bowed(_)
-            | Instrument::Piano(_) => None,
+            _ => None,
         }
     }
 
     /// Where the profile keeps this instrument's progress on its current
     /// kind. `None` for a harmonica, which keeps the Bending Trainer's.
     fn record_key(&self) -> Option<String> {
-        let instrument = match &self.instrument {
-            Instrument::Fretted(setup) => setup.kind.instrument_kind().slug(),
-            Instrument::Flute(_) => "flute",
-            Instrument::Clarinet(_) => "clarinet",
-            Instrument::Bowed(_) => "violin",
-            Instrument::Piano(_) => "piano",
-            Instrument::Harmonica(_) => return None,
-        };
+        if self.instrument.adapter().breath_model().is_some() {
+            return None;
+        }
+        let instrument = self.instrument.kind().slug();
         Some(harmonicon_app::profile::note_trainer_key(instrument, kind_id(self.kind)))
     }
 

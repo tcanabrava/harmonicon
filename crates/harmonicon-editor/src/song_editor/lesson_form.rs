@@ -18,6 +18,7 @@
 //! runs for `ContentKind::Song`) — author the chart as a song first if it
 //! needs one, then switch to Lesson mode to add the curriculum fields.
 
+use super::instrument_ui::EditorInstrumentKind;
 use bevy::input_focus::tab_navigation::TabIndex;
 use bevy::picking::Pickable;
 use bevy::prelude::*;
@@ -362,23 +363,10 @@ pub(super) fn save_lesson(
 /// as whatever's already in the editor; the author re-enters them to
 /// regenerate matching Fluent entries on the next save.
 pub(super) fn populate_from_lesson_manifest(manifest: &LessonManifest, state: &mut EditorState) {
-    if manifest.chart.is_none() {
-        use super::instrument_ui::InstrumentKind as EditorKind;
-        use harmonicon_core::instrument::InstrumentKind as Family;
-        if state.effective_instrument().kind() != manifest.instrument {
-            state.instrument = match manifest.instrument {
-                Family::Harmonica => EditorKind::Harmonica,
-                Family::Guitar => EditorKind::Guitar,
-                Family::Bass => EditorKind::Bass,
-                Family::Cavaquinho => EditorKind::Cavaquinho,
-                Family::Piano => EditorKind::Piano,
-                Family::Flute => EditorKind::Flute,
-                Family::Clarinet => EditorKind::Clarinet,
-                Family::Violin => EditorKind::Violin,
-            }
-            .selection();
-        }
+    if manifest.chart.is_none() && state.effective_instrument().kind() != manifest.instrument {
+        state.instrument = manifest.instrument.selection();
     }
+
     state.lesson_id = manifest.id.clone();
     state.lesson_unit = manifest.unit.clone();
     state.lesson_path = if manifest.optional { "elective".into() } else { "core".into() };

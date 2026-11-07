@@ -4,81 +4,29 @@
 use super::state::{DocumentCommand, EditorState, HarmonicaKind, InstrumentSelection, Mode};
 use bevy::prelude::*;
 use bevy::ui_widgets::Activate;
-use harmonicon_core::instrument::{
-    Instrument,
-    flute::Flute,
-    guitar::{Guitar, GuitarBody},
-    piano::Piano,
-};
+use harmonicon_core::instrument::Instrument;
 use harmonicon_platform::localization::{Localization, LocalizationExt};
 use harmonicon_platform::theme::SongEditorColors;
 use harmonicon_ui::dialogs::button;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(super) enum InstrumentKind {
-    Harmonica,
-    Guitar,
-    Bass,
-    Cavaquinho,
-    Piano,
-    Flute,
-    Clarinet,
-    Violin,
+pub(super) use harmonicon_core::instrument::InstrumentKind;
+pub(super) trait EditorInstrumentKind: Sized {
+    fn of(instrument: &Instrument) -> Self;
+    fn label(self) -> String;
+    fn selection(self) -> InstrumentSelection;
 }
-impl InstrumentKind {
-    pub const ALL: [Self; 8] = [
-        Self::Harmonica,
-        Self::Guitar,
-        Self::Bass,
-        Self::Cavaquinho,
-        Self::Piano,
-        Self::Flute,
-        Self::Clarinet,
-        Self::Violin,
-    ];
-    pub fn of(instrument: &Instrument) -> Self {
-        match instrument {
-            Instrument::Harmonica(_) => Self::Harmonica,
-            Instrument::Fretted(guitar) => match guitar.kind {
-                harmonicon_core::instrument::fretted_strings::FrettedKind::Guitar => Self::Guitar,
-                harmonicon_core::instrument::fretted_strings::FrettedKind::Bass => Self::Bass,
-                harmonicon_core::instrument::fretted_strings::FrettedKind::Cavaquinho => {
-                    Self::Cavaquinho
-                }
-            },
-            Instrument::Piano(_) => Self::Piano,
-            Instrument::Flute(_) => Self::Flute,
-            Instrument::Clarinet(_) => Self::Clarinet,
-            Instrument::Bowed(_) => Self::Violin,
-        }
+impl EditorInstrumentKind for InstrumentKind {
+    fn of(instrument: &Instrument) -> Self {
+        instrument.kind()
     }
-    pub fn label(self) -> &'static str {
-        match self {
-            Self::Harmonica => "editor-instrument-harmonica",
-            Self::Guitar => "editor-instrument-guitar",
-            Self::Bass => "editor-instrument-bass",
-            Self::Cavaquinho => "editor-instrument-cavaquinho",
-            Self::Piano => "editor-instrument-piano",
-            Self::Flute => "editor-instrument-flute",
-            Self::Clarinet => "instrument-clarinet",
-            Self::Violin => "instrument-violin",
-        }
+    fn label(self) -> String {
+        format!("song-instrument-{}", self.slug())
     }
-    pub fn selection(self) -> InstrumentSelection {
-        let instrument = match self {
-            Self::Harmonica => {
-                return InstrumentSelection::HarmonicaPreset(HarmonicaKind::Diatonic);
-            }
-            Self::Guitar => Guitar::standard(GuitarBody::Electric).into(),
-            Self::Bass => Guitar::bass().into(),
-            Self::Cavaquinho => Guitar::cavaquinho().into(),
-            Self::Piano => Piano::grand().into(),
-            Self::Flute => Flute::default().into(),
-            Self::Clarinet => harmonicon_core::instrument::clarinet::Clarinet::default().into(),
-            Self::Violin => {
-                harmonicon_core::instrument::bowed_strings::BowedKind::Violin.standard().into()
-            }
-        };
+    fn selection(self) -> InstrumentSelection {
+        if self == Self::Harmonica {
+            return InstrumentSelection::HarmonicaPreset(HarmonicaKind::Diatonic);
+        }
+        let instrument = self.default_instrument();
         InstrumentSelection::Configured { instrument, harmonica_origin: None }
     }
 }
@@ -159,7 +107,7 @@ pub(super) fn spawn_selector(
         .with_children(|p| {
             for kind in InstrumentKind::ALL {
                 p.spawn_empty().apply_scene(button::small(
-                    &loc.msg(kind.label()),
+                    &loc.msg(&kind.label()),
                     move |_: On<Activate>,
                           state: Res<EditorState>,
                           loc: Res<Localization>,

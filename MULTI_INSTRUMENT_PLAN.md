@@ -236,3 +236,29 @@ Validation for the correction: 2,361 workspace library tests passed (one
 existing ignored test); workspace Clippy passed with warnings denied; build-time
 UI/source enforcement passed. This is code-level validation, not a live visual
 review of the new violin screens.
+
+### Completion of the architecture cleanup
+
+- Removed the editor's duplicate event parser/serializer, including its separate
+  harmonica path. All families use core `note_event_codec::decode_for` / `encode`.
+  Legacy expression rates remain supported. Harmonica bend export now writes
+  the source reed plus one bend modifier, avoiding applying the bend twice.
+- Moved shared edit constraints to `note_edit`; family editors no longer depend
+  on guitar-owned validation.
+- Registered editor placement, modifiers, transposition, button sets, row counts,
+  row labels, window sizing and failure feedback in `instrument_adapter`.
+- Removed the duplicate editor identity enum and lesson identity conversion.
+  Document creation and trainer menus use core identity/default configuration.
+- Made staff target selection and its range depend on practice drills and a
+  family capability, replacing flute/bowed identity checks and range cloning.
+- Derived trainer progress keys, trainer titles, lesson choices and song labels
+  from registered identities. Saved trainer setup policy lives in the inventory;
+  generic consumers do not repeat it. Unrelated optional accessors use selective
+  matches rather than listing every unsupported family.
+- Actual teaching views, wire registrations and physical placement variants stay
+  explicit; a new family owns those implementations. Shared registration is an
+  expected edit, sibling instrument algorithms are not.
+
+Cleanup validation: 2,358 workspace library tests passed (one existing ignored
+case), and workspace Clippy passed with warnings denied. Five tests of the
+removed parser were replaced by two tests of shared decoding/export behaviour.

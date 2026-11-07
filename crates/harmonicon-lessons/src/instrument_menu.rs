@@ -11,17 +11,8 @@ use harmonicon_platform::localization::{Localization, LocalizationExt};
 use harmonicon_platform::theme::LoadedTheme;
 use harmonicon_song::lessons::{AvailableLessons, LoadedLessonInstrument};
 
-pub(crate) fn instrument_key(kind: InstrumentKind) -> &'static str {
-    match kind {
-        InstrumentKind::Harmonica => "song-instrument-harmonica",
-        InstrumentKind::Guitar => "song-instrument-guitar",
-        InstrumentKind::Bass => "song-instrument-bass",
-        InstrumentKind::Cavaquinho => "song-instrument-cavaquinho",
-        InstrumentKind::Piano => "song-instrument-piano",
-        InstrumentKind::Flute => "song-instrument-flute",
-        InstrumentKind::Clarinet => "instrument-clarinet",
-        InstrumentKind::Violin => "instrument-violin",
-    }
+pub(crate) fn instrument_key(kind: InstrumentKind) -> String {
+    format!("song-instrument-{}", kind.slug())
 }
 
 pub(crate) fn setup(
@@ -60,7 +51,7 @@ pub(crate) fn setup(
         scene::spawn_button(
             &mut commands,
             root,
-            &loc.msg(instrument_key(kind)),
+            &loc.msg(&instrument_key(kind)),
             move |_: On<Activate>, mut selection: ResMut<SelectedLessonInstrument>| {
                 selection.0 = Some(kind);
             },

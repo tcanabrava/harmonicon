@@ -11,6 +11,13 @@ pub trait InstrumentAdapter: InstrumentModel {
     fn kind(&self) -> InstrumentKind;
     /// Detector voice limit, not a claim about ergonomic playability.
     fn max_voices(&self) -> usize;
+    fn setup_override(&self) -> bool {
+        true
+    }
+    /// Whether target selection should be taught directly on a staff.
+    fn score_picker(&self) -> bool {
+        false
+    }
     fn practice_drills(&self, kind: TechniqueKind) -> Vec<crate::note_trainer::Drill>;
     fn breath_model(&self) -> Option<&Harmonica> {
         None

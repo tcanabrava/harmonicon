@@ -924,7 +924,7 @@ load-bearing about *this* crate.
   view is a UI preference like `snap_mode`, so it is in the grid cache,
   not undo. Rows above 16 share 16 rows' height (`mod::row_h`), so the
   flute's 37–38 rows fit. A flute's voice rule (one note at a time) is
-  `guitar_note::fits`, which is instrument-generic despite its home.
+  `note_edit::fits`, shared by all families.
 - **Instrument transitions are queued** as `DocumentCommand`s and applied
   after the editor pass. Undo can change the instrument, so observers and
   keyboard handlers must queue undo/redo too. Either way in or out of a
@@ -932,7 +932,7 @@ load-bearing about *this* crate.
   Snapshots include both instrument configuration and song key, since a
   restored authored harp must retain its source-key identity.
 - **Guitar edits check overlapping sustains**, not only simultaneous
-  attacks (`guitar_note::fits`): an occupied string or an excessive fret
+  attacks (`note_edit::fits`): an occupied string or an excessive fret
   span rejects the edit, and sets `unplayable_notice` for the status bar,
   without moving other notes — which is why `enforce_direction` is
   breath-only and `enforce_expr` skips a `PerVoice` instrument. A drag
@@ -944,3 +944,10 @@ load-bearing about *this* crate.
   recorded corpus.
   Custom bend intensity and multiple mutually exclusive techniques are
   rejected during validation rather than silently dropped on save.
+
+- Family operations and row presentation register in `instrument_adapter.rs`.
+  Generic placement, modifiers, transposition and button selection use that
+  descriptor. `instrument_chart` delegates event interpretation to core
+  `note_event_codec::decode_for` and `encode`, including harmonica events.
+  Core `InstrumentKind` supplies identity and default setups; do not add a
+  second editor identity enum or another JSON event parser.

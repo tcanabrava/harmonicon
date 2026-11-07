@@ -402,24 +402,32 @@ pub(crate) fn setup_harp_check(
     let is_bass = chart.and_then(HarpChart::instrument).is_some_and(|instrument| {
         instrument.kind() == harmonicon_core::instrument::InstrumentKind::Bass
     });
-    let title = match shown {
-        ControlsFor::Harmonica => "harp-check-title",
-        ControlsFor::Fretted
-            if chart.and_then(HarpChart::instrument).is_some_and(|instrument| {
-                instrument.kind() == harmonicon_core::instrument::InstrumentKind::Cavaquinho
-            }) =>
-        {
-            "instrument-check-title-cavaquinho"
+    let title = if shown == ControlsFor::Bowed {
+        format!(
+            "song-instrument-{}",
+            chart.and_then(HarpChart::instrument).expect("bowed chart").kind().slug()
+        )
+    } else {
+        match shown {
+            ControlsFor::Harmonica => "harp-check-title",
+            ControlsFor::Fretted
+                if chart.and_then(HarpChart::instrument).is_some_and(|instrument| {
+                    instrument.kind() == harmonicon_core::instrument::InstrumentKind::Cavaquinho
+                }) =>
+            {
+                "instrument-check-title-cavaquinho"
+            }
+            ControlsFor::Fretted if is_bass => "instrument-check-title-bass",
+            ControlsFor::Fretted => "instrument-check-title-guitar",
+            ControlsFor::Flute => "instrument-check-title-flute",
+            ControlsFor::Clarinet => "instrument-clarinet",
+            ControlsFor::Bowed => unreachable!("bowed title is resolved above"),
+            ControlsFor::Piano => "instrument-check-title-piano",
         }
-        ControlsFor::Fretted if is_bass => "instrument-check-title-bass",
-        ControlsFor::Fretted => "instrument-check-title-guitar",
-        ControlsFor::Flute => "instrument-check-title-flute",
-        ControlsFor::Clarinet => "instrument-clarinet",
-        ControlsFor::Bowed => "instrument-violin",
-        ControlsFor::Piano => "instrument-check-title-piano",
+        .to_owned()
     };
     let (root, header, page_root) =
-        spawn_menu_root(&mut commands, &loc.msg(title), None, &theme, "HarpCheck");
+        spawn_menu_root(&mut commands, &loc.msg(&title), None, &theme, "HarpCheck");
     commands.entity(page_root).insert(InstrumentControlsKind(
         chart.and_then(HarpChart::instrument).map(|instrument| instrument.kind()),
     ));
@@ -876,22 +884,17 @@ pub(crate) fn track_label(entry: &TrackChart, loc: &Localization) -> String {
             ("name", name),
             (
                 "instrument",
-                loc.msg(match entry.chart.instrument() {
-                    Some(Instrument::Fretted(ref setup))
-                        if setup.kind == FrettedKind::Cavaquinho =>
-                    {
-                        "song-instrument-cavaquinho"
-                    }
-                    Some(Instrument::Fretted(ref setup)) if setup.kind == FrettedKind::Bass => {
-                        "song-instrument-bass"
-                    }
-                    Some(Instrument::Fretted(_)) => "harp-check-instrument-guitar",
-                    Some(Instrument::Flute(_)) => "harp-check-instrument-flute",
-                    Some(Instrument::Clarinet(_)) => "instrument-clarinet",
-                    Some(Instrument::Bowed(_)) => "instrument-violin",
-                    Some(Instrument::Piano(_)) => "harp-check-instrument-piano",
-                    _ => "harp-check-instrument-harmonica",
-                })
+                loc.msg(&format!(
+                    "song-instrument-{}",
+                    entry
+                        .chart
+                        .instrument()
+                        .map_or(
+                            harmonicon_core::instrument::InstrumentKind::Harmonica,
+                            |instrument| instrument.kind()
+                        )
+                        .slug()
+                ))
                 .to_string(),
             ),
             ("notes", entry.report.total.to_string()),

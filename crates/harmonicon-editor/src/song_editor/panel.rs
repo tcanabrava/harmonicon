@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 
+use super::instrument_ui::EditorInstrumentKind;
 use bevy::input_focus::InputFocus;
 use bevy::prelude::*;
 use bevy::text::{EditableText, TextEdit};
@@ -420,19 +421,7 @@ pub(super) fn update_technique_button_visibility(
         let on = flute && state.flute_view == super::state::FluteView::Fingering;
         bg.0 = if on { colors.btn_active } else { colors.btn_bg };
     }
-    let set = if super::bowed_note::is_bowed(&state) {
-        NoteButtons::Bowed
-    } else if super::guitar_note::is_guitar(&state) {
-        NoteButtons::Guitar
-    } else if super::flute_note::is_wind(&state) {
-        NoteButtons::Flute
-    } else if super::piano_note::is_piano(&state) {
-        NoteButtons::Piano
-    } else if state.harmonica_kind().is_diatonic() {
-        NoteButtons::Diatonic
-    } else {
-        NoteButtons::Chromatic
-    };
+    let set = super::instrument_adapter::for_instrument(&state.effective_instrument()).buttons;
     for (kind, mut node) in &mut buttons {
         let supported = match state.effective_instrument() {
             harmonicon_core::instrument::Instrument::Fretted(setup) => match kind {
@@ -474,11 +463,11 @@ pub(super) fn update_harmonica_kind_text(
 ) {
     let kind = super::instrument_ui::InstrumentKind::of(&state.effective_instrument());
     let key = if kind == super::instrument_ui::InstrumentKind::Harmonica {
-        harmonica_kind_key(state.harmonica_kind())
+        harmonica_kind_key(state.harmonica_kind()).to_owned()
     } else {
         kind.label()
     };
-    let label = String::from(loc.msg(key));
+    let label = String::from(loc.msg(&key));
     for mut text in &mut texts {
         **text = label.clone();
     }

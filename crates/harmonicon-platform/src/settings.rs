@@ -193,6 +193,31 @@ pub struct MyInstruments {
 }
 
 impl MyInstruments {
+    /// Apply saved family settings at the inventory boundary, shared by trainer
+    /// entry points. Unconfigured families retain their registered defaults.
+    pub fn trainer_instrument(
+        &self,
+        kind: harmonicon_core::instrument::InstrumentKind,
+    ) -> harmonicon_core::instrument::Instrument {
+        use harmonicon_core::instrument::Instrument;
+        let mut instrument = kind.default_instrument();
+        match &mut instrument {
+            Instrument::Fretted(setup) => {
+                if let Some(preset) = self
+                    .fretted_tuning(setup.kind)
+                    .and_then(|id| setup.tuning_presets().iter().find(|preset| preset.id == id))
+                {
+                    setup.strings = preset.strings.to_vec();
+                }
+                setup.capo = self.fretted_capo(setup.kind).unwrap_or(0).min(setup.frets);
+            }
+            Instrument::Flute(setup) => setup.foot = self.flute_foot.unwrap_or_default(),
+            Instrument::Clarinet(setup) => setup.key = self.clarinet_key.unwrap_or_default(),
+            _ => {}
+        }
+        instrument
+    }
+
     pub fn fretted_tuning(
         &self,
         kind: harmonicon_core::instrument::fretted_strings::FrettedKind,

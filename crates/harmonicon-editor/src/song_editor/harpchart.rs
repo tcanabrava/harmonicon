@@ -3,44 +3,16 @@
 use bevy::prelude::*;
 
 use super::save_feedback::SaveFeedback;
-use super::state::{
-    Dir, EditorState, Expr, GridNote, HarmonicaKind, HarpTechnique, LoadedHarmonica, POSITIONS,
-    Scroll,
-};
+use super::state::{EditorState, GridNote, HarmonicaKind, LoadedHarmonica, POSITIONS, Scroll};
 use super::{LOAD_PURPOSE, MUSIC_PURPOSE, SAVE_PURPOSE, TICKS_PER_BEAT};
 use harmonicon_core::chart::{
     CURRENT_FORMAT_VERSION, Scale, TempoPoint, seconds_to_tick, tick_to_seconds,
 };
-use harmonicon_core::harmonica::{Harmonica, hole_notes};
-use harmonicon_core::midi::{midi_to_note, note_to_midi};
+use harmonicon_core::harmonica::Harmonica;
 use harmonicon_platform::localization::{Localization, LocalizationExt};
 use harmonicon_ui::dialogs::file_dialog::FileChosen;
 
 // ── Serialisation ────────────────────────────────────────────────────────────
-
-/// Resolves `n`'s note name for the chart's `events[].note` field — the
-/// actual sounded pitch (bend/overblow/overdraw/slide applied), not just
-/// the natural blow/draw note. Shares its derivation with the editor's own
-/// preview/practice synthesis (`playback::note_freq`) via
-/// `harmonicon_core::harmonica`, so an exported chart always matches what the
-/// editor actually plays; overblow/overdraw resolve via [`hole_notes`],
-/// which knows overblow sits above the *draw* reed on holes 1/4/5/6.
-fn note_name_for(n: &GridNote, harp: &Harmonica) -> String {
-    let action = n.dir().action();
-    let label = match n.technique() {
-        HarpTechnique::Normal => harp.wind_direction_label(n.hole(), &action),
-        HarpTechnique::Slide => harp.slide_label(n.hole(), &action),
-        HarpTechnique::Overblow | HarpTechnique::Overdraw => {
-            hole_notes(harp, n.hole()).over.unwrap_or_else(|| "C4".to_string())
-        }
-        HarpTechnique::Bend(a) => {
-            let base = harp.wind_direction_label(n.hole(), &action);
-            let midi = note_to_midi(&base).unwrap_or(60);
-            return midi_to_note((midi as f32 - a).round() as i32);
-        }
-    };
-    if label == "\u{2014}" { "C4".to_string() } else { label }
-}
 
 pub(super) fn serialize_harpchart(state: &EditorState) -> String {
     serialize_harpchart_notes(state, &state.notes)
@@ -96,48 +68,7 @@ pub(super) fn serialize_harpchart_notes(state: &EditorState, notes: &[GridNote])
 
             let events: Vec<Value> = notes
                 .iter()
-                .map(|n| {
-                    if harp.is_none() { return super::instrument_chart::encode_note(state, n, &instrument); }
-                    let harp = harp.expect("harmonica branch");
-                    let intensity = state
-                        .expression_intensities
-                        .get(&n.id)
-                        .and_then(|value| value.parse::<f64>().ok())
-                        .unwrap_or(0.5);
-                    let action = match n.dir() {
-                        Dir::Blow => "blow",
-                        Dir::Draw => "draw",
-                    };
-                    let note_name = note_name_for(n, harp);
-                    let mut modifiers: Vec<Value> = Vec::new();
-                    match n.technique() {
-                        HarpTechnique::Bend(a) => {
-                            modifiers.push(json!({ "type": "bend", "semitones": -(a as f64) }));
-                        }
-                        HarpTechnique::Overblow => modifiers.push(json!({ "type": "overblow" })),
-                        HarpTechnique::Overdraw => modifiers.push(json!({ "type": "overdraw" })),
-                        HarpTechnique::Slide => modifiers.push(json!({ "type": "slide" })),
-                        HarpTechnique::Normal => {}
-                    }
-                    match n.expr {
-                        Expr::Vibrato(hz) => modifiers.push(
-                            json!({ "type": "vibrato", "oscillation_hz": hz, "intensity": intensity }),
-                        ),
-                        Expr::Wah(hz) => modifiers.push(
-                            json!({ "type": "wah-wah", "oscillation_hz": hz, "intensity": intensity }),
-                        ),
-                        Expr::None => {}
-                    }
-                    let mut event = json!({
-                        "hole": n.hole(),
-                        "action": action,
-                        "note": note_name,
-                    });
-                    if !modifiers.is_empty() {
-                        event["modifiers"] = Value::Array(modifiers);
-                    }
-                    event
-                })
+                .map(|note| super::instrument_chart::encode_note(state, note, &instrument))
                 .collect();
 
             let mut phrase = json!({
@@ -366,36 +297,6 @@ pub(super) fn serialize_harpchart_notes(state: &EditorState, notes: &[GridNote])
 
 // ── Parsing ───────────────────────────────────────────────────────────────────
 
-pub(super) fn parse_pitch_expr(modifiers: &[serde_json::Value]) -> (HarpTechnique, Expr) {
-    let mut pitch = HarpTechnique::Normal;
-    let mut expr = Expr::None;
-    for m in modifiers {
-        match m["type"].as_str().unwrap_or("") {
-            "bend" => {
-                let s = m["semitones"].as_f64().unwrap_or(0.0) as f32;
-                pitch = HarpTechnique::Bend(-s);
-            }
-            "overblow" => pitch = HarpTechnique::Overblow,
-            "overdraw" => pitch = HarpTechnique::Overdraw,
-            "slide" => pitch = HarpTechnique::Slide,
-            // Default to the old fixed rates for charts saved before
-            // `oscillation_hz` was per-note; clamp away non-positive/absurd
-            // values so a hand-edited chart can't divide-by-zero the preview
-            // synth's phase integration.
-            "vibrato" => {
-                let hz = m["oscillation_hz"].as_f64().unwrap_or(5.5) as f32;
-                expr = Expr::Vibrato(hz.max(0.5));
-            }
-            "wah-wah" => {
-                let hz = m["oscillation_hz"].as_f64().unwrap_or(4.0) as f32;
-                expr = Expr::Wah(hz.max(0.5));
-            }
-            _ => {}
-        }
-    }
-    (pitch, expr)
-}
-
 /// A pickup of `editor_ticks` as the Details field shows it: beats of
 /// `meter`, whole when it is whole ("1") and otherwise to two places
 /// ("0.5"). Empty for no pickup.
@@ -599,11 +500,6 @@ pub(super) fn load_harpchart(v: &serde_json::Value, state: &mut EditorState, scr
     state.expression_intensities.clear();
     let mut next_id = 0u32;
     let instrument = state.effective_instrument();
-    // Any instrument but the harmonica: its events decode through core's
-    // codec, never as holes.
-    let guitar = !matches!(instrument, harmonicon_core::instrument::Instrument::Harmonica(_));
-    let hole_count = if guitar { 0 } else { state.row_count() };
-
     if let Some(track) = v["track"].as_array() {
         for phrase in track {
             let start_tick = if let Some(t) = phrase["tick"].as_u64() {
@@ -661,44 +557,17 @@ pub(super) fn load_harpchart(v: &serde_json::Value, state: &mut EditorState, scr
 
             let events = phrase["events"].as_array().map_or(&[][..], Vec::as_slice);
             for event in events {
-                if guitar {
-                    if let Some(note) = super::instrument_chart::decode_note(
-                        event,
-                        &instrument,
-                        next_id,
-                        start_tick,
-                        len,
-                        state,
-                    ) {
-                        notes.push(note);
-                        next_id += 1;
-                    }
-                    continue;
-                }
-                let hole = event["hole"].as_u64().unwrap_or(1) as u8;
-                if !(1..=hole_count).contains(&hole) {
-                    continue;
-                }
-                let dir =
-                    if event["action"].as_str() == Some("draw") { Dir::Draw } else { Dir::Blow };
-                let mods = event["modifiers"].as_array().map_or(&[][..], Vec::as_slice);
-                let (pitch, expr) = parse_pitch_expr(mods);
-                if let Some(intensity) = mods.iter().find_map(|modifier| {
-                    matches!(modifier["type"].as_str(), Some("vibrato" | "wah-wah"))
-                        .then(|| modifier["intensity"].as_f64())
-                        .flatten()
-                }) && intensity != 0.5
-                {
-                    state.expression_intensities.insert(next_id, intensity.to_string());
-                }
-                notes.push(GridNote::new(
+                if let Some(note) = super::instrument_chart::decode_note(
+                    event,
+                    &instrument,
                     next_id,
                     start_tick,
                     len,
-                    expr,
-                    GridNote::harmonica_target(hole, dir, pitch),
-                ));
-                next_id += 1;
+                    state,
+                ) {
+                    notes.push(note);
+                    next_id += 1;
+                }
             }
         }
     }

@@ -128,23 +128,12 @@ pub(super) fn transpose_notes(
 /// Transposes the selection — or the whole chart when nothing is selected
 /// — and leaves the outcome for the status bar to report.
 pub(super) fn transpose_selection(state: &mut EditorState, semitones: i32) {
-    // Resolution here is onto harmonica holes. A flute's pitch rows move
-    // directly; a guitar has no transposer.
-    if super::bowed_note::is_bowed(state) {
-        state.transpose_notice = Some(super::bowed_note::transpose(state, semitones));
-        return;
-    }
-    if super::flute_note::is_wind(state) {
-        let outcome = super::flute_note::transpose(state, semitones);
-        state.transpose_notice = Some(outcome);
-        return;
-    }
-    if super::piano_note::is_piano(state) {
-        let outcome = super::piano_note::transpose(state, semitones);
-        state.transpose_notice = Some(outcome);
-        // Keep the note being moved in the window, so an octave jump
-        // doesn't send it out of sight.
-        if let Some(row) = state.selected_note().map(super::state::GridNote::row) {
+    let adapter = super::instrument_adapter::for_instrument(&state.effective_instrument());
+    if let Some(transpose) = adapter.transpose {
+        state.transpose_notice = Some(transpose(state, semitones));
+        if adapter.window.is_some()
+            && let Some(row) = state.selected_note().map(super::state::GridNote::row)
+        {
             super::piano_note::reveal_row(state, row);
         }
         return;

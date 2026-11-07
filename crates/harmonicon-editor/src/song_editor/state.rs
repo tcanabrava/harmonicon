@@ -427,8 +427,10 @@ impl EditorState {
     /// flute in fingering view, which draws one per key, and a piano, which
     /// draws a scrolling window onto its keyboard (`piano_note`).
     pub(super) fn display_rows(&self) -> u8 {
-        if super::piano_note::is_piano(self) {
-            return self.row_count().min(super::piano_note::WINDOW_ROWS);
+        if let Some(window) =
+            super::instrument_adapter::for_instrument(&self.effective_instrument()).window
+        {
+            return self.row_count().min(window);
         }
         match self.flute_fingering_view() {
             Some(flute) => harmonicon_core::instrument::flute::key_rows(flute.foot).len() as u8,
@@ -696,32 +698,7 @@ impl EditorState {
 
     /// How many rows the grid has: a harmonica's holes, a guitar's strings.
     pub(super) fn row_count(&self) -> u8 {
-        match self.effective_instrument() {
-            harmonicon_core::instrument::Instrument::Bowed(strings) => {
-                return strings.strings.len() as u8;
-            }
-            harmonicon_core::instrument::Instrument::Fretted(guitar) => {
-                return guitar.string_count();
-            }
-            harmonicon_core::instrument::Instrument::Flute(flute) => {
-                return super::note_model::FLUTE_TOP_NOTE + 1 - flute.lowest();
-            }
-            harmonicon_core::instrument::Instrument::Clarinet(clarinet) => {
-                return super::note_model::FLUTE_TOP_NOTE + 1 - *clarinet.range().start();
-            }
-            harmonicon_core::instrument::Instrument::Piano(piano) => {
-                return super::note_model::PIANO_TOP_NOTE + 1 - piano.lowest();
-            }
-            harmonicon_core::instrument::Instrument::Harmonica(_) => {}
-        }
-        match self.harmonica_kind() {
-            HarmonicaKind::Diatonic
-            | HarmonicaKind::CountryTuned
-            | HarmonicaKind::PaddyRichter
-            | HarmonicaKind::NaturalMinor => 10,
-            HarmonicaKind::Chromatic => 12,
-            HarmonicaKind::Chromatic16 => 16,
-        }
+        super::instrument_adapter::for_instrument(&self.effective_instrument()).rows
     }
 
     /// Switches [`EditorState::harmonica_kind`] and repairs any note that
@@ -1024,7 +1001,7 @@ fn overlapping_group(state: &EditorState, id: u32) -> Vec<u32> {
 /// can't make.
 pub(super) fn enforce_direction(state: &mut EditorState, id: u32) {
     // Breath only: a guitar edit is validated and refused, never repaired
-    // by moving the notes beside it (`guitar_note::fits`).
+    // by moving the notes beside it (`note_edit::fits`).
     let Some(anchor @ PlayPosition::Hole(_)) =
         state.note_by_id(id).and_then(|n| n.target.position())
     else {

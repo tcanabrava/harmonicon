@@ -1097,7 +1097,7 @@ trainer-chord-board-help = Consulta el diagrama para las cuerdas al aire y silen
 
 trainer-reference-playing = Sonando la referencia — tu entrada no se está evaluando.
 
-trainer-flute-pick-help = Elige una nota en la partitura para repetirla · También puedes usar Tab y Intro · Las notas atenuadas no están disponibles para este ejercicio. Dorado: objetivo · Contorno blanco: nota inicial.
+trainer-pitch-pick-help = Elige una nota en la partitura para repetirla · También puedes usar Tab y Intro · Las notas atenuadas no están disponibles para este ejercicio. Dorado: objetivo · Contorno blanco: nota inicial.
 
 lesson-instrument-title = Lecciones · Elige tu instrumento
 lesson-instrument-help = Elige el instrumento que tocas. Solo se cargarán sus rutas de aprendizaje.
@@ -1190,3 +1190,5 @@ bowed-staccato = Staccato
 bowed-invalid = La altura o digitación no encaja en esta cuerda, o se solapa con una cuerda incompatible. Selecciona una nota para editar su dedo o posición.
 bowed-cents = Afinación · { $cents } cents
 bowed-heard = Se oye { $note }
+
+note-trainer-instrument-title = Entrenamiento de notas — { $instrument }

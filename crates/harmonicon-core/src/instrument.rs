@@ -89,6 +89,20 @@ impl InstrumentKind {
             Self::Violin => "violin",
         }
     }
+    /// Default configuration registered with the identity, shared by document
+    /// creation and trainer entry points.
+    pub fn default_instrument(self) -> Instrument {
+        match self {
+            Self::Harmonica => crate::harmonica::richter_harp("C").into(),
+            Self::Guitar => fretted_strings::FrettedKind::Guitar.default_setup().into(),
+            Self::Bass => fretted_strings::FrettedKind::Bass.default_setup().into(),
+            Self::Cavaquinho => fretted_strings::FrettedKind::Cavaquinho.default_setup().into(),
+            Self::Piano => Piano::default().into(),
+            Self::Flute => Flute::default().into(),
+            Self::Clarinet => Clarinet::default().into(),
+            Self::Violin => bowed_strings::BowedKind::Violin.standard().into(),
+        }
+    }
     pub fn from_slug(value: &str) -> Option<Self> {
         Self::ALL.into_iter().find(|kind| kind.slug() == value)
     }

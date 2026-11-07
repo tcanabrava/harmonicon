@@ -856,12 +856,14 @@ pub enum Modifier {
     Harmonic,
     #[serde(rename = "vibrato")]
     Vibrato {
+        #[serde(default = "default_vibrato_hz")]
         oscillation_hz: f32,
         #[serde(skip_serializing_if = "Option::is_none")]
         intensity: Option<f32>,
     },
     #[serde(rename = "wah-wah")]
     WahWah {
+        #[serde(default = "default_wah_hz")]
         oscillation_hz: f32,
         #[serde(skip_serializing_if = "Option::is_none")]
         intensity: Option<f32>,
@@ -1212,4 +1214,11 @@ mod tests {
                 .unwrap_or_else(|e| panic!("difficulty '{s}' failed to parse: {e}"));
         }
     }
+}
+
+fn default_vibrato_hz() -> f32 {
+    5.5
+}
+fn default_wah_hz() -> f32 {
+    4.0
 }

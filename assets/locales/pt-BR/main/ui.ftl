@@ -1095,7 +1095,7 @@ trainer-chord-board-help = Veja no diagrama as cordas soltas e abafadas. O braç
 
 trainer-reference-playing = Referência tocando — sua entrada não está sendo avaliada.
 
-trainer-flute-pick-help = Escolha uma nota na partitura para repeti-la · Você também pode usar Tab e Enter · As notas esmaecidas não estão disponíveis neste exercício. Dourado: alvo · Contorno branco: nota inicial.
+trainer-pitch-pick-help = Escolha uma nota na partitura para repeti-la · Você também pode usar Tab e Enter · As notas esmaecidas não estão disponíveis neste exercício. Dourado: alvo · Contorno branco: nota inicial.
 
 lesson-instrument-title = Lições · Escolha seu instrumento
 lesson-instrument-help = Escolha o instrumento que você toca. Apenas as trilhas desse instrumento serão carregadas.
@@ -1188,3 +1188,5 @@ bowed-staccato = Staccato
 bowed-invalid = A altura ou digitação não cabe nesta corda ou se sobrepõe a uma corda incompatível. Selecione uma nota para editar dedo ou posição.
 bowed-cents = Afinação · { $cents } cents
 bowed-heard = Ouvindo { $note }
+
+note-trainer-instrument-title = Treino de notas — { $instrument }

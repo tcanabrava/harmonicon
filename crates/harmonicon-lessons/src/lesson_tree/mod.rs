@@ -264,7 +264,7 @@ pub(crate) fn setup_lesson_tree(
         return;
     };
     let lessons = &curriculum.lessons;
-    let instrument = loc.msg(crate::instrument_menu::instrument_key(kind)).to_string();
+    let instrument = loc.msg(&crate::instrument_menu::instrument_key(kind)).to_string();
     let title =
         loc.msg_args("lesson-tree-instrument-title", &[("instrument", instrument)]).to_string();
     // `_plain` plus a two-axis scroll area of our own: the shared

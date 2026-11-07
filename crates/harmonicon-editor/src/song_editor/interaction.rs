@@ -58,22 +58,10 @@ pub(super) fn select_or_add(state: &mut EditorState, hole: u8, tick: usize) {
 
     let len = next_start.map_or(TICKS_PER_BEAT, |start| (start - tick).min(TICKS_PER_BEAT)).max(1);
 
-    // On a guitar the row is a string, and everything below this is about
-    // breath and reeds.
-    if super::bowed_note::is_bowed(state) {
-        super::bowed_note::place(state, hole, tick, len);
-        return;
-    }
-    if super::guitar_note::is_guitar(state) {
-        super::guitar_note::place(state, hole, tick, len);
-        return;
-    }
-    if super::flute_note::is_wind(state) {
-        super::flute_note::place(state, hole, tick, len);
-        return;
-    }
-    if super::piano_note::is_piano(state) {
-        super::piano_note::place(state, hole, tick, len);
+    if let Some(place) =
+        super::instrument_adapter::for_instrument(&state.effective_instrument()).place
+    {
+        place(state, hole, tick, len);
         return;
     }
 
@@ -196,20 +184,10 @@ pub(super) fn apply_modifier(state: &mut EditorState, kind: ModButton) {
         }
         _ => {}
     }
-    if super::bowed_note::is_bowed(state) {
-        super::bowed_note::apply_modifier(state, kind);
-        return;
-    }
-    if super::guitar_note::is_guitar(state) {
-        super::guitar_note::apply_modifier(state, kind);
-        return;
-    }
-    if super::flute_note::is_wind(state) {
-        super::flute_note::apply_modifier(state, kind);
-        return;
-    }
-    // A key has no technique to change.
-    if super::piano_note::is_piano(state) {
+    if let Some(modify) =
+        super::instrument_adapter::for_instrument(&state.effective_instrument()).modify
+    {
+        modify(state, kind);
         return;
     }
     if matches!(kind, ModButton::Blow | ModButton::Draw) {
@@ -413,15 +391,12 @@ pub(super) fn report_technique_skips(
 ) {
     if state.unplayable_notice {
         state.bypass_change_detection().unplayable_notice = false;
-        feedback.set(loc.msg(if super::bowed_note::is_bowed(&state) {
-            "bowed-invalid"
-        } else if super::flute_note::is_wind(&state) {
-            "editor-wind-invalid"
-        } else if super::piano_note::is_piano(&state) {
-            "editor-piano-invalid"
-        } else {
-            "editor-guitar-invalid"
-        }));
+        feedback.set(
+            loc.msg(
+                super::instrument_adapter::for_instrument(&state.effective_instrument())
+                    .invalid_message,
+            ),
+        );
     }
     if state.technique_notice.is_none() {
         return;
@@ -730,7 +705,7 @@ pub(super) fn spawn_resize_grips(
                     let instrument = state.effective_instrument();
                     if !state.plays_harmonica()
                         && let Some(current) = state.note_by_id(id).copied()
-                        && !super::guitar_note::fits(
+                        && !super::note_edit::fits(
                             &instrument,
                             &state.notes,
                             &GridNote { tick, len, ..current },

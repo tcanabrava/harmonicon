@@ -5,6 +5,9 @@ impl InstrumentAdapter for Flute {
     fn practice_drills(&self, kind: TechniqueKind) -> Vec<crate::note_trainer::Drill> {
         crate::note_trainer::wind_drills(self, kind)
     }
+    fn score_picker(&self) -> bool {
+        true
+    }
     fn max_voices(&self) -> usize {
         1
     }
@@ -21,6 +24,9 @@ impl InstrumentAdapter for Flute {
 impl InstrumentAdapter for Clarinet {
     fn practice_drills(&self, kind: TechniqueKind) -> Vec<crate::note_trainer::Drill> {
         crate::note_trainer::wind_drills(self, kind)
+    }
+    fn score_picker(&self) -> bool {
+        true
     }
     fn max_voices(&self) -> usize {
         1

@@ -198,21 +198,13 @@ impl EffectiveHarmonica {
             return Some(harp.clone().into());
         }
         let own = chart.instrument()?;
-        Some(match (&own, &self.instrument) {
-            (Instrument::Fretted(from), Some(played @ Instrument::Fretted(to)))
-                if from.kind == to.kind =>
-            {
-                played.clone()
-            }
-            (Instrument::Flute(_), Some(played @ Instrument::Flute(_))) => played.clone(),
-            (Instrument::Clarinet(_), Some(played @ Instrument::Clarinet(_))) => played.clone(),
-            (Instrument::Bowed(from), Some(played @ Instrument::Bowed(to)))
-                if from.kind == to.kind =>
-            {
-                played.clone()
-            }
-            _ => own,
-        })
+        Some(
+            self.instrument
+                .as_ref()
+                .filter(|played| played.kind() == own.kind() && own.adapter().setup_override())
+                .cloned()
+                .unwrap_or(own),
+        )
     }
 
     /// Whether the player has chosen a harp other than the chart's.

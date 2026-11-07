@@ -12,10 +12,6 @@ pub(super) struct NewNoteSettings {
     pub bow: Option<BowGesture>,
 }
 
-pub(super) fn is_bowed(state: &EditorState) -> bool {
-    matches!(state.effective_instrument(), Instrument::Bowed(_))
-}
-
 pub(super) fn place(state: &mut EditorState, string: u8, tick: usize, len: usize) {
     let Instrument::Bowed(strings) = state.effective_instrument() else { return };
     let Some(pitch) = state.bowed.pitch.or_else(|| strings.open_pitch(string)) else { return };
@@ -33,7 +29,7 @@ pub(super) fn place(state: &mut EditorState, string: u8, tick: usize, len: usize
     .with_performance(harmonicon_core::note_performance::PerformanceInstructions::from_bow(
         state.bowed.bow,
     ));
-    if !super::guitar_note::fits(&Instrument::Bowed(strings), &state.notes, &note, &[]) {
+    if !super::note_edit::fits(&Instrument::Bowed(strings), &state.notes, &note, &[]) {
         state.unplayable_notice = true;
         return;
     }
@@ -59,7 +55,7 @@ pub(super) fn set_pitch(state: &mut EditorState, pitch: u8) -> bool {
         note.target = NoteTarget::Positioned(PlayPosition::Fingerboard(at));
     }
     let instrument = Instrument::Bowed(strings);
-    if notes.iter().any(|note| !super::guitar_note::fits(&instrument, &notes, note, &[])) {
+    if notes.iter().any(|note| !super::note_edit::fits(&instrument, &notes, note, &[])) {
         return false;
     }
     state.notes = notes;
@@ -175,7 +171,7 @@ pub(super) fn apply_modifier(state: &mut EditorState, kind: super::ui::ModButton
             note.target = NoteTarget::Positioned(PlayPosition::Fingerboard(new));
         }
         let instrument = Instrument::Bowed(strings);
-        if notes.iter().any(|note| !super::guitar_note::fits(&instrument, &notes, note, &[])) {
+        if notes.iter().any(|note| !super::note_edit::fits(&instrument, &notes, note, &[])) {
             state.unplayable_notice = true;
             return;
         }

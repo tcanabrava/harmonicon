@@ -1098,7 +1098,7 @@ trainer-chord-board-help = Read the chord diagram for open and muted strings. Th
 
 trainer-reference-playing = Reference playing — your input is not being assessed.
 
-trainer-flute-pick-help = Choose a note on the score to repeat it · Tab and Enter work too · Dimmed notes are unavailable for this exercise. Gold: target · White outline: starting note.
+trainer-pitch-pick-help = Choose a note on the score to repeat it · Tab and Enter work too · Dimmed notes are unavailable for this exercise. Gold: target · White outline: starting note.
 
 lesson-instrument-title = Lessons · Choose your instrument
 lesson-instrument-help = Choose what you play. Only that instrument’s lesson paths will be loaded.
@@ -1191,3 +1191,5 @@ bowed-staccato = Staccato
 bowed-invalid = That pitch or fingering does not fit this string, or overlaps an incompatible string. Select a note before editing its finger or hand position.
 bowed-cents = Intonation · { $cents } cents
 bowed-heard = Hearing { $note }
+
+note-trainer-instrument-title = Note Trainer — { $instrument }

@@ -184,7 +184,7 @@ impl EditorState {
             let instrument = self.effective_instrument();
             let mut sounding = self.notes.clone();
             placed.retain(|(_, note)| {
-                let fits = super::guitar_note::fits(&instrument, &sounding, note, &[]);
+                let fits = super::note_edit::fits(&instrument, &sounding, note, &[]);
                 if fits {
                     sounding.push(*note);
                 }

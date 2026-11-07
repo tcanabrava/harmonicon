@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: MIT
 //! Guitar setup edits are atomic, undoable, and retain authored fret positions.
+#[cfg(test)]
+use super::instrument_ui::EditorInstrumentKind;
 use super::save_feedback::SaveFeedback;
 use super::state::{EditorState, InstrumentSelection, Mode};
 use bevy::prelude::*;
@@ -120,7 +122,7 @@ fn configure(state: &mut EditorState, guitar: Guitar) -> bool {
         let Some(at @ PlayPosition::Fret(_)) = note.target.position() else { return false };
         note.target = NoteTarget::Positioned(at);
     }
-    if notes.iter().any(|note| !super::guitar_note::fits(&instrument, &notes, note, &[])) {
+    if notes.iter().any(|note| !super::note_edit::fits(&instrument, &notes, note, &[])) {
         return false;
     }
     state.instrument = InstrumentSelection::Configured { instrument, harmonica_origin: None };

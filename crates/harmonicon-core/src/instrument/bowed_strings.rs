@@ -12,6 +12,12 @@ pub enum BowedKind {
     Violin,
 }
 impl BowedKind {
+    pub const fn instrument_kind(self) -> super::InstrumentKind {
+        match self {
+            Self::Violin => super::InstrumentKind::Violin,
+        }
+    }
+
     pub fn standard(self) -> BowedStrings {
         match self {
             Self::Violin => {

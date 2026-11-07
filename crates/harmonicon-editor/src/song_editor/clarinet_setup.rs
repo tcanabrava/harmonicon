@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: MIT
 //! Clarinet setup preserves sounding notes and rejects an invalid range change.
+#[cfg(test)]
+use super::instrument_ui::EditorInstrumentKind;
 use super::state::{EditorState, InstrumentSelection, Mode};
 use bevy::prelude::*;
 use harmonicon_core::instrument::clarinet::{Clarinet, ClarinetKey};

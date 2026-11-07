@@ -7,7 +7,7 @@
 //! alternates. The flute has one voice: a note placed while another sounds
 //! ends that one there, and one placed on another's onset is refused,
 //! since the two could only be a chord. Drags, resizes and pastes are
-//! checked by the same rule through `guitar_note::fits`, which asks the
+//! checked by the same rule through `note_edit::fits`, which asks the
 //! instrument what can sound together.
 use super::interaction::next_expr;
 use super::note_model::FLUTE_TOP_NOTE;
@@ -18,10 +18,6 @@ use harmonicon_core::instrument::PlayPosition;
 use harmonicon_core::instrument::flute::Flute;
 use harmonicon_core::instrument::wind::FingeringAssignment;
 use harmonicon_core::note_target::NoteTarget;
-
-pub(super) fn is_wind(state: &EditorState) -> bool {
-    state.effective_instrument().fingering_chart().is_some()
-}
 
 fn fingering_of(note: &GridNote) -> Option<FingeringAssignment> {
     match note.target.position() {

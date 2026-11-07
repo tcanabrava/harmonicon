@@ -494,6 +494,7 @@ pub(super) fn drag_grid_scrollbar(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::song_editor::instrument_ui::EditorInstrumentKind;
 
     #[test]
     fn wheel_over_flute_keyboard_keeps_notes_aligned_and_piano_still_scrolls() {

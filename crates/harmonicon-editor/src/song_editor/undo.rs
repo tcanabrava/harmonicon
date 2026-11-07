@@ -78,10 +78,10 @@ impl Snapshot {
                             harmonicon_core::instrument::Instrument::Fretted(guitar) => {
                                 guitar.strings.capacity()
                             }
-                            harmonicon_core::instrument::Instrument::Bowed(_)
-                            | harmonicon_core::instrument::Instrument::Flute(_)
-                            | harmonicon_core::instrument::Instrument::Clarinet(_)
-                            | harmonicon_core::instrument::Instrument::Piano(_) => 0,
+                            harmonicon_core::instrument::Instrument::Bowed(strings) => {
+                                strings.strings.capacity()
+                            }
+                            _ => 0,
                         }
                 }
             }
