@@ -19,8 +19,9 @@ use gix::remote::fetch::Shallow;
 use crate::pack::{EngineSupport, Incompatible, PackError, PackKind, PackManifest};
 use crate::repo::{InstalledRepo, RepoSpec, SpecError};
 
-/// A pack's whole checkout may not exceed this. Content is charts, small
-/// images and audio; anything larger is a mistake or hostile.
+/// A pack's download may not exceed this. Content is charts, small images
+/// and audio; anything larger is a mistake or hostile. Songs a player keeps
+/// after upstream removed them are not counted.
 pub const MAX_PACK_BYTES: u64 = 1024 * 1024 * 1024;
 
 #[derive(Debug, thiserror::Error)]
@@ -133,8 +134,12 @@ pub fn install(
             let manifest = validate_checkout(&staging, kind, engine)?;
             if kind == PackKind::Songs {
                 crate::retained_songs::preserve_removed(&dest, &staging)?;
-                // Validate the combined copy before touching the installed pack.
-                validate_checkout(&staging, kind, engine)?;
+                // Validate the combined copy before touching the installed
+                // pack, but not its size: the download already passed that,
+                // and what was added is the player's kept songs, which grow
+                // with every update and would eventually fail them all.
+                check_tree(&staging, None)?;
+                read_manifest(&staging, kind, engine)?;
             }
             Ok((commit, manifest))
         });
@@ -205,7 +210,7 @@ pub fn validate_checkout(
     kind: PackKind,
     engine: &EngineSupport,
 ) -> Result<PackManifest, SyncError> {
-    check_tree(dir)?;
+    check_tree(dir, Some(MAX_PACK_BYTES))?;
     read_manifest(dir, kind, engine)
 }
 
@@ -228,9 +233,9 @@ pub fn read_manifest(
 }
 
 /// No symbolic links (one could point an asset path anywhere on the
-/// player's disk) and a bounded size. `.git` is skipped: it is ours, not the
-/// pack's.
-fn check_tree(dir: &Path) -> Result<(), SyncError> {
+/// player's disk) and, given a `size_limit`, no more bytes than that. `.git`
+/// is skipped: it is ours, not the pack's.
+fn check_tree(dir: &Path, size_limit: Option<u64>) -> Result<(), SyncError> {
     let mut total = 0u64;
     let mut stack = vec![dir.to_path_buf()];
     while let Some(current) = stack.pop() {
@@ -250,7 +255,7 @@ fn check_tree(dir: &Path) -> Result<(), SyncError> {
                 stack.push(path);
             } else {
                 total += entry.metadata()?.len();
-                if total > MAX_PACK_BYTES {
+                if size_limit.is_some_and(|limit| total > limit) {
                     return Err(SyncError::TooLarge);
                 }
             }
@@ -473,6 +478,15 @@ mod tests {
     }
 
     #[cfg(unix)]
+    #[test]
+    fn the_size_limit_is_only_applied_when_asked_for() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("song.ogg"), [0u8; 100]).unwrap();
+        assert!(matches!(check_tree(dir.path(), Some(99)), Err(SyncError::TooLarge)));
+        check_tree(dir.path(), Some(100)).unwrap();
+        check_tree(dir.path(), None).unwrap();
+    }
+
     #[test]
     fn a_symlink_in_the_pack_is_refused() {
         let up = upstream(1);

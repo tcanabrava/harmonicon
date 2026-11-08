@@ -349,10 +349,12 @@ lock); this crate adapts its model. Findings:
   rather than kept on update. It is now a named `CHART_EXTENSIONS`, held
   equal to the score crate's list (plus `harpchart`) by a test in
   `harmonicon-platform`, which sees both.
-- **Hazard, open**: retained songs accumulate in the checkout with no
-  bound, and every update counts them against `MAX_PACK_BYTES`. Once they
-  cross 1 GiB, every later update fails with "larger than 1024 MB" and
-  nothing says why or how to recover.
+- **Hazard, fixed**: retained songs accumulate in the checkout with no
+  bound, and the re-validation after `preserve_removed` counted them
+  against `MAX_PACK_BYTES`, so once they crossed 1 GiB every update would
+  have failed with "larger than 1024 MB". That pass now checks links and
+  the manifest only; the limit applies to the download, which has already
+  passed it.
 - **Hazard, open**: `MAX_PACK_BYTES` is checked after the clone, so a
   hostile or mistaken repository can fill the disk before it's refused.
   Only reachable through an address the player chose.
