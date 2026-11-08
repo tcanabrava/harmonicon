@@ -37,6 +37,10 @@ Nothing below can be approved by a test.
     with sparse non-negative reconstruction plus noise and residual terms;
   - add a frequency-dependent noise estimate and separate attack/sustain
     thresholds;
+  - measure how often a low note whose fundamental is weaker than its own
+    second harmonic is reported as two notes an octave apart:
+    `suppress_harmonics` only drops a peak that is a multiple of a
+    *stronger* one (`docs/code_review_plan.md`, `harmonicon-dsp`);
   - decide whether the harmonica constraint solver goes live, scoped to
     NMF only. It is proven only on synthetic audio, and a real reed's
     blow/draw transition may be stripped like a phantom.

@@ -592,5 +592,7 @@ densely tested.
 ## Review complete
 
 All sixteen crates reviewed, including the two parts first deferred
-(`music_score` and the note trainer). Open hazards are listed under each
-crate above.
+(`music_score` and the note trainer), and every hazard found has been
+fixed except one: `harmonicon-dsp`'s harmonic suppression, which waits on
+the recorded detection corpus (`docs/pitch_detection_plan.md`, and
+`PLAN.md`'s corpus item).
