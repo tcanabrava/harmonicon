@@ -355,9 +355,12 @@ lock); this crate adapts its model. Findings:
   have failed with "larger than 1024 MB". That pass now checks links and
   the manifest only; the limit applies to the download, which has already
   passed it.
-- **Hazard, open**: `MAX_PACK_BYTES` is checked after the clone, so a
-  hostile or mistaken repository can fill the disk before it's refused.
-  Only reachable through an address the player chose.
+- **Hazard, fixed**: `MAX_PACK_BYTES` was checked only after the clone,
+  so a hostile or mistaken repository could fill the disk first. A watcher
+  now measures the staging folder every 100 ms and stops the clone past
+  `STAGING_LIMIT_BYTES`: twice the content limit plus a margin, since a
+  depth-1 clone is the checkout plus one barely-compressed pack of it, so
+  no pack the content check accepts is refused earlier.
 - Checked and sound: scheme allowlist (`ext::`, `http` refused), slug
   sanitizing, symlink refusal, staged swap with rollback, compatibility
   rules (pre-releases match their release), corrupt `installed.json`.

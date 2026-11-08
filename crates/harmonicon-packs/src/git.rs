@@ -10,7 +10,8 @@
 
 use std::num::NonZeroU32;
 use std::path::{Path, PathBuf};
-use std::sync::atomic::AtomicBool;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::time::Duration;
 
 use gix::progress::Discard;
 use gix::remote::Direction;
@@ -23,6 +24,17 @@ use crate::repo::{InstalledRepo, RepoSpec, SpecError};
 /// and audio; anything larger is a mistake or hostile. Songs a player keeps
 /// after upstream removed them are not counted.
 pub const MAX_PACK_BYTES: u64 = 1024 * 1024 * 1024;
+
+/// The most a pack within [`MAX_PACK_BYTES`] can take in its staging folder
+/// while it downloads: the checkout plus a depth-1 git pack of the same
+/// content (media barely compresses), with a margin for git's own files. A
+/// clone is stopped once its staging folder passes this, rather than after
+/// it has filled the disk; such a pack would fail [`check_tree`] after
+/// checkout anyway, so no pack the size check accepts is refused here.
+const STAGING_LIMIT_BYTES: u64 = 2 * MAX_PACK_BYTES + 64 * 1024 * 1024;
+
+/// How often a running clone's staging folder is measured.
+const STAGING_POLL: Duration = Duration::from_millis(100);
 
 #[derive(Debug, thiserror::Error)]
 pub enum SyncError {
@@ -130,19 +142,20 @@ pub fn install(
     remove_if_present(&staging)?;
 
     let result =
-        clone_shallow(url, git_ref.as_deref(), &staging, should_interrupt).and_then(|commit| {
-            let manifest = validate_checkout(&staging, kind, engine)?;
-            if kind == PackKind::Songs {
-                crate::retained_songs::preserve_removed(&dest, &staging)?;
-                // Validate the combined copy before touching the installed
-                // pack, but not its size: the download already passed that,
-                // and what was added is the player's kept songs, which grow
-                // with every update and would eventually fail them all.
-                check_tree(&staging, None)?;
-                read_manifest(&staging, kind, engine)?;
-            }
-            Ok((commit, manifest))
-        });
+        clone_shallow(url, git_ref.as_deref(), &staging, should_interrupt, STAGING_LIMIT_BYTES)
+            .and_then(|commit| {
+                let manifest = validate_checkout(&staging, kind, engine)?;
+                if kind == PackKind::Songs {
+                    crate::retained_songs::preserve_removed(&dest, &staging)?;
+                    // Validate the combined copy before touching the installed
+                    // pack, but not its size: the download already passed that,
+                    // and what was added is the player's kept songs, which grow
+                    // with every update and would eventually fail them all.
+                    check_tree(&staging, None)?;
+                    read_manifest(&staging, kind, engine)?;
+                }
+                Ok((commit, manifest))
+            });
     let (commit, manifest) = match result {
         Ok(ok) => ok,
         Err(e) => {
@@ -163,7 +176,63 @@ pub fn install(
     ))
 }
 
+/// [`fetch_and_checkout`], stopped as soon as `dest` holds more than
+/// `disk_limit` bytes, and refused if it ends up holding more. A watcher
+/// thread measures `dest` every [`STAGING_POLL`] and stops gix through the
+/// same interrupt flag it passes `should_interrupt` on through.
 fn clone_shallow(
+    url: &str,
+    git_ref: Option<&str>,
+    dest: &Path,
+    should_interrupt: &AtomicBool,
+    disk_limit: u64,
+) -> Result<String, SyncError> {
+    let stop = AtomicBool::new(false);
+    let too_large = AtomicBool::new(false);
+    let done = AtomicBool::new(false);
+    let result = std::thread::scope(|scope| {
+        scope.spawn(|| {
+            while !done.load(Ordering::Relaxed) {
+                if should_interrupt.load(Ordering::Relaxed) {
+                    stop.store(true, Ordering::Relaxed);
+                }
+                if tree_bytes(dest) > disk_limit {
+                    too_large.store(true, Ordering::Relaxed);
+                    stop.store(true, Ordering::Relaxed);
+                }
+                std::thread::sleep(STAGING_POLL);
+            }
+        });
+        let result = fetch_and_checkout(url, git_ref, dest, &stop);
+        done.store(true, Ordering::Relaxed);
+        result
+    });
+    if too_large.load(Ordering::Relaxed) || tree_bytes(dest) > disk_limit {
+        return Err(SyncError::TooLarge);
+    }
+    result
+}
+
+/// Bytes under `dir`, `.git` included, without following links. Best
+/// effort: a clone in progress creates and renames files as this walks.
+fn tree_bytes(dir: &Path) -> u64 {
+    let mut total = 0u64;
+    let mut stack = vec![dir.to_path_buf()];
+    while let Some(current) = stack.pop() {
+        let Ok(entries) = std::fs::read_dir(&current) else { continue };
+        for entry in entries.flatten() {
+            let Ok(meta) = std::fs::symlink_metadata(entry.path()) else { continue };
+            if meta.is_dir() {
+                stack.push(entry.path());
+            } else {
+                total = total.saturating_add(meta.len());
+            }
+        }
+    }
+    total
+}
+
+fn fetch_and_checkout(
     url: &str,
     git_ref: Option<&str>,
     dest: &Path,
@@ -478,6 +547,18 @@ mod tests {
     }
 
     #[cfg(unix)]
+    #[test]
+    fn a_clone_past_its_staging_limit_is_refused() {
+        let upstream = upstream(1);
+        let dest = tempfile::tempdir().unwrap();
+        let url = format!("file://{}", upstream.path().display());
+        let staging = dest.path().join("staging");
+        let refused = clone_shallow(&url, None, &staging, &AtomicBool::new(false), 1);
+        assert!(matches!(refused, Err(SyncError::TooLarge)), "{refused:?}");
+        let other = dest.path().join("other");
+        clone_shallow(&url, None, &other, &AtomicBool::new(false), STAGING_LIMIT_BYTES).unwrap();
+    }
+
     #[test]
     fn the_size_limit_is_only_applied_when_asked_for() {
         let dir = tempfile::tempdir().unwrap();

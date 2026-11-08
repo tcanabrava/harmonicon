@@ -14,7 +14,18 @@ pub const INDEX: &str = ".harmonicon-retained-songs.json";
 /// pack update removes it, so `harmonicon-platform`, which sees both, has a
 /// test holding them equal.
 pub const CHART_EXTENSIONS: &[&str] = &[
-    "harpchart", "mid", "midi", "gp3", "gp4", "gp5", "gpx", "gp", "mscz", "musicxml", "xml", "mxl",
+    "harpchart",
+    "mid",
+    "midi",
+    "gp3",
+    "gp4",
+    "gp5",
+    "gpx",
+    "gp",
+    "mscz",
+    "musicxml",
+    "xml",
+    "mxl",
 ];
 
 pub fn read_index(root: &Path) -> BTreeSet<String> {
@@ -39,9 +50,7 @@ fn has_chart(folder: &Path) -> io::Result<bool> {
         let entry = entry?;
         if entry.file_type()?.is_file()
             && entry.path().extension().and_then(|extension| extension.to_str()).is_some_and(
-                |extension| {
-                    CHART_EXTENSIONS.contains(&extension.to_ascii_lowercase().as_str())
-                },
+                |extension| CHART_EXTENSIONS.contains(&extension.to_ascii_lowercase().as_str()),
             )
         {
             return Ok(true);
