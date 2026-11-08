@@ -411,9 +411,9 @@ without a pass, and nothing reads `SongManifest::waveform`.
   finds no bundled themes. Resolving against
   `FileAssetReader::get_base_path()` would remove the need, but wants a
   packaged run to verify.
-- **Cleanup, open**: `LocalizationExt::msg` warns on *every* call for a
-  missing key, and several callers run per frame, so one missing key
-  floods the log. Warning once per key needs a set behind a lock; small.
+- **Cleanup, fixed**: `LocalizationExt::msg` and `msg_args` warned on
+  *every* lookup of a missing key, and several callers run per frame, so
+  one missing key flooded the log. They now warn once per key.
 - Checked and sound: `packs://` path confinement (only normal components,
   first must be a registered pack), debounced atomic settings saves with
   an exit flush, the cfg guards against `build.rs`, scoped translation

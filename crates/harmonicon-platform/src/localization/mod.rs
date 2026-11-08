@@ -465,10 +465,7 @@ pub trait LocalizationExt {
 
 impl LocalizationExt for Localization {
     fn msg(&self, key: &str) -> LocalizedStr {
-        LocalizedStr::new(self.content(key).unwrap_or_else(|| {
-            warn!("Missing translation for {key:?}");
-            key.to_string()
-        }))
+        LocalizedStr::new(self.content(key).unwrap_or_else(|| missing(key)))
     }
 
     fn msg_args(&self, key: &str, args: &[(&str, String)]) -> LocalizedStr {
@@ -477,12 +474,28 @@ impl LocalizationExt for Localization {
             fluent_args.set(*name, value.as_str());
         }
         let request = Request::new(key).args(&fluent_args);
-        let s = self.content(request).unwrap_or_else(|| {
-            warn!("Missing translation for {key:?}");
-            key.to_string()
-        });
+        let s = self.content(request).unwrap_or_else(|| missing(key));
         LocalizedStr::new(strip_bidi_isolates(s))
     }
+}
+
+/// The stand-in for a missing key: the key itself, warning the first time
+/// it misses. Several callers look a string up every frame, so warning on
+/// every miss buried the log under one key.
+fn missing(key: &str) -> String {
+    static WARNED: std::sync::Mutex<Option<std::collections::HashSet<String>>> =
+        std::sync::Mutex::new(None);
+    let first =
+        WARNED.lock().map(|mut seen| first_miss(seen.get_or_insert_default(), key)).unwrap_or(true);
+    if first {
+        warn!("Missing translation for {key:?}");
+    }
+    key.to_string()
+}
+
+/// Records `key` in `seen`; whether this was its first miss.
+fn first_miss(seen: &mut std::collections::HashSet<String>, key: &str) -> bool {
+    !seen.contains(key) && seen.insert(key.to_string())
 }
 
 /// Strips Fluent's bidi-isolation marks (FSI/PDI, U+2068/U+2069), which
@@ -563,6 +576,14 @@ mod tests {
         let english = Locale::new(lang("en-US")).with_default(lang("en-US"));
         let loc = build_from_bundles(&[game], &assets, &packs, &english);
         assert_eq!(&*loc.msg("lesson-x"), "Lesson");
+    }
+
+    #[test]
+    fn a_missing_key_is_reported_once_however_often_it_is_asked_for() {
+        let mut seen = std::collections::HashSet::new();
+        assert!(super::first_miss(&mut seen, "a-key"));
+        assert!(!super::first_miss(&mut seen, "a-key"));
+        assert!(super::first_miss(&mut seen, "another-key"));
     }
 
     #[test]
