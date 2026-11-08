@@ -61,8 +61,8 @@ pub(super) fn rebuild_full_score(
     mut layers: Query<(Entity, &mut FullScoreLayer)>,
     visibility: Query<&InheritedVisibility>,
     existing: Query<(Entity, &ChildOf), With<MusicScoreNoteGlyph>>,
-    mut clefs: Query<(&mut Text, &mut Node), With<MusicScoreClef>>,
-    mut signatures: Query<(&MusicScoreTimeSig, &mut Text), Without<MusicScoreClef>>,
+    mut clefs: ClefQuery,
+    mut signatures: TimeSigQuery,
     mut roots: Query<(&mut Node, Option<&InstrumentScoreClef>, Option<&InstrumentOctaveAnnotation>), Without<MusicScoreClef>>,
 ) {
     let spacing = &engraving.spacing;
@@ -91,6 +91,7 @@ pub(super) fn rebuild_full_score(
             &meter,
             &bars,
             spacing.0,
+            full.root,
             layer,
             0.0,
             -1.0,
@@ -139,5 +140,45 @@ mod full_score_tests {
         assert_eq!(world.query::<&MusicScoreNotesLayer>().iter(world).count(), 1);
         assert_eq!(world.query::<&FullScoreLayer>().iter(world).count(), 1);
         assert_eq!(world.query::<&MusicScoreReference>().iter(world).count(), 1);
+    }
+
+    #[test]
+    fn rebuilding_the_full_score_leaves_the_live_staffs_clef_alone() {
+        let mut app = App::new();
+        let (mut live, mut full) = (Entity::PLACEHOLDER, Entity::PLACEHOLDER);
+        app.world_mut().commands().spawn(Node::default()).with_children(|p| {
+            let font = BravuraFont(Handle::default());
+            live = spawn_music_score(p, &font);
+            full = spawn_full_score(p, &font, false, 4.0);
+        });
+        app.world_mut().flush();
+        app.world_mut()
+            .entity_mut(full)
+            .insert((InstrumentScoreClef(Clef::Bass), InheritedVisibility::VISIBLE));
+        app.insert_resource(BravuraFont(Handle::default()))
+            .insert_resource(TieMaterialHandle {
+                below: Handle::default(),
+                above: Handle::default(),
+                below_highlighted: Handle::default(),
+                above_highlighted: Handle::default(),
+            })
+            .init_resource::<MusicScoreNotes>()
+            .init_resource::<MusicScoreMeter>()
+            .init_resource::<MusicScoreBarMap>()
+            .init_resource::<MusicScoreSpacing>()
+            .init_resource::<MusicScoreKeySignature>()
+            .add_systems(Update, rebuild_full_score);
+        app.update();
+
+        let world = app.world_mut();
+        let clef_of = |world: &mut World, root: Entity| {
+            world
+                .query_filtered::<(&Text, &ChildOf), With<MusicScoreClef>>()
+                .iter(world)
+                .find(|(_, parent)| parent.parent() == root)
+                .map(|(text, _)| text.0.clone())
+        };
+        assert_eq!(clef_of(world, full).as_deref(), Some(Clef::Bass.glyph()));
+        assert_eq!(clef_of(world, live).as_deref(), Some(Clef::Treble.glyph()));
     }
 }

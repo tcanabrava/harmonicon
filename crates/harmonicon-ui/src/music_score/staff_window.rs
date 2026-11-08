@@ -14,12 +14,13 @@ pub(super) fn spawn_staff_window(
     meter: &MusicScoreMeter,
     bar_map: &MusicScoreBarMap,
     scale: f32,
+    root: Entity,
     layer: Entity,
     origin: f64,
     lo: f64,
     hi: f64,
-    clefs: &mut Query<(&mut Text, &mut Node), With<MusicScoreClef>>,
-    time_sigs: &mut Query<(&MusicScoreTimeSig, &mut Text), Without<MusicScoreClef>>,
+    clefs: &mut ClefQuery,
+    time_sigs: &mut TimeSigQuery,
     forced: Option<Clef>,
     update_clef: bool,
     octave_annotation: i8,
@@ -27,7 +28,8 @@ pub(super) fn spawn_staff_window(
 ) {
     // One clef for the whole song, from its own range — see `choose_clef`.
     let clef = notation::resolve_clef(notes, forced);
-    for (mut text, mut node) in clefs.iter_mut().filter(|_| update_clef) {
+    let own = |parent: &ChildOf| parent.parent() == root;
+    for (mut text, mut node, _) in clefs.iter_mut().filter(|(_, _, p)| update_clef && own(p)) {
         let glyph = match (clef, octave_annotation) {
             (Clef::Bass, -1) => "\u{E064}", (Clef::Treble, -1) => "\u{E052}", _ => clef.glyph(),
         };
@@ -37,7 +39,7 @@ pub(super) fn spawn_staff_window(
         }
     }
 
-    for (slot, mut text) in time_sigs.iter_mut() {
+    for (slot, mut text, _) in time_sigs.iter_mut().filter(|(_, _, p)| own(p)) {
         let digit = if slot.numerator { meter.numerator } else { meter.denominator };
         let glyphs = time_sig_glyphs(digit);
         if text.0 != glyphs {

@@ -476,13 +476,12 @@ without a pass, and nothing reads `SongManifest::waveform`.
     which collects and sorts every note in the song, before finding
     nothing had changed. It now resolves only when the signature, the
     notes or the panel's instrument clef changed, or the slot is new.
-  - **Hazard, open**: the clef and time-signature queries in
-    `rebuild_score_notes` and `rebuild_full_score` aren't scoped to their
-    own panel, so each rewrites every staff's clef. The pause score and
-    the live strip coexist, and agree only because both call sites apply
-    the same `InstrumentScoreClef` to the same notes. Scoping each
-    `MusicScoreClef`/`MusicScoreTimeSig` to its root (as
-    `KeySignatureSlot` already is) would remove the coincidence.
+  - **Hazard, fixed**: the clef and time-signature writes in
+    `rebuild_score_notes` and `rebuild_full_score` weren't scoped to their
+    own panel, so the paused full score and the live strip each rewrote
+    the other's clef, agreeing only because both got the same instrument
+    clef. Each now writes only its own root's children
+    (`rebuilding_the_full_score_leaves_the_live_staffs_clef_alone`).
   - Checked and sound: `MeterMap` (always a tick-0 segment, zero-length
     bars fall back to 4/4), bar splitting and ties, rest spelling
     (deliberate blank bar tails, all tested), accidentals per staff

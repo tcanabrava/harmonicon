@@ -632,6 +632,19 @@ struct MusicScoreNoteGlyph;
 
 // ── Plugin ───────────────────────────────────────────────────────────────
 
+/// Every staff's clef glyph, with the panel root it belongs to. A rebuild
+/// writes only its own panel's (`ChildOf` is that root): the live strip and
+/// the paused full score are on screen together.
+type ClefQuery<'w, 's> =
+    Query<'w, 's, (&'static mut Text, &'static mut Node, &'static ChildOf), With<MusicScoreClef>>;
+/// Every staff's time-signature digits, scoped the same way as [`ClefQuery`].
+type TimeSigQuery<'w, 's> = Query<
+    'w,
+    's,
+    (&'static MusicScoreTimeSig, &'static mut Text, &'static ChildOf),
+    Without<MusicScoreClef>,
+>;
+
 #[derive(bevy::ecs::system::SystemParam)]
 struct EngravingSettings<'w> {
     spacing: Res<'w, MusicScoreSpacing>,
@@ -896,16 +909,16 @@ fn rebuild_score_notes(
     selection: Res<MusicScoreSelection>,
     playhead: Res<MusicScorePlayhead>,
     panels: Query<
-        (&ComputedNode, Option<&PianoGrandStaff>, Option<Ref<InstrumentScoreClef>>, Option<&InstrumentOctaveAnnotation>),
+        (Entity, &ComputedNode, Option<&PianoGrandStaff>, Option<Ref<InstrumentScoreClef>>, Option<&InstrumentOctaveAnnotation>),
         With<MusicScorePanel>,
     >,
-    mut layers: Query<(Entity, &mut Node), (With<MusicScoreNotesLayer>, Without<MusicScoreClef>)>,
+    mut layers: Query<(Entity, &mut Node, &ChildOf), (With<MusicScoreNotesLayer>, Without<MusicScoreClef>)>,
     existing: Query<(Entity, &ChildOf), With<MusicScoreNoteGlyph>>,
     meter: Res<MusicScoreMeter>,
     bar_map: Res<MusicScoreBarMap>,
     engraving: EngravingSettings,
-    mut clefs: Query<(&mut Text, &mut Node), With<MusicScoreClef>>,
-    mut time_sigs: Query<(&MusicScoreTimeSig, &mut Text), Without<MusicScoreClef>>,
+    mut clefs: ClefQuery,
+    mut time_sigs: TimeSigQuery,
 ) {
     let spacing = &engraving.spacing;
     let signature = &engraving.signature;
@@ -922,12 +935,12 @@ fn rebuild_score_notes(
     // px, so this needs `inverse_scale_factor()` to match — same
     // conversion `gameplay_2d::size_note_ribbons` already applies for the
     // same reason.
-    let Some(panel_width) =
-        panels.iter().next().map(|(n, _, _, _)| n.size().x * n.inverse_scale_factor())
+    let Some((panel, panel_width)) =
+        panels.iter().next().map(|(e, n, _, _, _)| (e, n.size().x * n.inverse_scale_factor()))
     else {
         return;
     };
-    let Some((layer, _)) = layers.iter().next() else {
+    let Some((layer, _, _)) = layers.iter().find(|(_, _, parent)| parent.parent() == panel) else {
         return;
     };
     let scale = spacing.0;
@@ -948,7 +961,7 @@ fn rebuild_score_notes(
         || bar_map.is_changed()
         || spacing.is_changed()
         || signature.is_changed()
-        || panels.iter().any(|(_, _, clef, _)| clef.is_some_and(|clef| clef.is_changed()))
+        || panels.iter().any(|(_, _, _, clef, _)| clef.is_some_and(|clef| clef.is_changed()))
     {
         let span = beats_behind + beats_ahead;
         let lo = now - beats_behind - span;
@@ -961,6 +974,7 @@ fn rebuild_score_notes(
             &meter,
             &bar_map,
             scale,
+            panel,
             layer,
             now,
             lo,
@@ -968,9 +982,9 @@ fn rebuild_score_notes(
             &existing,
             &mut clefs,
             &mut time_sigs,
-            panels.iter().next().is_some_and(|(_, grand, _, _)| grand.is_some()),
-            panels.iter().next().and_then(|(_, _, clef, _)| clef.map(|clef| clef.0)),
-            panels.iter().next().and_then(|(_, _, _, octave)| octave.map(|octave| octave.0)).unwrap_or(0),
+            panels.iter().next().is_some_and(|(_, _, grand, _, _)| grand.is_some()),
+            panels.iter().next().and_then(|(_, _, _, clef, _)| clef.map(|clef| clef.0)),
+            panels.iter().next().and_then(|(_, _, _, _, octave)| octave.map(|octave| octave.0)).unwrap_or(0),
             &signature.0,
         );
         commands.entity(layer).with_children(|parent| {
@@ -1009,7 +1023,7 @@ fn rebuild_score_notes(
         });
         if let Some((start, end)) = selection.0 {
             let height = PANEL_HEIGHT
-                * if panels.iter().next().is_some_and(|(_, grand, _, _)| grand.is_some()) {
+                * if panels.iter().next().is_some_and(|(_, _, grand, _, _)| grand.is_some()) {
                     2.0
                 } else {
                     1.0
@@ -1058,7 +1072,7 @@ fn rebuild_score_notes(
     // Local x=0 of the layer is `origin`; shifting it by how far the
     // playhead has moved since keeps the reference line on "now".
     let left = Val::Px(PLAYHEAD_X + ((origin - now) * scale as f64) as f32);
-    for (_, mut node) in &mut layers {
+    for (_, mut node, _) in &mut layers {
         if node.left != left {
             node.left = left;
         }
@@ -1076,13 +1090,14 @@ fn spawn_window(
     meter: &MusicScoreMeter,
     bar_map: &MusicScoreBarMap,
     scale: f32,
+    root: Entity,
     layer: Entity,
     origin: f64,
     lo: f64,
     hi: f64,
     existing: &Query<(Entity, &ChildOf), With<MusicScoreNoteGlyph>>,
-    clefs: &mut Query<(&mut Text, &mut Node), With<MusicScoreClef>>,
-    time_sigs: &mut Query<(&MusicScoreTimeSig, &mut Text), Without<MusicScoreClef>>,
+    clefs: &mut ClefQuery,
+    time_sigs: &mut TimeSigQuery,
     grand: bool,
     forced: Option<Clef>,
     octave_annotation: i8,
@@ -1104,6 +1119,7 @@ fn spawn_window(
             meter,
             bar_map,
             scale,
+            root,
             layer,
             origin,
             lo,
@@ -1134,6 +1150,7 @@ fn spawn_window(
             meter,
             bar_map,
             scale,
+            root,
             bass,
             origin,
             lo,
@@ -1152,6 +1169,7 @@ fn spawn_window(
             meter,
             bar_map,
             scale,
+            root,
             layer,
             origin,
             lo,
