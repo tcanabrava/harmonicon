@@ -442,7 +442,15 @@ pub struct NoteScored {
 
 // ── Shared components ─────────────────────────────────────────────────────────
 
+/// A top-level entity of a gameplay-state screen (Play 2D, the pause menu,
+/// both trainers, Jam Session), swept by `lifecycle::cleanup_gameplay`.
+///
+/// Requires a [`TabGroup`](bevy::input_focus::tab_navigation::TabGroup)
+/// because Bevy's Tab navigation only reaches a `TabIndex` inside one, and
+/// these screens have no shared menu root to supply it: without it, Tab
+/// reached nothing on any of them.
 #[derive(Component, Default, Clone)]
+#[require(bevy::input_focus::tab_navigation::TabGroup)]
 pub struct GameplayRoot;
 
 #[derive(Component, Default, Clone)]

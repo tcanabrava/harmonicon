@@ -75,10 +75,6 @@ Nothing below can be approved by a test.
 
 - Flathub submission and release signing keys. Version/tag agreement is
   already enforced by `release.yaml`.
-- **Finish the code review's two deferred parts** (`docs/code_review_plan.md`):
-  `harmonicon-ui`'s `music_score` and `harmonicon-gameplay`'s note trainer,
-  once their in-progress work settles. The open hazards it found are
-  listed under each crate there.
 
 ## Multiple instruments
 

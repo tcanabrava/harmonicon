@@ -806,6 +806,25 @@ fn cleanup_despawns_only_gameplay_entities() {
     assert!(world.entities().contains(keep), "unrelated entities must survive");
 }
 
+#[test]
+fn tab_reaches_a_widget_on_a_gameplay_screen() {
+    // Bevy's Tab navigation only finds a `TabIndex` inside a `TabGroup`;
+    // gameplay screens have no menu root to provide one, so `GameplayRoot`
+    // must.
+    use bevy::ecs::system::RunSystemOnce;
+    use bevy::input_focus::InputFocus;
+    use bevy::input_focus::tab_navigation::{NavAction, TabIndex, TabNavigation};
+    let mut world = World::new();
+    let root = world.spawn(GameplayRoot).id();
+    let button = world.spawn((TabIndex(0), ChildOf(root))).id();
+    let reached = world
+        .run_system_once(|nav: TabNavigation| {
+            nav.navigate(&InputFocus::default(), NavAction::Next).ok()
+        })
+        .unwrap();
+    assert_eq!(reached, Some(button));
+}
+
 /// A world `score_notes` can run in: the clock at `clock`, `active`
 /// sounding, `valid` the pitches the played C Richter harp can make, and
 /// every scoring resource at its default. Callers add their `SongNotes`.

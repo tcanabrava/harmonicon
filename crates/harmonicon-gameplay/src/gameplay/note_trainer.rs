@@ -402,7 +402,7 @@ pub(super) fn save_progress(
 pub(super) fn nearest_midi(pitches: &[PitchInfo], target: f32, a4_hz: f32) -> Option<f32> {
     pitches
         .iter()
-        .filter(|p| p.frequency > 0.0)
+        .filter(|p| p.frequency.is_finite() && p.frequency > 0.0)
         .map(|p| 69.0 + 12.0 * (p.frequency / a4_hz).log2())
         .min_by(|a, b| (a - target).abs().total_cmp(&(b - target).abs()))
 }
@@ -562,17 +562,14 @@ fn status_with_names(
                 )
                 .to_string();
         }
-        if practice
+        if let Some(heard) = practice
             .heard_midi
-            .is_some_and(|m| m > drill.target + tolerance_cents / 100.0 && m < drill.target + 3.0)
+            .filter(|&m| m > drill.target + tolerance_cents / 100.0 && m < drill.target + 3.0)
         {
             return loc
                 .msg_args(
                     "trainer-bend-too-high",
-                    &[(
-                        "cents",
-                        format!("{:+.0}", (practice.heard_midi.unwrap() - drill.target) * 100.0),
-                    )],
+                    &[("cents", format!("{:+.0}", (heard - drill.target) * 100.0))],
                 )
                 .to_string();
         }

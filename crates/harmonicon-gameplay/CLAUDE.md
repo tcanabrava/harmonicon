@@ -22,7 +22,10 @@ load-bearing about *this* crate.
   (`Entity despawned: the entity with ID … is invalid`, once per entity);
   0.19 passed it silently, which is why `beat_guides`' pool carried the
   marker unnoticed. Anything spawned inside a `with_children` block under
-  a `GameplayRoot` needs no marker of its own.
+  a `GameplayRoot` needs no marker of its own. It also **requires a
+  `TabGroup`**: these screens have no menu root above them, and Bevy's Tab
+  navigation reaches no `TabIndex` outside a group, so without it Tab
+  reached nothing on the trainers, the pause menu or Jam Session.
 
 - **Time authority:** `GameplayClock`, ticked by `tick_clock` — both in
   `gameplay/clock.rs`, along with `should_anchor_to_sink` and

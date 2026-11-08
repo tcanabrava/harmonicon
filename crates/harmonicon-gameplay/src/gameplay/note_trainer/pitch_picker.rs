@@ -54,7 +54,8 @@ pub(super) fn spawn_for_instrument(
     let high = targets.iter().map(|drill| drill.target.round() as u8).max().unwrap();
     let mut rows: Vec<Vec<(u8, u8)>> = Vec::new();
     for pitch in low..=high {
-        let written = instrument.notation().transposition.written_semitone(pitch) as u8;
+        let written =
+            instrument.notation().transposition.written_semitone(pitch).clamp(0, 127) as u8;
         if rows.is_empty()
             || (written.is_multiple_of(12) && pitch != high && pitch > low.saturating_add(1))
         {

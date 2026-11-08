@@ -395,7 +395,10 @@ skills in `.claude/skills/`, loaded on demand rather than living here:
   no keyboard support at all) with `TabIndex(0)` attached, never a
   hand-rolled `PointerClick` observer on a plain `Node`. Every screen's
   root needs a `TabGroup` (`bevy::input_focus::tab_navigation`) for
-  Tab/Shift+Tab to scope to; a modal (a confirm/file dialog, an open
+  Tab/Shift+Tab to scope to — Bevy reaches *no* `TabIndex` outside one.
+  Menu pages get it from the shared menu root, and every gameplay-state
+  screen from `GameplayRoot`, which requires one; a new screen outside
+  both must add its own. A modal (a confirm/file dialog, an open
   combobox dropdown) needs `TabGroup::modal()` or its items' `TabIndex`
   flipped negative while closed (see `dialogs::combobox::
   set_combobox_open`) so Tab can't reach something invisible — bevy's own

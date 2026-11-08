@@ -452,7 +452,7 @@ without a pass, and nothing reads `SongManifest::waveform`.
 - Checked and sound: streak date maths (missed day, lapse, clock set
   back), `FirstRun` sampled before anything can save, the state enums.
 
-### 10. `harmonicon-ui` — done 2026-11-06, except `music_score`
+### 10. `harmonicon-ui` — done 2026-11-06 (`music_score` 2026-11-08)
 
 - **Bug, fixed `6560e1ba`, `278245f2`, `bf9a23ce`**: a modal `TabGroup`
   confines focus only once focus is inside it, and none of the five
@@ -470,13 +470,31 @@ without a pass, and nothing reads `SongManifest::waveform`.
   `Text({"Retry".to_string()})` as allowed. Single-word labels slip
   through — "Save" did. Flagging every capitalised word would need an
   allowlist for asset names and identifiers.
-- **Deferred**: `music_score` had uncommitted work in progress when this
-  crate was reviewed; review it once that lands. Its divisions by a
-  meter or a beat width are already guarded (`max(1)`, `> 0.0` checks).
+- **`music_score`, reviewed 2026-11-08 against HEAD `15643ec9`**:
+  - **Efficiency, fixed**: `key_signature::rebuild` had no `run_if`, so
+    every frame, for every key-signature slot, it resolved the clef,
+    which collects and sorts every note in the song, before finding
+    nothing had changed. It now resolves only when the signature, the
+    notes or the panel's instrument clef changed, or the slot is new.
+  - **Hazard, open**: the clef and time-signature queries in
+    `rebuild_score_notes` and `rebuild_full_score` aren't scoped to their
+    own panel, so each rewrites every staff's clef. The pause score and
+    the live strip coexist, and agree only because both call sites apply
+    the same `InstrumentScoreClef` to the same notes. Scoping each
+    `MusicScoreClef`/`MusicScoreTimeSig` to its root (as
+    `KeySignatureSlot` already is) would remove the coincidence.
+  - Checked and sound: `MeterMap` (always a tick-0 segment, zero-length
+    bars fall back to 4/4), bar splitting and ties, rest spelling
+    (deliberate blank bar tails, all tested), accidentals per staff
+    position with the key signature per letter, the spelled-pitch
+    `expect` in `projection::note_spelling` (core's
+    `every_midi_name_parses_back_to_its_own_semitone`, uncommitted at
+    review time, covers every `u8`), and every division by a beat, bar or
+    duration.
 - Checked and sound: no `unwrap`/`expect`/`panic!` outside tests; the
   file dialog's overwrite question; confirm dialog `DialogId` scoping.
 
-### 11. `harmonicon-gameplay` — done 2026-11-06, except the note trainer
+### 11. `harmonicon-gameplay` — done 2026-11-06 (note trainer 2026-11-08)
 
 - **Bug, fixed `683b9c31`**: `resume_section_repeat` rewound to the loop
   on any change to `Paused` while unpaused, and song setup writes
@@ -490,8 +508,21 @@ without a pass, and nothing reads `SongManifest::waveform`.
   three sorted.
 - **Cleanup, fixed `9ba09551`**: the guitar neck's never-spawned "next"
   hand region and every branch on it.
-- **Deferred**: the note trainer (`note_trainer*`) is under active work;
-  review it when that settles.
+- **Note trainer, reviewed 2026-11-08 against HEAD `15643ec9`**:
+  - **Bug, fixed**: Bevy's Tab navigation only reaches a `TabIndex`
+    inside a `TabGroup`, and no gameplay-state screen had one except
+    Results: Tab reached nothing on the Note Trainer, the Bending
+    Trainer, the pause menu or Jam Session. Every one of their roots
+    carries `GameplayRoot`, which now requires a `TabGroup`
+    (`tab_reaches_a_widget_on_a_gameplay_screen`).
+  - **Cleanup, fixed**: `nearest_midi` let an infinite frequency through
+    (the chord path already filtered it); the staff pitch picker's
+    written pitch truncated an `i16` with `as u8`; a guarded `unwrap` in
+    the bend hint is now a `filter`.
+  - Checked and sound: drill stepping and resume (empty lists guarded),
+    the glide's start gate and zero-span trace, the chord check (every
+    pitch in one frame, nothing extra), fretboard click bounds and the
+    excused `PointerClick`, stale pitches cleared after 250 ms.
 - Checked and sound: the clock (rate-slewed anchoring, snap threshold,
   every jump through `rewind_to`, play/pause only on edges), the judge's
   cursor (rebuilt in range by adaptive difficulty), every coaching ratio
@@ -553,6 +584,6 @@ densely tested.
 
 ## Review complete
 
-All sixteen crates reviewed. Deferred until in-progress work lands:
-`music_score` (ui) and the note trainer (gameplay). Open hazards are
-listed under each crate above.
+All sixteen crates reviewed, including the two parts first deferred
+(`music_score` and the note trainer). Open hazards are listed under each
+crate above.
