@@ -5,28 +5,42 @@ the same way as [Playing a Song](playing-a-song.md), but instead of scored
 falling notes, you get an open 12-bar backing to improvise over, for as
 long as the chosen backing and Loop setting allow. Nothing is scored.
 
+You can jam on any instrument a song has a part for: the picker lists
+each part separately — *Ode to Joy — chart* for the harmonica, *Ode to
+Joy — guitar*, *Ode to Joy — flute* — and the screen draws the
+instrument you picked.
+
 By default the screen is a calm stage with one visual centre: the song
-title and which harp to grab, the **Loop** toggle (restarts the backing
-track when it ends, instead of stopping), the chorus/bar position, a big
-**current → next chord** readout, a compact twelve-cell **form strip**
-that lights the bar you're in, and one line naming the **hole and breath
-the mic hears** — gold for a chord tone of the bar currently sounding,
-green for anywhere else in the blues scale, amber for outside it. Follow
-the colour, not memorized theory. That's everything you need to keep
-your eyes off the screen for a whole chorus.
+title (and, on a harmonica, which harp to grab), the **Loop** toggle
+(restarts the backing track when it ends, instead of stopping), the
+chorus/bar position, a big **current → next chord** readout, a compact
+twelve-cell **form strip** that lights the bar you're in, and one line
+naming **what the mic hears** — the hole and breath on a harmonica, the
+note name (say *Note G4*) on any other instrument. It's gold for a chord
+tone of the bar currently sounding, green for anywhere else in the
+scale, amber for outside it. Follow the colour, not memorized theory.
+That's everything you need to keep your eyes off the screen for a whole
+chorus.
 
 Click **Guides** to open the rest, remembered between jams:
 
 - **Left**: the full **12-bar chord grid** (the current bar lights up as
   the backing plays), the **metronome**, and a live **spectrogram** of
   what your mic is hearing.
-- **Right — the harmonica**: a reference bend diagram for every hole,
-  plus a **live-tinted hole map** that recolors each hole/direction as
-  you play, in the same colours as the indicator.
+- **Right — your instrument**, with every note that fits the scale in
+  green and the rest grey. The note you're playing lights up in the same
+  colours as the indicator.
+  - **Harmonica**: a reference bend diagram for every hole, plus the
+    **hole map**, one cell per hole and breath.
+  - **Guitar, bass, cavaquinho**: the **fretboard**, each string from
+    open to the 12th fret, in your tuning.
+  - **Piano**: a three-octave **keyboard**, C3 to C6.
+  - **Flute, clarinet, violin, viola**: the instrument's **range** as a grid
+    of notes, one octave per row with the highest on top.
 
 ![Jam Session screen](images/jam-session.png)
 
-There's no "wrong note" here in the scored sense — the hole map is a guide,
+There's no "wrong note" here in the scored sense — the map is a guide,
 not a judge. It's the same live feedback the
 [improvisation lesson](lessons.md#unit-2--counting-the-blues) uses, so
 practicing here and in that lesson builds the same skill.
@@ -40,7 +54,7 @@ pause and reach the pause menu's Restart/Quit Session controls.
 
 ## Call & Response
 
-Turn on **⇄ Call & Response** and the game takes turns with you: every
+On a harmonica part, turn on **⇄ Call & Response** and the game takes turns with you: every
 four bars it plays a short harmonica phrase over the chords that are
 sounding — two bars of "Listen…" — then steps back for two bars of
 "Your turn". Answer however you like: echo it, vary it, or play
@@ -83,7 +97,7 @@ backing play exactly as generated.
 
 If the song you picked was authored from a MIDI file that kept its
 original tracks (rather than one pre-mixed backing track), a row of
-buttons appears below the 12-bar grid and the harmonica, one per track,
+buttons appears below the 12-bar grid and the instrument, one per track,
 each showing 🔊 next to the track's name. Click one to mute it — it
 switches to 🔇 and drops out of the mix instantly, with no effect on the
 other tracks or on timing; click it again to bring it back. This is handy
