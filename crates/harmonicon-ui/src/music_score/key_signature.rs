@@ -17,12 +17,19 @@ pub(super) fn rebuild(
     font: Option<Res<BravuraFont>>,
     signature: Res<MusicScoreKeySignature>,
     notes: Res<MusicScoreNotes>,
-    roots: Query<(Option<&InstrumentScoreClef>, Has<PianoGrandStaff>)>,
+    roots: Query<(Option<Ref<InstrumentScoreClef>>, Has<PianoGrandStaff>)>,
     mut slots: Query<(Entity, &mut KeySignatureSlot)>,
 ) {
     let Some(font) = font else { return };
+    // Runs every frame, and resolving the clef sorts every note in the
+    // song, so only a slot whose inputs can have moved resolves it.
+    let inputs_changed = signature.is_changed() || notes.is_changed();
     for (entity, mut slot) in &mut slots {
         let (forced, grand) = roots.get(slot.root).unwrap_or((None, false));
+        let clef_changed = forced.as_ref().is_some_and(|forced| forced.is_changed());
+        if slot.last.is_some() && !inputs_changed && !clef_changed {
+            continue;
+        }
         let clef = if slot.lower { Clef::Bass } else if grand { Clef::Treble } else { notation::resolve_clef(&notes.0, forced.map(|forced| forced.0)) };
         if slot.last == Some((signature.0, clef)) { continue; }
         slot.last = Some((signature.0, clef));
