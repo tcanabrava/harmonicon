@@ -440,7 +440,7 @@ impl AssetLoader for ThemeJsonLoader {
 /// sibling below can just always answer "bundled".
 #[cfg(not(any(target_arch = "wasm32", target_os = "android")))]
 pub fn theme_source_prefix(theme_name: &str) -> &'static str {
-    let bundled = std::path::Path::new("assets/themes").join(theme_name);
+    let bundled = crate::paths::bundled_assets_dir().join("themes").join(theme_name);
     if bundled.is_dir() { "" } else { "external://" }
 }
 

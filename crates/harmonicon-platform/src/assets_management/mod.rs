@@ -190,15 +190,15 @@ fn rescan_on_external_change(
 
 #[cfg(not(any(target_arch = "wasm32", target_os = "android")))]
 fn scan_note_themes(mut available_2d: ResMut<AvailableNoteThemes2d>) {
-    available_2d.0 = scan_theme_dir("assets/notes/2d", "png");
+    available_2d.0 = scan_theme_dir(&crate::paths::bundled_assets_dir().join("notes/2d"), "png");
     info!("Found note themes: {:?}", available_2d.0);
 }
 
 /// Collects the `<name>` stems of files with `ext` directly under `dir`.
 #[cfg(not(any(target_arch = "wasm32", target_os = "android")))]
-fn scan_theme_dir(dir: &str, ext: &str) -> Vec<String> {
+fn scan_theme_dir(dir: &std::path::Path, ext: &str) -> Vec<String> {
     let Ok(entries) = std::fs::read_dir(dir) else {
-        warn!("No note themes directory at {dir}/");
+        warn!("No note themes directory at {}/", dir.display());
         return Vec::new();
     };
     let mut names: Vec<String> = entries
@@ -255,9 +255,10 @@ fn scan_theme_names(root: &std::path::Path) -> Vec<String> {
 // `theme.rs`, which does the matching bundled-first resolution when loading).
 #[cfg(not(any(target_arch = "wasm32", target_os = "android")))]
 fn scan_ui_themes(mut available: ResMut<AvailableThemes>) {
-    let mut names = scan_theme_names(std::path::Path::new("assets/themes"));
+    let bundled = crate::paths::bundled_assets_dir().join("themes");
+    let mut names = scan_theme_names(&bundled);
     if names.is_empty() {
-        warn!("No themes directory at assets/themes/; defaulting to \"default\"");
+        warn!("No themes directory at {}/; defaulting to \"default\"", bundled.display());
     }
 
     if let Some(external_root) = dirs::home_dir().map(|h| h.join("Harmonicon/themes")) {

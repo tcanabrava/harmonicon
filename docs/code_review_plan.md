@@ -405,14 +405,15 @@ without a pass, and nothing reads `SongManifest::waveform`.
   instrument at *any* depth when walking for curricula, so a legacy
   pack's lesson folder called `piano` lost its text. Only the top level
   is a curriculum.
-- **Hazard, open**: three native paths read `assets/` relative to the
-  working directory (`scan_ui_themes`, `scan_theme_dir`,
-  `theme_source_prefix`), while Bevy reads from beside the executable.
-  Every launcher (flatpak, macOS, the Windows shortcut) `cd`s into the
-  install folder to compensate; a binary started from anywhere else
-  finds no bundled themes. Resolving against
-  `FileAssetReader::get_base_path()` would remove the need, but wants a
-  packaged run to verify.
+- **Hazard, fixed**: three native paths read `assets/` relative to the
+  working directory (`scan_ui_themes`, `scan_note_themes`,
+  `theme_source_prefix`), while Bevy reads from `BEVY_ASSET_ROOT`, the
+  manifest directory or beside the executable, so a binary started from
+  anywhere but its install folder found no bundled themes. All three now
+  start from `paths::bundled_assets_dir`, which asks Bevy's
+  `FileAssetReader::get_base_path`. Checked by starting a release build
+  from `/tmp`: both note themes and the bundled UI themes were found. The
+  launchers' `cd` into the install folder is now unnecessary but harmless.
 - **Cleanup, fixed**: `LocalizationExt::msg` and `msg_args` warned on
   *every* lookup of a missing key, and several callers run per frame, so
   one missing key flooded the log. They now warn once per key.

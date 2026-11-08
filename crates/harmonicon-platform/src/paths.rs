@@ -62,6 +62,17 @@ pub fn packs_dir() -> Option<PathBuf> {
     data_dir().map(|dir| dir.join("packs"))
 }
 
+/// The bundled `assets/` folder, where Bevy's default file source reads it:
+/// `BEVY_ASSET_ROOT`, else `CARGO_MANIFEST_DIR`, else the executable's own
+/// folder, with `assets` joined on (`AssetPlugin`'s default `file_path`).
+/// Anything that lists bundled assets with `std::fs` must start here rather
+/// than from the working directory, or it finds nothing when the game is
+/// started from anywhere but its install folder.
+#[cfg(not(any(target_arch = "wasm32", target_os = "android")))]
+pub fn bundled_assets_dir() -> PathBuf {
+    bevy::asset::io::file::FileAssetReader::get_base_path().join("assets")
+}
+
 /// Reads a persisted JSON file over `T`'s defaults, for `settings.json` and
 /// `profile.json`. A missing file is the defaults.
 ///
