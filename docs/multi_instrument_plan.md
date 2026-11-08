@@ -326,14 +326,20 @@ can't be confused with a detection problem.
 
 ## Content, progress and menus
 
-- **Packs declare their instrument** in `pack.json`, with a
-  `LESSON_FORMAT_VERSION` bump. Each instrument gets its own lesson pack
-  and technique DAG (`harmonicon-lessons-guitar`, …). The existing
-  100-lesson pack is the harmonica's.
-- **A profile is per instrument.** Song records are keyed by part,
-  lesson/training records by pack, and the practice streak stays global
-  (you practised today, whatever you played). The skill tree shows the
-  selected instrument's DAG.
+- **One lessons pack, a curriculum per instrument.** The pack's top-level
+  folders are instruments (`harmonica/`, `guitar/`, `flute/`, `piano/`),
+  each lesson names its `instrument`, and the catalog loads only the
+  selected instrument's, so each has its own technique DAG. This replaced
+  the earlier idea of a pack per instrument: one pack keeps one release,
+  one CI and one set of translations. `validate-pack` keeps lesson ids
+  unique across the whole pack and refuses a prerequisite that crosses
+  instruments.
+- **Progress is per instrument through its keys.** Song records are keyed
+  by the part's chart, lesson and training records by the lesson's
+  pack-unique id, Note Trainer records by `instrument:kind`; the practice
+  streak stays global (you practised today, whatever you played). Ids are
+  unique within a pack, not across packs, so a second pack reusing an id
+  for another instrument would share its progress.
 - **"My instruments"** generalises the harp-check page's
   bring-your-own-harp choice. It describes how each instrument the player
   holds is set up rather than listing which they own. **Landed already:** the
@@ -362,9 +368,84 @@ can't be confused with a detection problem.
   - a sine plus filtered breath noise for the flute.
 
   The phase-integration vibrato rule applies to both.
-- **Jam Session** generalises later. `hole_map` becomes "where the scale
-  lives on this instrument": pentatonic boxes on guitar, scale fingerings on
-  flute.
+- **Jam Session**: see the next section.
+
+## Jam Session per instrument (design, for review)
+
+**What Jam judges is already instrument-free.** Scale tones and each bar's
+chord tones are pitch classes (`hole_map::note_class`), improv adherence
+(`ImprovStats`) counts fresh attacks by MIDI number, and the band,
+rhythm guide and mixer never see the instrument. The harmonica lives in
+three places only, so those are what change:
+
+1. **The vocabulary.** `JamHoleGuide` becomes a `JamGuide` holding the
+   instrument's playable pitches (`InstrumentModel::valid_pitches`), the
+   scale and the chord tones per bar. `improv` only ever asks
+   `note_to_holes.contains_key`, so it asks the pitch set instead and is
+   otherwise untouched. The harmonica's hole lookup moves into its own
+   map, built from `positions_for`.
+2. **The map** ("where the scale lives on this instrument"). Each
+   instrument reuses the strip it already draws in Play 2D, tinted by one
+   shared pure rule: chord tone of the current bar, in scale, out of
+   scale, or a ghost note of the current call.
+   - harmonica: today's hole strip;
+   - guitar: the fretboard strip (`guitar_visuals::spawn_fretboard`,
+     `paint_cell`), every fret tinted, which draws the familiar pentatonic
+     boxes without authoring any; capo and tuning from "My instruments";
+   - piano: the keyboard (`dialogs::piano_keys`);
+   - flute: the pitch rows over its range, with the fingering chart of the
+     pitch being played (Play 2D's strip).
+3. **The call.** `PlayableNote { midi, hole, blow }` becomes `{ midi,
+   position: PlayPosition }`, and the harmonica-only `transition_ok`
+   becomes a per-family "can a player move from a to b inside a phrase":
+   - harmonica: as today (at most two holes, a breath change only on the
+     same or the next hole);
+   - guitar: within the fingering solver's hand span of the phrase's
+     first position, so a call stays in one box;
+   - flute and piano: an interval of at most a fifth, and for the flute
+     no register change inside a bar.
+
+   The phrase generator's three invariants (reachable steps, a non-chord
+   tone resolving to a chord tone, ending on a chord tone by beat 3) are
+   pitch rules and carry over unchanged, as do its tests over many seeds.
+
+Around those three:
+
+- **Key.** A harmonica jam still picks the harp from the jam key and
+  position (`Position::interval_below_jam_key`). Every other instrument
+  plays in the jam key itself. The position compass and lessons'
+  `position_cycle` are harmonica concepts and are not shown.
+- **Which instrument.** A picked song jams on the part for the selected
+  instrument (the song list already knows each part's instrument); a
+  generated jam asks, defaulting to the lesson's instrument or the last
+  one used.
+- **Detection range** comes from the instrument's `range`, as the Note
+  Trainer's does.
+- **Lessons** need no format change: the three jam criteria are pitch
+  rules, so a guitar or flute lesson can use them once its instrument can
+  jam.
+
+Phases, each committed on its own:
+
+1. `JamGuide` and the pitch set, harmonica only, no behaviour change (the
+   existing jam tests are the proof).
+2. Instrument selection, key and detection range, and the guitar's
+   fretboard map, without call-and-response.
+3. Per-family call vocabulary and transitions.
+4. Piano and flute maps.
+
+**Open, for a decision before phase 2:**
+
+- **The call's voice.** It is a harmonica so that it reads as a soloist
+  over the band. On guitar, the instrument's own voice teaches the sound
+  to echo but may blend into a comping guitar stem; another lead voice
+  stays distinct but is not what the player makes.
+- **Which instruments jam in 1.0.** Guitar is the obvious one. Flute and
+  piano follow the same pattern but each needs its map.
+- **Guitar chords in a jam.** Improv counts each attacked pitch, so a
+  strummed chord counts several notes at once; whether a chord should
+  count as one attack (and whether chord tones of a strum score as
+  chord-tone playing) is a teaching question.
 
 ## Phases
 
