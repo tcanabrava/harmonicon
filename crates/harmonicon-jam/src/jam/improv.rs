@@ -143,6 +143,11 @@ pub fn reset_improv_stats(mut gate: ResMut<ImprovGate>, mut stats: ResMut<Improv
 /// [`classify_note_fit`] against the bar it landed on — the live twin of
 /// `hole_map::update_hole_map`'s per-frame tint, but counting discrete
 /// attacks once each instead of repainting every frame a pitch stays held.
+///
+/// Counts every pitch the detector hears, whatever the instrument and
+/// however it was played: a bent note is a pitch like any other. Only the
+/// note name decides its fit, and the detector's range is already sized to
+/// the instrument (`gameplay::lifecycle::setup_scoring_config`).
 pub fn accumulate_improv_stats(
     active: Res<ActivePitches>,
     guide: Option<Res<JamGuide>>,
@@ -156,16 +161,14 @@ pub fn accumulate_improv_stats(
     };
     let mut sounding = [false; 256];
     for pitch in &active.0 {
-        if guide.pitches.contains(&pitch.midi) {
-            sounding[pitch.midi as usize] = true;
-        }
+        sounding[pitch.midi as usize] = true;
     }
     gate.0.release_absent(|m| sounding[m as usize]);
 
     let chord_tones = &guide.chord_tones_by_bar[current.0];
     let resting = in_rest_window(absolute.0, PHRASE_PLAY_BARS, PHRASE_REST_BARS);
     for p in &active.0 {
-        if !guide.pitches.contains(&p.midi) || !gate.0.is_fresh(p.midi, true) {
+        if !gate.0.is_fresh(p.midi, true) {
             continue;
         }
         gate.0.consume(p.midi);

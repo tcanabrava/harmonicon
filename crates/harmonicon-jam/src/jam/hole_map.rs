@@ -34,13 +34,6 @@ use super::improv::classify_note_fit;
 /// two can't disagree.
 #[derive(Resource)]
 pub struct JamGuide {
-    /// Every pitch the jam counts as played on this instrument: what
-    /// `improv` tallies and the gate it releases against. Instrument-free,
-    /// so a guitar or flute jam can fill it from its own model. For a
-    /// harmonica it is the blow and draw notes only, `note_to_holes`'
-    /// keys: a bent note is not counted, though `valid_pitches` would
-    /// include it.
-    pub(crate) pitches: HashSet<u8>,
     /// MIDI note number → the holes that can sound it (may be more than one
     /// — e.g. draw-2 and blow-3 are both G4 on a C harp). The harmonica's
     /// own map; nothing outside it should need holes.
@@ -145,7 +138,6 @@ pub(crate) fn build_hole_guide(
     (
         holes,
         JamGuide {
-            pitches: note_to_holes.keys().copied().collect(),
             note_to_holes,
             playable: playable_notes(harp),
             scale_classes,
@@ -312,7 +304,8 @@ pub(crate) fn spawn_detected_note(parent: &mut ChildSpawnerCommands, loc: &Local
     });
 }
 
-/// Names the hole/breath the mic hears and tints it by fit — chord tone,
+/// Names the lowest pitch the mic hears, as a hole and breath when the harp
+/// has one for it and as a note name otherwise, tinted by fit — chord tone,
 /// in scale, outside — writing only when the reading changes.
 pub fn update_detected_note(
     active: Res<ActivePitches>,
@@ -324,16 +317,27 @@ pub fn update_detected_note(
     let Some(guide) = guide else {
         return;
     };
-    let (reading, color) = match lowest_sounding(&active.0, &guide.playable) {
-        Some((pitch, note)) => {
-            let key = if note.blow { "jam-detected-blow" } else { "jam-detected-draw" };
+    let (reading, color) = match active.0.iter().min_by_key(|p| p.midi) {
+        Some(pitch) => {
             let fit = classify_note_fit(
                 &pitch.note,
                 &guide.chord_tones_by_bar[current.0],
                 &guide.scale_classes,
             );
+            // A hole and breath where the harp has one for this pitch;
+            // otherwise (a bend, another instrument) the note itself.
+            let reading = match lowest_sounding(std::slice::from_ref(pitch), &guide.playable) {
+                Some((_, note)) => {
+                    let key = if note.blow { "jam-detected-blow" } else { "jam-detected-draw" };
+                    loc.msg_args(key, &[("hole", note.hole.to_string())])
+                }
+                None => loc.msg_args(
+                    "jam-detected-pitch",
+                    &[("note", format!("{}{}", pitch.note, pitch.octave))],
+                ),
+            };
             (
-                loc.msg_args(key, &[("hole", note.hole.to_string())]),
+                reading,
                 match fit {
                     super::improv::NoteFit::ChordTone => PLAY_CHORD_TONE,
                     super::improv::NoteFit::InScale => PLAY_IN_SCALE,

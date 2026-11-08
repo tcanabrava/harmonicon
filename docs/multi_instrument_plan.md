@@ -370,85 +370,33 @@ can't be confused with a detection problem.
   The phase-integration vibrato rule applies to both.
 - **Jam Session**: see the next section.
 
-## Jam Session per instrument (design, for review)
+## Jam Session per instrument
 
-**What Jam judges is already instrument-free.** Scale tones and each bar's
-chord tones are pitch classes (`hole_map::note_class`), improv adherence
-(`ImprovStats`) counts fresh attacks by MIDI number, and the band,
-rhythm guide and mixer never see the instrument. The harmonica lives in
-three places only, so those are what change:
+A jam is a tune playing while the player improvises over it. For every
+instrument the screen shows the backing's form and chords (instrument-free
+already) and **the instrument the player chose, with the notes that fit the
+scale marked** — what the harmonica's hole map does today.
 
-1. **The vocabulary** (landed, harmonica only). `JamGuide` (formerly
-   `JamHoleGuide`) holds the pitches the jam counts (`JamGuide::pitches`),
-   the scale and the chord tones per bar; `improv` asks that set rather
-   than the hole lookup and is otherwise untouched. Another instrument
-   fills it from `InstrumentModel::valid_pitches`. The harmonica's is its
-   blow and draw notes only, as before, so a bent note is not counted:
-   **open** whether it should be, since bends are blues vocabulary but
-   counting them changes what an improv lesson scores. The hole lookup
-   stays, for the harmonica's own map.
-2. **The map** ("where the scale lives on this instrument"). Each
-   instrument reuses the strip it already draws in Play 2D, tinted by one
-   shared pure rule: chord tone of the current bar, in scale, out of
-   scale, or a ghost note of the current call.
-   - harmonica: today's hole strip;
-   - guitar: the fretboard strip (`guitar_visuals::spawn_fretboard`,
-     `paint_cell`), every fret tinted, which draws the familiar pentatonic
-     boxes without authoring any; capo and tuning from "My instruments";
-   - piano: the keyboard (`dialogs::piano_keys`);
-   - flute: the pitch rows over its range, with the fingering chart of the
-     pitch being played (Play 2D's strip).
-3. **The call.** `PlayableNote { midi, hole, blow }` becomes `{ midi,
-   position: PlayPosition }`, and the harmonica-only `transition_ok`
-   becomes a per-family "can a player move from a to b inside a phrase":
-   - harmonica: as today (at most two holes, a breath change only on the
-     same or the next hole);
-   - guitar: within the fingering solver's hand span of the phrase's
-     first position, so a call stays in one box;
-   - flute and piano: an interval of at most a fifth, and for the flute
-     no register change inside a bar.
-
-   The phrase generator's three invariants (reachable steps, a non-chord
-   tone resolving to a chord tone, ending on a chord tone by beat 3) are
-   pitch rules and carry over unchanged, as do its tests over many seeds.
-
-Around those three:
-
-- **Key.** A harmonica jam still picks the harp from the jam key and
-  position (`Position::interval_below_jam_key`). Every other instrument
-  plays in the jam key itself. The position compass and lessons'
-  `position_cycle` are harmonica concepts and are not shown.
-- **Which instrument.** A picked song jams on the part for the selected
-  instrument (the song list already knows each part's instrument); a
-  generated jam asks, defaulting to the lesson's instrument or the last
-  one used.
-- **Detection range** comes from the instrument's `range`, as the Note
-  Trainer's does.
-- **Lessons** need no format change: the three jam criteria are pitch
-  rules, so a guitar or flute lesson can use them once its instrument can
-  jam.
-
-Phases, each committed on its own:
-
-1. ~~`JamGuide` and the pitch set, harmonica only, no behaviour change~~
-   (landed).
-2. Instrument selection, key and detection range, and the guitar's
-   fretboard map, without call-and-response.
-3. Per-family call vocabulary and transitions.
-4. Piano and flute maps.
-
-**Open, for a decision before phase 2:**
-
-- **The call's voice.** It is a harmonica so that it reads as a soloist
-  over the band. On guitar, the instrument's own voice teaches the sound
-  to echo but may blend into a comping guitar stem; another lead voice
-  stays distinct but is not what the player makes.
-- **Which instruments jam in 1.0.** Guitar is the obvious one. Flute and
-  piano follow the same pattern but each needs its map.
-- **Guitar chords in a jam.** Improv counts each attacked pitch, so a
-  strummed chord counts several notes at once; whether a chord should
-  count as one attack (and whether chord tones of a strum score as
-  chord-tone playing) is a teaching question.
+- **Counting is instrument-free** (landed). `improv` tallies every pitch
+  the detector hears by its note name — chord tone of the current bar, in
+  scale, outside — so a bent note counts like any other, and a guitar or
+  flute counts without any instrument model. The detector's range is
+  already sized to the part's instrument (`setup_scoring_config`). The
+  "detected note" readout names a hole and breath when the harp has one,
+  and the note otherwise.
+- **The instrument is the part's.** The Jam song picker offers every part,
+  and the pre-song page that runs before a jam already asks a guitar for
+  its tuning and a flute for its foot joint.
+- **The map reuses each instrument's own drawing**, tinted by the one fit
+  rule (`classify_note_fit`): in-scale notes marked, the note being played
+  lit by its fit.
+  - harmonica: today's hole strip;
+  - guitar: the fretboard (`guitar_visuals`), which draws the familiar
+    scale boxes without authoring any;
+  - piano: the keyboard (`dialogs::piano_keys`);
+  - flute: its range as note cells, the chord tones and scale marked.
+- **Harmonica-only, and staying so:** the "grab a C harp" hint, the bend
+  overlay, call-and-response and the position compass.
 
 ## Phases
 

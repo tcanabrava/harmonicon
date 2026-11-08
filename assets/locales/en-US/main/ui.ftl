@@ -708,6 +708,7 @@ jam-adaptive-band-on = Adaptive band: on
 jam-adaptive-band-off = Adaptive band: off
 jam-detected-blow = Hole {$hole} blow
 jam-detected-draw = Hole {$hole} draw
+jam-detected-pitch = Note {$note}
 jam-detected-none = —
 jam-midi-track-mute-tooltip = Click to mute/unmute this track
 jam-rhythm-guide = Rhythm Guide

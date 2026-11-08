@@ -129,15 +129,19 @@ fn accumulate_improv_stats_rearms_after_the_note_stops_and_restarts() {
 }
 
 #[test]
-fn accumulate_improv_stats_ignores_pitches_the_harp_cant_produce() {
+fn accumulate_improv_stats_counts_a_bent_note_like_any_other_pitch() {
     let mut world = improv_test_world();
-    // MIDI 61 (C#4) isn't anywhere in this harp's blow/draw layout.
+    // C#4 is no blow or draw note on this harp, only hole 1's draw bent a
+    // semitone. It is still a pitch the player chose, and it isn't in C
+    // blues.
     world.insert_resource(ActivePitches(vec![improv_pitch_info(61, "C#")]));
     let mut schedule = Schedule::default();
     schedule.add_systems(accumulate_improv_stats);
     schedule.run(&mut world);
 
-    assert_eq!(world.resource::<ImprovStats>().total(), 0);
+    let stats = world.resource::<ImprovStats>();
+    assert_eq!(stats.total(), 1);
+    assert_eq!(stats.out_of_scale, 1);
 }
 
 #[test]

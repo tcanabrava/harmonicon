@@ -15,19 +15,6 @@ fn note_class_drops_octave() {
 }
 
 #[test]
-fn the_counted_pitches_are_the_harps_blow_and_draw_notes() {
-    use harmonicon_core::instrument::InstrumentModel;
-    let harp = c_harp();
-    let (_, guide) = build_hole_guide(&harp, "C", Progression::Standard, Scale::FirstPosition);
-    let blow_draw: HashSet<u8> = guide.note_to_holes.keys().copied().collect();
-    assert_eq!(guide.pitches, blow_draw);
-    // Bb4 is hole 3's draw bent a semitone: the harp sounds it, the jam
-    // doesn't count it.
-    assert!(harp.valid_pitches().contains(&70));
-    assert!(!guide.pitches.contains(&70));
-}
-
-#[test]
 fn guide_maps_a_shared_note_to_every_hole_that_sounds_it() {
     // On a C harp, G4 is both draw-2 and blow-3 — both holes should light.
     let (_, guide) = build_hole_guide(&c_harp(), "C", Progression::Standard, Scale::FirstPosition);

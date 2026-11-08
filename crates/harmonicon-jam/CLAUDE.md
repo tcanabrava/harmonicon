@@ -134,7 +134,7 @@ load-bearing about *this* crate.
   one. No text, counts or history ever reach the screen.
 
 - **`jam::hole_map` is the one place a note is classified.** `JamGuide`
-  (per-jam: the pitches the jam counts, pitch → holes, the harp's playable
+  (per-jam: pitch → holes, the harp's playable
   vocabulary, scale classes, chord tones per bar) and `note_class` live
   there, not in `session`, so
   `improv`'s tally, `position_guide`'s patching, `call_response`'s phrase
@@ -142,10 +142,11 @@ load-bearing about *this* crate.
   disagree. `session` only builds it (`build_hole_guide`) and spawns the
   strip (`spawn_hole_map`).
   **Only the hole map and the call generator may read holes.** What the
-  jam *counts* is `JamGuide::pitches`, an instrument-free set, which is the
-  seam per-instrument Jam Session builds on
-  (`docs/multi_instrument_plan.md` § Jam Session per instrument). For a
-  harmonica it is the blow and draw notes, so a bent note is not counted.
+  jam *counts* is every pitch the detector hears, by note name: a bent
+  note counts, and so does any instrument's, which is what per-instrument
+  Jam Session builds on (`docs/multi_instrument_plan.md` § Jam Session
+  per instrument). The detected-note readout names a hole and breath only
+  when the harp has one for the pitch.
 
 - **Generated jams continue independently of `JamLoop`.** `JamLoop` remains
   the persistent opt-in behavior for a picked finite song. The presence of

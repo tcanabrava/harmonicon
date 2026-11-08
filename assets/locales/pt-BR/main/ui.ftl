@@ -706,6 +706,7 @@ jam-adaptive-band-on = Banda adaptativa: ligada
 jam-adaptive-band-off = Banda adaptativa: desligada
 jam-detected-blow = Furo {$hole} sopro
 jam-detected-draw = Furo {$hole} sucção
+jam-detected-pitch = Nota {$note}
 jam-detected-none = —
 jam-midi-track-mute-tooltip = Clique para silenciar/ativar esta faixa
 jam-rhythm-guide = Guia de Ritmo
