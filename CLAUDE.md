@@ -2,6 +2,12 @@
 
 Guidance for Claude Code when working in this repository.
 
+**Finding code: grep `CODE_MAP.md` first** (`grep -n -i "keyword"
+CODE_MAP.md`) rather than searching the tree. It has a "where to look first"
+table and one line per source file (path, size, what it is). Don't read it
+whole. After adding, moving or re-documenting a file, regenerate it with
+`python3 scripts/code_map.py`.
+
 ## Git history safety
 
 Treat every commit reachable from `origin/main` as immutable. Never amend,
