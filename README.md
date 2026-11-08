@@ -11,7 +11,7 @@ backing, a guided **Lessons** curriculum, a **Bending Trainer**, a full
 in-game **song editor**, a live audio spectrogram, and a small toolchain for
 turning MIDI files into playable charts.
 
-> Status: experimental desktop alpha candidate (`0.0.13`), tracking Bevy `0.20.0-rc.2`.
+> Status: experimental desktop alpha candidate, built on Bevy 0.20.
 
 ---
 

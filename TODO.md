@@ -13,16 +13,6 @@ See `ROADMAP.md`'s 1.0 section for the bar and `PLAN.md` for the order.
   traditional. Same rights-and-judgment constraint as the content item
   below — **not to be authored unsupervised**.
 
-- [ ] **Bevy is pinned to the `v0.20.0-rc.2` git tag**, because a release
-  candidate is not published to crates.io. When 0.20.0 final lands: drop the
-  `git`/`tag` keys from `Cargo.toml`'s `bevy` entry and the matching
-  `allow-git` exemption from `deny.toml` (`unknown-git = "deny"` rejects the
-  source otherwise). `bevy_fluent` may have a 0.20-compatible release by
-  then too, at which point `harmonicon-platform`'s absorbed
-  `localization::ftl` *could* go back to being a dependency — owning ~300
-  lines is arguably the better trade, since that crate's version tracks
-  Bevy's and gated this upgrade.
-
 ## Bring your own harp, bring your own songs (post-1.0)
 
 `ROADMAP.md` has the reasoning, `PLAN.md` the order. Phase 0 blocks both.
