@@ -487,24 +487,29 @@ mod tests {
     }
 
     #[test]
-    fn violin_requires_fretless_positions_and_rejects_non_adjacent_double_stops() {
-        let original: serde_json::Value =
-            serde_json::from_str(include_str!("../../tests/fixtures/violin.harpchart")).unwrap();
-        let mut value = original.clone();
-        validate_and_parse_chart(&mut value).unwrap();
-        value["track"][0]["events"][0]["fingerboard"]["finger"] = serde_json::json!(1);
-        assert!(
-            validate_and_parse_chart(&mut value).is_err(),
-            "open pitch cannot have a stopped finger"
-        );
-        value = original.clone();
-        value["track"][0]["events"][0]["fingerboard"] = serde_json::Value::Null;
-        assert!(validate_and_parse_chart(&mut value).is_err());
-        value = original;
-        let event = &mut value["track"][13]["events"][1];
-        event["note"] = serde_json::json!("D4");
-        event["fingerboard"]["string"] = serde_json::json!(3);
-        assert!(validate_and_parse_chart(&mut value).is_err());
+    fn bowed_charts_require_fretless_positions_and_reject_non_adjacent_double_stops() {
+        for source in [
+            include_str!("../../tests/fixtures/violin.harpchart"),
+            include_str!("../../tests/fixtures/viola.harpchart"),
+        ] {
+            let original: serde_json::Value = serde_json::from_str(source).unwrap();
+            let mut value = original.clone();
+            validate_and_parse_chart(&mut value).unwrap();
+            value["track"][0]["events"][0]["fingerboard"]["finger"] = serde_json::json!(1);
+            assert!(
+                validate_and_parse_chart(&mut value).is_err(),
+                "open pitch cannot have a stopped finger"
+            );
+            value = original.clone();
+            value["track"][0]["events"][0]["fingerboard"] = serde_json::Value::Null;
+            assert!(validate_and_parse_chart(&mut value).is_err());
+            value = original;
+            let event = &mut value["track"][13]["events"][1];
+            event["note"] =
+                serde_json::json!(if source.contains("\"viola\"") { "G3" } else { "D4" });
+            event["fingerboard"]["string"] = serde_json::json!(3);
+            assert!(validate_and_parse_chart(&mut value).is_err());
+        }
     }
 
     fn flute_chart() -> serde_json::Value {

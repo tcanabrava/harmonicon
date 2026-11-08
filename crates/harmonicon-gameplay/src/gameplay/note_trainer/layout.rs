@@ -183,7 +183,7 @@ pub(crate) fn setup(
         root.spawn(Node {
             width: Val::Percent(100.0),
             flex_direction: if trainer.guitar().is_some()
-                || trainer.instrument.fingering_chart().is_some()
+                || trainer.instrument.adapter().score_picker()
             {
                 FlexDirection::Row
             } else {
@@ -199,12 +199,12 @@ pub(crate) fn setup(
             workspace
                 .spawn(Node {
                     width: Val::Percent(100.0),
-                    flex_basis: if trainer.guitar().is_some()
-                        || matches!(trainer.instrument, Instrument::Clarinet(_))
+                    flex_basis: if trainer.flute().is_some() {
+                        Val::Px(300.0)
+                    } else if trainer.guitar().is_some()
+                        || trainer.instrument.adapter().score_picker()
                     {
                         Val::Px(420.0)
-                    } else if trainer.flute().is_some() {
-                        Val::Px(300.0)
                     } else {
                         Val::Auto
                     },
@@ -290,7 +290,7 @@ pub(crate) fn setup(
                         width: Val::Percent(100.0),
                         flex_basis: if trainer.guitar().is_some() {
                             Val::Px(400.0)
-                        } else if trainer.instrument.fingering_chart().is_some() {
+                        } else if trainer.instrument.adapter().score_picker() {
                             Val::Px(680.0)
                         } else {
                             Val::Auto

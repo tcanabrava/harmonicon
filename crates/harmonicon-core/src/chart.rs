@@ -69,16 +69,22 @@ pub enum ChartInstrument {
         #[serde(default)]
         body: GuitarBody,
     },
-    /// A Boehm flute, from format 1.9.0. Its foot joint decides the lowest
-    /// note; a C foot when not given.
+    /// Bowed fretless strings, from format 1.14.0.
     Violin {
         #[serde(default = "violin_strings")]
+        strings: Vec<String>,
+    },
+    /// Viola identity with its own tuning, from format 1.15.0.
+    Viola {
+        #[serde(default = "viola_strings")]
         strings: Vec<String>,
     },
     Clarinet {
         #[serde(default)]
         key: crate::instrument::clarinet::ClarinetKey,
     },
+    /// A Boehm flute, from format 1.9.0. Its foot joint decides the lowest
+    /// note; a C foot when not given.
     Flute {
         #[serde(default)]
         foot: FootJoint,
@@ -93,6 +99,10 @@ pub enum ChartInstrument {
 
 fn violin_strings() -> Vec<String> {
     vec!["E5".into(), "A4".into(), "D4".into(), "G3".into()]
+}
+
+fn viola_strings() -> Vec<String> {
+    vec!["A4".into(), "D4".into(), "G3".into(), "C3".into()]
 }
 
 fn grand_keys() -> u8 {
@@ -114,13 +124,17 @@ impl ChartInstrument {
             Instrument::Piano(model) => Self::from_piano(model),
             Instrument::Flute(model) => Self::from_flute(model),
             Instrument::Clarinet(model) => Self::Clarinet { key: model.key },
-            Instrument::Bowed(model) => Self::Violin {
-                strings: model
+            Instrument::Bowed(model) => {
+                let strings = model
                     .strings
                     .iter()
                     .map(|&pitch| crate::midi::midi_to_note(i32::from(pitch)))
-                    .collect(),
-            },
+                    .collect();
+                match model.kind {
+                    crate::instrument::bowed_strings::BowedKind::Violin => Self::Violin { strings },
+                    crate::instrument::bowed_strings::BowedKind::Viola => Self::Viola { strings },
+                }
+            }
         })
     }
 
@@ -211,8 +225,14 @@ impl ChartInstrument {
                 )
             }
             Self::Flute { foot } => Some(Flute::new(*foot).into()),
-            Self::Violin { strings } => {
-                let mut setup = crate::instrument::bowed_strings::BowedKind::Violin.standard();
+            Self::Violin { strings } | Self::Viola { strings } => {
+                use crate::instrument::bowed_strings::BowedKind;
+                let kind = if matches!(self, Self::Viola { .. }) {
+                    BowedKind::Viola
+                } else {
+                    BowedKind::Violin
+                };
+                let mut setup = kind.standard();
                 setup.strings = strings
                     .iter()
                     .map(|name| u8::try_from(note_to_midi(name)?).ok())
@@ -285,7 +305,7 @@ impl HarpChart {
 /// spec than this build supports up front, with a clear error, instead of
 /// failing on some confusing downstream `additionalProperties` schema
 /// rejection or (worse) silently misreading a field whose meaning changed.
-pub const CURRENT_FORMAT_VERSION: &str = "1.14.0";
+pub const CURRENT_FORMAT_VERSION: &str = "1.15.0";
 
 /// Parses a `"MAJOR.MINOR.PATCH"` version string into a comparable tuple.
 /// `None` for anything that isn't exactly three dot-separated integers.

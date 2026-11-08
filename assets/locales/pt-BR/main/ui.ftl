@@ -1190,3 +1190,5 @@ bowed-cents = Afinação · { $cents } cents
 bowed-heard = Ouvindo { $note }
 
 note-trainer-instrument-title = Treino de notas — { $instrument }
+
+song-instrument-viola = Viola

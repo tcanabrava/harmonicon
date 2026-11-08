@@ -1,0 +1,288 @@
+{
+  "metadata": {
+    "format_version": "1.15.0",
+    "description": "Viola first-position exercise: open C3 through stopped notes, string choices, bow guidance and an adjacent-string double stop."
+  },
+  "song": {
+    "title": "Viola foundations",
+    "artist": "Harmonicon",
+    "genre": "Exercise",
+    "tempo_bpm": 90,
+    "feel": "straight",
+    "key": "C",
+    "difficulty": "easy",
+    "time_signature": "4/4"
+  },
+  "timing": {
+    "resolution": 480,
+    "tempo_map": [
+      {
+        "tick": 0,
+        "bpm": 90
+      }
+    ]
+  },
+  "instrument": {
+    "type": "viola"
+  },
+  "track": [
+    {
+      "tick": 0,
+      "duration": 0.5,
+      "events": [
+        {
+          "note": "C3",
+          "fingerboard": {
+            "string": 4,
+            "finger": 0
+          },
+          "bow": {
+            "direction": "down",
+            "articulation": "detache"
+          }
+        }
+      ],
+      "phrase": "First position"
+    },
+    {
+      "tick": 480,
+      "duration": 0.5,
+      "events": [
+        {
+          "note": "D3",
+          "fingerboard": {
+            "string": 4,
+            "finger": 1,
+            "hand_position": 1
+          },
+          "bow": {
+            "direction": "up",
+            "articulation": "detache"
+          }
+        }
+      ]
+    },
+    {
+      "tick": 960,
+      "duration": 0.5,
+      "events": [
+        {
+          "note": "E3",
+          "fingerboard": {
+            "string": 4,
+            "finger": 2,
+            "hand_position": 1
+          },
+          "bow": {
+            "direction": "down",
+            "articulation": "detache"
+          }
+        }
+      ]
+    },
+    {
+      "tick": 1440,
+      "duration": 0.5,
+      "events": [
+        {
+          "note": "F3",
+          "fingerboard": {
+            "string": 4,
+            "finger": 3,
+            "hand_position": 1
+          },
+          "bow": {
+            "direction": "up",
+            "articulation": "detache"
+          }
+        }
+      ]
+    },
+    {
+      "tick": 1920,
+      "duration": 0.5,
+      "events": [
+        {
+          "note": "G3",
+          "fingerboard": {
+            "string": 4,
+            "finger": 4,
+            "hand_position": 1
+          },
+          "bow": {
+            "direction": "down",
+            "articulation": "detache"
+          }
+        }
+      ]
+    },
+    {
+      "tick": 2400,
+      "duration": 0.5,
+      "events": [
+        {
+          "note": "G3",
+          "fingerboard": {
+            "string": 3,
+            "finger": 0
+          },
+          "bow": {
+            "direction": "up",
+            "articulation": "detache"
+          }
+        }
+      ],
+      "phrase": "String changes"
+    },
+    {
+      "tick": 2880,
+      "duration": 0.5,
+      "events": [
+        {
+          "note": "A3",
+          "fingerboard": {
+            "string": 3,
+            "finger": 1,
+            "hand_position": 1
+          },
+          "bow": {
+            "direction": "down",
+            "articulation": "detache"
+          }
+        }
+      ]
+    },
+    {
+      "tick": 3360,
+      "duration": 0.5,
+      "events": [
+        {
+          "note": "B3",
+          "fingerboard": {
+            "string": 3,
+            "finger": 2,
+            "hand_position": 1
+          },
+          "bow": {
+            "direction": "up",
+            "articulation": "detache"
+          }
+        }
+      ]
+    },
+    {
+      "tick": 3840,
+      "duration": 0.5,
+      "events": [
+        {
+          "note": "C4",
+          "fingerboard": {
+            "string": 3,
+            "finger": 3,
+            "hand_position": 1
+          },
+          "bow": {
+            "direction": "down",
+            "articulation": "detache"
+          }
+        }
+      ]
+    },
+    {
+      "tick": 4320,
+      "duration": 0.5,
+      "events": [
+        {
+          "note": "D4",
+          "fingerboard": {
+            "string": 3,
+            "finger": 4,
+            "hand_position": 1
+          },
+          "bow": {
+            "direction": "up",
+            "articulation": "detache"
+          }
+        }
+      ]
+    },
+    {
+      "tick": 4800,
+      "duration": 0.5,
+      "events": [
+        {
+          "note": "D4",
+          "fingerboard": {
+            "string": 2,
+            "finger": 0
+          },
+          "bow": {
+            "direction": "down",
+            "articulation": "detache"
+          }
+        }
+      ]
+    },
+    {
+      "tick": 5280,
+      "duration": 0.5,
+      "events": [
+        {
+          "note": "E4",
+          "fingerboard": {
+            "string": 2,
+            "finger": 1,
+            "hand_position": 1
+          },
+          "bow": {
+            "direction": "up",
+            "articulation": "detache"
+          }
+        }
+      ]
+    },
+    {
+      "tick": 5760,
+      "duration": 0.5,
+      "events": [
+        {
+          "note": "A4",
+          "fingerboard": {
+            "string": 1,
+            "finger": 0
+          },
+          "bow": {
+            "direction": "down",
+            "articulation": "detache"
+          }
+        }
+      ]
+    },
+    {
+      "tick": 6240,
+      "duration": 0.5,
+      "phrase": "Open double stop",
+      "events": [
+        {
+          "note": "A4",
+          "fingerboard": {
+            "string": 1,
+            "finger": 0
+          }
+        },
+        {
+          "note": "D4",
+          "fingerboard": {
+            "string": 2,
+            "finger": 0
+          }
+        }
+      ]
+    }
+  ],
+  "scoring": {
+    "perfect_window_ms": 50,
+    "good_window_ms": 100,
+    "miss_window_ms": 130
+  }
+}

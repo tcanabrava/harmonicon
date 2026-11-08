@@ -64,10 +64,11 @@ pub enum InstrumentKind {
     Flute,
     Clarinet,
     Violin,
+    Viola,
 }
 
 impl InstrumentKind {
-    pub const ALL: [Self; 8] = [
+    pub const ALL: [Self; 9] = [
         Self::Harmonica,
         Self::Guitar,
         Self::Bass,
@@ -76,6 +77,7 @@ impl InstrumentKind {
         Self::Flute,
         Self::Clarinet,
         Self::Violin,
+        Self::Viola,
     ];
     pub const fn slug(self) -> &'static str {
         match self {
@@ -87,6 +89,7 @@ impl InstrumentKind {
             Self::Flute => "flute",
             Self::Clarinet => "clarinet",
             Self::Violin => "violin",
+            Self::Viola => "viola",
         }
     }
     /// Default configuration registered with the identity, shared by document
@@ -101,6 +104,7 @@ impl InstrumentKind {
             Self::Flute => Flute::default().into(),
             Self::Clarinet => Clarinet::default().into(),
             Self::Violin => bowed_strings::BowedKind::Violin.standard().into(),
+            Self::Viola => bowed_strings::BowedKind::Viola.standard().into(),
         }
     }
     pub fn from_slug(value: &str) -> Option<Self> {

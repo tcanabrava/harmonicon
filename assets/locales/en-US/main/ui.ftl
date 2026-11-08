@@ -1193,3 +1193,5 @@ bowed-cents = Intonation · { $cents } cents
 bowed-heard = Hearing { $note }
 
 note-trainer-instrument-title = Note Trainer — { $instrument }
+
+song-instrument-viola = Viola

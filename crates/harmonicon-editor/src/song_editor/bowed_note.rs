@@ -212,33 +212,37 @@ mod tests {
     }
     #[test]
     fn chart_round_trip_preserves_fretless_placement_and_independent_bow_guidance() {
-        let original: serde_json::Value = serde_json::from_str(include_str!(
-            "../../../harmonicon-song/tests/fixtures/violin.harpchart"
-        ))
-        .unwrap();
-        let mut state = EditorState::default();
-        super::super::harpchart::load_harpchart(
-            &original,
-            &mut state,
-            &mut super::super::state::Scroll::default(),
-        );
-        assert_eq!(state.notes.len(), 15);
-        assert!(state.notes[0].performance.bowed().is_some());
-        assert!(at(&state.notes[0]).is_some());
-        let mut saved =
-            serde_json::from_str(&super::super::harpchart::serialize_harpchart(&state)).unwrap();
-        harmonicon_song::song::validate_and_migrate_chart(&mut saved).unwrap();
-        let after: harmonicon_core::chart::HarpChart = serde_json::from_value(saved).unwrap();
-        let before: harmonicon_core::chart::HarpChart = serde_json::from_value(original).unwrap();
-        assert_eq!(before.instrument(), after.instrument());
-        let events = |chart: &harmonicon_core::chart::HarpChart| {
-            chart
-                .track
-                .iter()
-                .flat_map(|item| &item.events)
-                .map(|event| (chart.event_pitch(event), event.fingerboard, event.bow))
-                .collect::<Vec<_>>()
-        };
-        assert_eq!(events(&before), events(&after));
+        for source in [
+            include_str!("../../../harmonicon-song/tests/fixtures/violin.harpchart"),
+            include_str!("../../../harmonicon-song/tests/fixtures/viola.harpchart"),
+        ] {
+            let original: serde_json::Value = serde_json::from_str(source).unwrap();
+            let mut state = EditorState::default();
+            super::super::harpchart::load_harpchart(
+                &original,
+                &mut state,
+                &mut super::super::state::Scroll::default(),
+            );
+            assert_eq!(state.notes.len(), 15);
+            assert!(state.notes[0].performance.bowed().is_some());
+            assert!(at(&state.notes[0]).is_some());
+            let mut saved =
+                serde_json::from_str(&super::super::harpchart::serialize_harpchart(&state))
+                    .unwrap();
+            harmonicon_song::song::validate_and_migrate_chart(&mut saved).unwrap();
+            let after: harmonicon_core::chart::HarpChart = serde_json::from_value(saved).unwrap();
+            let before: harmonicon_core::chart::HarpChart =
+                serde_json::from_value(original).unwrap();
+            assert_eq!(before.instrument(), after.instrument());
+            let events = |chart: &harmonicon_core::chart::HarpChart| {
+                chart
+                    .track
+                    .iter()
+                    .flat_map(|item| &item.events)
+                    .map(|event| (chart.event_pitch(event), event.fingerboard, event.bow))
+                    .collect::<Vec<_>>()
+            };
+            assert_eq!(events(&before), events(&after));
+        }
     }
 }

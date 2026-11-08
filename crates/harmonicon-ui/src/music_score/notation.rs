@@ -113,6 +113,8 @@ pub enum Clef {
     /// Ordinary treble. Bottom line E4.
     #[default]
     Treble,
+    /// C clef on the middle line (C4); ordinary viola notation.
+    Alto,
     /// Treble with an octave-up indicator: everything draws an octave
     /// lower than it sounds, so the bottom line reads as E5. The harmonica
     /// register that would otherwise sit far above the staff.
@@ -133,6 +135,7 @@ impl Clef {
     /// already-clef-relative steps and needs no clef of its own.
     pub(super) fn base_midi(self) -> u8 {
         match self {
+            Clef::Alto => 53,      // F3; middle C4 is step 4
             Clef::Treble => 64,    // E4
             Clef::Treble8va => 76, // E5 — drawn an octave below its sound
             Clef::Treble8vb => 52, // E3 sounds where written E4 sits
@@ -144,6 +147,7 @@ impl Clef {
     /// The SMuFL glyph to draw.
     pub fn glyph(self) -> &'static str {
         match self {
+            Clef::Alto => "\u{E05C}", // SMuFL cClef
             Clef::Treble => glyph::G_CLEF,
             Clef::Treble8va => glyph::G_CLEF_8VA,
             Clef::Bass => glyph::F_CLEF,
@@ -159,6 +163,7 @@ impl Clef {
         match self {
             Clef::Treble | Clef::Treble8va | Clef::Treble8vb => 2,
             Clef::Bass | Clef::Bass8vb => 6,
+            Clef::Alto => 4,
         }
     }
 }
@@ -1476,6 +1481,7 @@ pub fn resolve_clef(notes: &[NotationNote], forced: Option<Clef>) -> Clef {
     // median sits high: written C5 or above. `Bass8vb` is written an octave
     // above it sounds, so its threshold in sounding pitch is an octave lower.
     let (threshold, treble) = match forced {
+        Some(Clef::Alto) => (76, Clef::Treble),
         Some(Clef::Bass) => (72, Clef::Treble),
         Some(Clef::Bass8vb) => (60, Clef::Treble8vb),
         _ => return forced.unwrap_or_else(|| choose_clef(notes)),
@@ -1510,5 +1516,23 @@ mod bass_notation_tests {
         assert_eq!(resolve_clef(&[], Some(Clef::Bass8vb)), Clef::Bass8vb);
         assert_eq!(Clef::Bass8vb.glyph(), "\u{E064}");
         assert_eq!(Clef::Bass8vb.anchor_step(), Clef::Bass.anchor_step());
+    }
+}
+
+#[cfg(test)]
+mod alto_notation_tests {
+    use super::*;
+    #[test]
+    fn alto_centres_middle_c_and_places_violas_low_c_with_one_ledger_line() {
+        for (midi, step) in [(53, 0), (57, 2), (60, 4), (64, 6), (67, 8)] {
+            assert_eq!(staff_step(midi, Clef::Alto), step);
+        }
+        assert_eq!(staff_step(48, Clef::Alto), -3);
+        assert_eq!(ledger_line_steps(staff_step(48, Clef::Alto)), [-2]);
+        assert_eq!(Clef::Alto.anchor_step(), 4);
+        assert_eq!(Clef::Alto.glyph(), "\u{E05C}");
+        assert_eq!(resolve_clef(&[], Some(Clef::Alto)), Clef::Alto);
+        let high = NotationNote { spelling: None, start_beat: 0.0, duration_beats: 1.0, midi: 84, tied_from_previous: false, highlighted: true };
+        assert_eq!(resolve_clef(&[high], Some(Clef::Alto)), Clef::Treble);
     }
 }

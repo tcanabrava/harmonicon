@@ -44,7 +44,7 @@ use bevy::text::{FontHinting, LineHeight};
 use bevy::ui::ComputedNode;
 
 mod pitch_picker;
-pub use pitch_picker::{PitchChoiceInk, spawn_pitch_choices, spawn_written_pitch_choices};
+pub use pitch_picker::{PitchChoiceInk, spawn_pitch_choices, spawn_written_pitch_choices, spawn_written_pitch_choices_in_clef};
 
 mod note_glyphs;
 mod tie_material;
@@ -598,6 +598,7 @@ pub struct InstrumentScoreClef(pub Clef);
 pub fn instrument_clef(kind: harmonicon_core::instrument::InstrumentKind) -> Option<Clef> {
     match kind {
         harmonicon_core::instrument::InstrumentKind::Bass => Some(Clef::Bass),
+        harmonicon_core::instrument::InstrumentKind::Viola => Some(Clef::Alto),
         harmonicon_core::instrument::InstrumentKind::Guitar | harmonicon_core::instrument::InstrumentKind::Clarinet | harmonicon_core::instrument::InstrumentKind::Violin => Some(Clef::Treble),
         _ => None,
     }

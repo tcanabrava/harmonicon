@@ -2,7 +2,9 @@
 //! Select drill targets on a staff, using the family's practice range.
 use super::*;
 use bevy::ui::InteractionDisabled;
-use harmonicon_ui::music_score::{BravuraFont, PitchChoiceInk, spawn_written_pitch_choices};
+use harmonicon_ui::music_score::{
+    BravuraFont, PitchChoiceInk, spawn_written_pitch_choices_in_clef,
+};
 
 #[derive(Component)]
 pub(crate) struct PitchChoice(u8);
@@ -89,7 +91,13 @@ pub(super) fn spawn_for_instrument(
                 })
                 .with_children(|score| {
                     for pitches in &rows {
-                        for (midi, entity) in spawn_written_pitch_choices(score, font, pitches) {
+                        for (midi, entity) in spawn_written_pitch_choices_in_clef(
+                            score,
+                            font,
+                            pitches,
+                            harmonicon_ui::music_score::instrument_clef(instrument.kind())
+                                .unwrap_or(harmonicon_ui::music_score::Clef::Treble),
+                        ) {
                             score.commands().entity(entity).insert(PitchChoice(midi)).observe(
                                 move |_: On<Activate>, mut trainer: ResMut<NoteTrainer>| {
                                     trainer.select_pitch(midi);

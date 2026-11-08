@@ -10,20 +10,22 @@
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum BowedKind {
     Violin,
+    Viola,
 }
 impl BowedKind {
     pub const fn instrument_kind(self) -> super::InstrumentKind {
         match self {
             Self::Violin => super::InstrumentKind::Violin,
+            Self::Viola => super::InstrumentKind::Viola,
         }
     }
 
     pub fn standard(self) -> BowedStrings {
-        match self {
-            Self::Violin => {
-                BowedStrings { kind: self, strings: vec![76, 69, 62, 55], stopped_semitones: 24 }
-            }
-        }
+        let strings = match self {
+            Self::Violin => vec![76, 69, 62, 55],
+            Self::Viola => vec![69, 62, 55, 48],
+        };
+        BowedStrings { kind: self, strings, stopped_semitones: 24 }
     }
 }
 
@@ -33,7 +35,7 @@ pub struct BowedStrings {
     /// String 1 first, by physical order; pitches need not be sorted.
     pub strings: Vec<u8>,
     /// Supported stopped interval per string, not an anatomical limit or fret
-    /// count. The initial violin adapter supports two octaves above each open.
+    /// count. The bowed adapter supports two octaves above each open.
     pub stopped_semitones: u8,
 }
 
@@ -244,6 +246,24 @@ impl super::InstrumentModel for BowedStrings {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn viola_uses_its_own_tuning_and_reuses_stopping_and_first_position_guidance() {
+        let viola = BowedKind::Viola.standard();
+        assert_eq!(viola.kind.instrument_kind(), super::super::InstrumentKind::Viola);
+        assert_eq!(viola.strings, [69, 62, 55, 48]);
+        assert_eq!(viola.range(), Some((48, 93)));
+        let d3 = viola.positions_for(50).into_iter().find(|at| at.string == 4).unwrap();
+        assert_eq!((d3.finger, d3.hand_position), (Some(1), Some(1)));
+        assert_eq!(viola.pitch_of(d3), Some(50));
+        assert_eq!(viola.stopping_fraction(4, 60.0), Some(0.5));
+        assert!(viola.positions_for(47).is_empty());
+        assert!(viola.positions_for(94).is_empty());
+        for note in 48..=93 {
+            assert!(
+                viola.positions_for(note).into_iter().all(|at| viola.pitch_of(at) == Some(note))
+            );
+        }
+    }
     #[test]
     fn standard_violin_has_sounding_tuning_and_multiple_locations() {
         let violin = BowedKind::Violin.standard();

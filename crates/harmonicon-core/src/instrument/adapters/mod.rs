@@ -45,19 +45,9 @@ mod tests {
 
     #[test]
     fn registered_families_keep_pitch_drills_and_wire_configuration_consistent() {
-        let mut instruments = vec![
-            Instrument::Harmonica(crate::harmonica::richter_harp("C")),
-            Instrument::Piano(Piano::default()),
-            Instrument::Flute(Flute::default()),
-            Instrument::Clarinet(Clarinet::default()),
-            Instrument::Bowed(bowed_strings::BowedKind::Violin.standard()),
-        ];
-        instruments.extend(
-            fretted_strings::FrettedKind::ALL
-                .into_iter()
-                .map(|kind| Instrument::Fretted(kind.default_setup())),
-        );
-        for instrument in instruments {
+        for kind in InstrumentKind::ALL {
+            let instrument = kind.default_instrument();
+            assert_eq!(instrument.kind(), kind);
             let adapter = instrument.adapter();
             let pitches = instrument.valid_pitches();
             assert_eq!(

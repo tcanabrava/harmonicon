@@ -323,11 +323,11 @@
         },
         {
           "type": "object",
-          "description": "A bowed fretless violin (format 1.14.0), sounding pitches. String 1 is first. Standard E5 A4 D4 G3 when omitted; supported stopped range is two octaves above each open string.",
+          "description": "A bowed fretless violin (format 1.14.0) or viola (format 1.15.0), sounding pitches. String 1 is first. Defaults: violin E5 A4 D4 G3; viola A4 D4 G3 C3. Supported stopped range is two octaves above each open string.",
           "required": ["type"],
           "additionalProperties": false,
           "properties": {
-            "type": { "type": "string", "enum": ["violin"] },
+            "type": { "type": "string", "enum": ["violin", "viola"] },
             "strings": { "type": "array", "minItems": 1, "maxItems": 8, "items": { "type": "string", "pattern": "^[A-G][#b]?[0-9]$" } }
           }
         },

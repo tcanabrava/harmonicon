@@ -25,9 +25,20 @@ pub fn spawn_written_pitch_choices(
     font: &BravuraFont,
     pitches: &[(u8, u8)],
 ) -> Vec<(u8, Entity)> {
+    spawn_written_pitch_choices_in_clef(parent, font, pitches, Clef::Treble)
+}
+
+/// Render selectable written pitches in the instrument's teaching clef while
+/// retaining the caller's sounding IDs. Existing callers keep treble by default.
+pub fn spawn_written_pitch_choices_in_clef(
+    parent: &mut ChildSpawnerCommands,
+    font: &BravuraFont,
+    pitches: &[(u8, u8)],
+    clef: Clef,
+) -> Vec<(u8, Entity)> {
     let label_top = pitches
         .iter()
-        .map(|&(_, written)| y_for_step(staff_step(written, Clef::Treble)) + 20.0)
+        .map(|&(_, written)| y_for_step(staff_step(written, clef)) + 20.0)
         .fold(114.0_f32, f32::max);
     let mut choices = Vec::new();
     parent
@@ -45,12 +56,12 @@ pub fn spawn_written_pitch_choices(
                 flex_shrink: 0.0,
                 ..default()
             })
-            .with_children(|clef| {
-                clef.spawn(super::glyph(
+            .with_children(|symbol| {
+                symbol.spawn(super::glyph(
                     font,
-                    Clef::Treble.glyph(),
+                    clef.glyph(),
                     4.0,
-                    y_for_step(2),
+                    y_for_step(clef.anchor_step()),
                     Color::WHITE,
                 ));
             });
@@ -82,7 +93,7 @@ pub fn spawn_written_pitch_choices(
                             PitchChoiceInk(midi),
                         ))
                         .with_children(|marks| {
-                            let step = staff_step(written, Clef::Treble);
+                            let step = staff_step(written, clef);
                             for ledger in ledger_line_steps(step) {
                                 marks.spawn((
                                     Node {
@@ -180,4 +191,38 @@ pub fn spawn_written_pitch_choices(
             }
         });
     choices
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn alto_picker_engraves_middle_c_on_the_middle_line_and_keeps_sounding_ids() {
+        let mut app = App::new();
+        let mut choices = Vec::new();
+        app.world_mut().commands().spawn(Node::default()).with_children(|parent| {
+            choices = spawn_written_pitch_choices_in_clef(
+                parent,
+                &BravuraFont(Handle::default()),
+                &[(48, 60)],
+                Clef::Alto,
+            );
+        });
+        app.world_mut().flush();
+        assert_eq!(choices.len(), 1);
+        assert_eq!(choices[0].0, 48);
+        let world = app.world_mut();
+        let texts: Vec<_> =
+            world.query::<&Text>().iter(world).map(|text| text.0.as_str()).collect();
+        assert!(texts.contains(&Clef::Alto.glyph()));
+        assert!(!texts.contains(&Clef::Treble.glyph()));
+        let (head, node) = world
+            .query::<(&Text, &Node)>()
+            .iter(world)
+            .find(|(text, _)| text.0 == glyph::NOTEHEAD_BLACK)
+            .unwrap();
+        assert_eq!(head.0, glyph::NOTEHEAD_BLACK);
+        assert_eq!(node.top, Val::Px(y_for_step(4) - GLYPH_BASELINE_CORRECTION));
+    }
 }

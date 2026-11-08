@@ -192,8 +192,8 @@ Each independently reviewable part receives a commit and relevant validation.
 - Model checks cover tuning, alternate strings, first-position guidance,
   fractional stopping geometry, boundary validation and bow metadata round trips.
   Core: 453 tests passed; core Clippy passed with warnings denied.
-- Step 6 continues with violin chart, editor, trainer and Play integration.
-  Step 7 (viola and alto clef) remains planned.
+- Steps 6 and 7 software integration is complete: violin and viola share the
+  bowed editor, trainer and Play views. Validation limits are recorded below.
 
 ### Architecture correction after violin integration
 
@@ -228,7 +228,7 @@ fully dynamic plugin system: editor and gameplay view registration still have
 explicit family branches. Existing piano/guitar algorithms must not be edited
 merely to initialize another family's metadata.
 
-Regression checks cover all eight registered identities, valid target drills,
+Regression checks cover every registered identity, valid target drills,
 pitch mapping and configuration round trips, as well as optional performance
 instructions and existing family-specific suites.
 
@@ -262,3 +262,40 @@ review of the new violin screens.
 Cleanup validation: 2,358 workspace library tests passed (one existing ignored
 case), and workspace Clippy passed with warnings denied. Five tests of the
 removed parser were replaced by two tests of shared decoding/export behaviour.
+
+### Step 7: viola through the bowed-string family
+
+- Registered viola identity and its A4–D4–G3–C3 string order. It shares violin's
+  bounded two-octave stopped range per string, continuous stopping geometry,
+  optional first-position guidance, adjacent-string constraints and bow metadata.
+- Reused the bowed editor, staff note picker, string choices, trainer, Play
+  diagram, assessment and synth. Default document creation, trainer entry,
+  catalog labels and curriculum selection pick up the registered identity.
+  No piano or guitar implementation changes are needed for this step.
+- Added alto clef with middle C on the middle line, its key-signature placement
+  and low-register ledger lines. High parts can choose treble using the existing
+  whole-part policy, keeping the clef stable while the score scrolls.
+- Added a viola first-position exercise fixture and exercised both violin and
+  viola through the same loader and editor round-trip checks. Song format
+  1.15.0 / lesson format 7; older content remains supported.
+- Tuning reference: [Yamaha's viola guide](https://www.yamaha.com/en/musical_instrument_guide/violin/structure/structure004.html).
+  C-clef glyph and alignment follow [SMuFL clefs](https://w3c.github.io/smufl/latest/tables/clefs.html)
+  and [glyph registration](https://w3c.github.io/smufl/latest/specification/text-metrics-glyph-registration.html).
+
+Real microphone/pickup recordings remain a separate validation item for the
+new instruments. Synthetic/model and UI checks do not establish reliable bow,
+finger or string detection. This implementation provides curriculum selection
+and chart exercises; it does not bundle new clarinet/violin/viola lesson packs.
+
+Step 7 validation: 2,362 workspace library tests passed (one existing ignored
+case), with the gameplay suite rerun after the final layout adjustment. Workspace
+Clippy passed with warnings denied; all four glyph-coverage checks and all three
+module-boundary/size checks passed. The dev build passed.
+
+Live review at 1920×1080 covered creating/loading a viola document, its alto-clef
+score, pitch selection and alternate strings, the full trainer fingerboard,
+score-led Play, and the paused practice score. The reusable staff picker now
+accepts an explicit clef; its rendered-tree test verifies middle C on alto's
+middle line while retaining sounding IDs. Bowed trainer controls and the picker
+share a row so the fingerboard stays visible. Review captures were kept under
+`/tmp/harmonicon-viola-review`; no user settings were changed.
