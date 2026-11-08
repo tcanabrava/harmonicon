@@ -116,7 +116,7 @@ safe-to-author subset per `TODO.md`); nothing melodic or rights-sensitive.
 Like the `improvisation` lesson it builds on, each of the jam-criteria
 lessons still needs a minimal `chart` field — a single long placeholder
 `TrackItem` spanning the jam, supplying `song.key`/`harmonica` for
-`JamHoleGuide` construction — even though no notes are individually scored.
+`JamGuide` construction — even though no notes are individually scored.
 (An earlier draft of this doc said these three needed "no chart"; that was
 imprecise — the code has always required one, and the shipped lessons
 follow that pattern.)
@@ -138,7 +138,7 @@ improvising over anything but the blues scale." Two parts:
    off `multiple-notes` instead of `deep-bends`).
 2. **True non-blues jam improvisation, needing new engine work** — Jam
    Session's live hole-map/scale-adherence feedback
-   (`jam::hole_map::JamHoleGuide`) was hardcoded to
+   (`jam::hole_map::JamGuide`) was hardcoded to
    `blues_scale_classes` regardless of what a lesson or "Generate Jam"
    picked. Fixed by a new `JamScale` resource (`harmonicon-app`'s `app.rs`, mirrors the
    existing `JamProgression`) plus a `LessonManifest::scale` field
@@ -226,7 +226,7 @@ it.
   i.e. the practical, stay-on-one-harp meaning of "switching position"
   (blues-hexatonic pitch classes rooted at the jam key +0/+7/+2 semitones).
   `on_position_called` re-highlights the compass and patches the live
-  `JamHoleGuide::scale_classes` in place (it's normally computed once at
+  `JamGuide::scale_classes` in place (it's normally computed once at
   session setup and never re-derived) so the *existing*
   `PassCriteria::ScaleAdherence`/`jam::improv::ImprovStats` machinery judges
   played notes against whichever position was actually called — no new

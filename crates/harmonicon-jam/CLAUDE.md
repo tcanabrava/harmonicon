@@ -80,8 +80,8 @@ load-bearing about *this* crate.
   same reasoning `jam::improv`'s phrase-discipline pattern rests on)
   rather than a separate timer. **The call is a pure function**
   (`call_response::phrase::generate_call`) of the two bars' chords
-  (`JamHoleGuide::chord_tones_by_bar`), the jam scale, the harp the
-  player is holding (`JamHoleGuide::playable`, built by
+  (`JamGuide::chord_tones_by_bar`), the jam scale, the harp the
+  player is holding (`JamGuide::playable`, built by
   `phrase::playable_notes` — plain blows/draws only, so no call ever asks
   for a bend or the slide), the chart's straight/shuffle `Feel`, the
   density (`JamCallDensity`, the "Phrasing" cycle button: sparse /
@@ -133,13 +133,19 @@ load-bearing about *this* crate.
   running. Deterministic under a recorded beat stream — the tests replay
   one. No text, counts or history ever reach the screen.
 
-- **`jam::hole_map` is the one place a note is classified.** `JamHoleGuide`
-  (per-jam: pitch → holes, the harp's playable vocabulary, scale classes,
-  chord tones per bar) and `note_class` live there, not in `session`, so
+- **`jam::hole_map` is the one place a note is classified.** `JamGuide`
+  (per-jam: the pitches the jam counts, pitch → holes, the harp's playable
+  vocabulary, scale classes, chord tones per bar) and `note_class` live
+  there, not in `session`, so
   `improv`'s tally, `position_guide`'s patching, `call_response`'s phrase
   generator and the hole map's own tint all read one lookup and cannot
   disagree. `session` only builds it (`build_hole_guide`) and spawns the
   strip (`spawn_hole_map`).
+  **Only the hole map and the call generator may read holes.** What the
+  jam *counts* is `JamGuide::pitches`, an instrument-free set, which is the
+  seam per-instrument Jam Session builds on
+  (`docs/multi_instrument_plan.md` § Jam Session per instrument). For a
+  harmonica it is the blow and draw notes, so a bent note is not counted.
 
 - **Generated jams continue independently of `JamLoop`.** `JamLoop` remains
   the persistent opt-in behavior for a picked finite song. The presence of

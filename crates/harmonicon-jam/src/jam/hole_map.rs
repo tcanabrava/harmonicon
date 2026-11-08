@@ -2,7 +2,7 @@
 
 //! Jam Session's live harmonica hole map: the per-jam lookup of which holes
 //! sound which notes and how each note sits against the scale and the
-//! bar's chord ([`JamHoleGuide`]), the bottom-strip hole cells it tints from
+//! bar's chord ([`JamGuide`]), the bottom-strip hole cells it tints from
 //! the mic every frame ([`update_hole_map`]), and the note-class helpers
 //! `improv`, `position_guide` and `call_response` share so no two of them
 //! can classify a note differently.
@@ -33,9 +33,17 @@ use super::improv::classify_note_fit;
 /// them directly, the same lookup `update_hole_map`'s tint uses, so the
 /// two can't disagree.
 #[derive(Resource)]
-pub struct JamHoleGuide {
+pub struct JamGuide {
+    /// Every pitch the jam counts as played on this instrument: what
+    /// `improv` tallies and the gate it releases against. Instrument-free,
+    /// so a guitar or flute jam can fill it from its own model. For a
+    /// harmonica it is the blow and draw notes only, `note_to_holes`'
+    /// keys: a bent note is not counted, though `valid_pitches` would
+    /// include it.
+    pub(crate) pitches: HashSet<u8>,
     /// MIDI note number → the holes that can sound it (may be more than one
-    /// — e.g. draw-2 and blow-3 are both G4 on a C harp).
+    /// — e.g. draw-2 and blow-3 are both G4 on a C harp). The harmonica's
+    /// own map; nothing outside it should need holes.
     pub(crate) note_to_holes: HashMap<u8, Vec<u8>>,
     /// The same blow/draw vocabulary as `note_to_holes`, kept per (hole,
     /// direction) for `call_response::phrase`, whose calls need to know
@@ -100,7 +108,7 @@ pub(crate) fn build_hole_guide(
     key: &str,
     progression: Progression,
     scale: Scale,
-) -> (Vec<HoleInfo>, JamHoleGuide) {
+) -> (Vec<HoleInfo>, JamGuide) {
     let dash = "\u{2014}";
     let scale_classes = scale.classes(key);
     let chord_tones_by_bar: [HashSet<String>; 12] = {
@@ -136,7 +144,8 @@ pub(crate) fn build_hole_guide(
 
     (
         holes,
-        JamHoleGuide {
+        JamGuide {
+            pitches: note_to_holes.keys().copied().collect(),
             note_to_holes,
             playable: playable_notes(harp),
             scale_classes,
@@ -227,7 +236,7 @@ pub(crate) fn spawn_hole_map(
 /// what to echo. Reuses the same `ActivePitches` the scored modes detect.
 pub fn update_hole_map(
     active: Res<ActivePitches>,
-    guide: Option<Res<JamHoleGuide>>,
+    guide: Option<Res<JamGuide>>,
     current: Res<CurrentBar>,
     call_response: Option<Res<super::call_response::CallResponseState>>,
     mut cells: Query<(&JamHoleCell, &mut BackgroundColor)>,
@@ -307,7 +316,7 @@ pub(crate) fn spawn_detected_note(parent: &mut ChildSpawnerCommands, loc: &Local
 /// in scale, outside — writing only when the reading changes.
 pub fn update_detected_note(
     active: Res<ActivePitches>,
-    guide: Option<Res<JamHoleGuide>>,
+    guide: Option<Res<JamGuide>>,
     current: Res<CurrentBar>,
     loc: Res<Localization>,
     mut labels: Query<(&mut Text, &mut TextColor), With<JamDetectedNote>>,

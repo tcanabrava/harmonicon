@@ -106,7 +106,7 @@ pub fn current_bar_index(clock: f64, secs_per_bar: f64) -> usize {
 /// update_hole_map` don't each recompute it from two different
 /// beats-per-bar sources that could disagree (`ScoringConfig::
 /// beats_per_bar`, which honors a chart's `time_signature_map` override,
-/// vs `JamHoleGuide`'s own copy).
+/// vs `JamGuide`'s own copy).
 #[derive(Resource, Default)]
 pub struct CurrentBar(pub usize);
 

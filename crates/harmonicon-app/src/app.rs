@@ -69,7 +69,7 @@ pub enum GameplayMode {
 pub struct JamProgression(pub Progression);
 
 /// The scale Jam Session's live hole-map feedback (`jam::session::
-/// JamHoleGuide`) judges played notes against — see `harmonicon_core::chart::Scale`.
+/// JamGuide`) judges played notes against — see `harmonicon_core::chart::Scale`.
 /// Defaults to `FirstPosition` (the blues hexatonic). Set explicitly by
 /// "Generate Jam" (`menu::jam_generate`) and by a jam-based lesson's
 /// `scale` manifest field (`menu::pages::lesson_reader::parse_scale`); the

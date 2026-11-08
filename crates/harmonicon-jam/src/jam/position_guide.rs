@@ -15,7 +15,7 @@
 //!   hexatonic pitch classes rooted at the jam key +0/+7/+2 semitones, i.e.
 //!   the practical, *stay-on-one-harp* meaning of "switching position"), and
 //!   [`on_position_called`] both re-highlights the compass and patches
-//!   `JamHoleGuide::scale_classes` so the existing `ScaleAdherence` lesson
+//!   `JamGuide::scale_classes` so the existing `ScaleAdherence` lesson
 //!   criterion (`jam::improv::ImprovStats`) judges played notes against
 //!   whichever position was actually called at the time — no new scoring
 //!   machinery, just a moving target for the one that already exists.
@@ -31,7 +31,7 @@ use harmonicon_platform::theme::{CircleOfFifthsColors, LoadedTheme};
 use harmonicon_song::song::SongManifest;
 use harmonicon_ui::dialogs::circle_of_fifths::spawn_circle_of_fifths;
 
-use super::hole_map::JamHoleGuide;
+use super::hole_map::JamGuide;
 
 // ── Pure timing/mapping ─────────────────────────────────────────────────────
 
@@ -99,7 +99,7 @@ pub(crate) fn cycle_position(
     }
 }
 
-/// Reacts to a newly called position: patches `JamHoleGuide::scale_classes`
+/// Reacts to a newly called position: patches `JamGuide::scale_classes`
 /// in place (it's only ever computed once at `session::setup` otherwise, so
 /// a mid-session `JamScale` change would silently do nothing to live
 /// scoring/tint without this) using the same chart-vs-`JamScale` precedence
@@ -109,7 +109,7 @@ pub(crate) fn on_position_called(
     mut events: MessageReader<PositionCalled>,
     selected: Res<SelectedSong>,
     manifests: Res<Assets<SongManifest>>,
-    mut guide: ResMut<JamHoleGuide>,
+    mut guide: ResMut<JamGuide>,
     loc: Res<Localization>,
     theme: Res<LoadedTheme>,
     slots: Query<(Entity, &PositionCompassSlot)>,

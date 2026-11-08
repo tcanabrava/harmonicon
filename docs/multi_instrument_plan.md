@@ -378,12 +378,15 @@ chord tones are pitch classes (`hole_map::note_class`), improv adherence
 rhythm guide and mixer never see the instrument. The harmonica lives in
 three places only, so those are what change:
 
-1. **The vocabulary.** `JamHoleGuide` becomes a `JamGuide` holding the
-   instrument's playable pitches (`InstrumentModel::valid_pitches`), the
-   scale and the chord tones per bar. `improv` only ever asks
-   `note_to_holes.contains_key`, so it asks the pitch set instead and is
-   otherwise untouched. The harmonica's hole lookup moves into its own
-   map, built from `positions_for`.
+1. **The vocabulary** (landed, harmonica only). `JamGuide` (formerly
+   `JamHoleGuide`) holds the pitches the jam counts (`JamGuide::pitches`),
+   the scale and the chord tones per bar; `improv` asks that set rather
+   than the hole lookup and is otherwise untouched. Another instrument
+   fills it from `InstrumentModel::valid_pitches`. The harmonica's is its
+   blow and draw notes only, as before, so a bent note is not counted:
+   **open** whether it should be, since bends are blues vocabulary but
+   counting them changes what an improv lesson scores. The hole lookup
+   stays, for the harmonica's own map.
 2. **The map** ("where the scale lives on this instrument"). Each
    instrument reuses the strip it already draws in Play 2D, tinted by one
    shared pure rule: chord tone of the current bar, in scale, out of
@@ -427,8 +430,8 @@ Around those three:
 
 Phases, each committed on its own:
 
-1. `JamGuide` and the pitch set, harmonica only, no behaviour change (the
-   existing jam tests are the proof).
+1. ~~`JamGuide` and the pitch set, harmonica only, no behaviour change~~
+   (landed).
 2. Instrument selection, key and detection range, and the guitar's
    fretboard map, without call-and-response.
 3. Per-family call vocabulary and transitions.

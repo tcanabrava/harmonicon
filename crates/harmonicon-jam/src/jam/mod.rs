@@ -77,7 +77,7 @@ impl Plugin for JamPlugin {
                     ),
             )
             // Jam Session, position-cycling lesson mechanic: calls a new position
-            // (cycling `JamScale`) every few bars and patches `JamHoleGuide` to
+            // (cycling `JamScale`) every few bars and patches `JamGuide` to
             // match — ordered before `improv::accumulate_improv_stats` so a
             // bar-boundary frame is never scored against the stale scale. A
             // no-op for an ordinary jam (`JamPositionCycle` off).

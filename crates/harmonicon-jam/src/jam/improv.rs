@@ -12,7 +12,7 @@ use bevy::prelude::*;
 
 use harmonicon_gameplay::gameplay::{AbsoluteBar, ActivePitches, CurrentBar};
 
-use super::hole_map::JamHoleGuide;
+use super::hole_map::JamGuide;
 
 /// How "targeted" a sounding note is, worst to best.
 #[derive(Clone, Copy, PartialEq, PartialOrd, Debug)]
@@ -145,7 +145,7 @@ pub fn reset_improv_stats(mut gate: ResMut<ImprovGate>, mut stats: ResMut<Improv
 /// attacks once each instead of repainting every frame a pitch stays held.
 pub fn accumulate_improv_stats(
     active: Res<ActivePitches>,
-    guide: Option<Res<JamHoleGuide>>,
+    guide: Option<Res<JamGuide>>,
     current: Res<CurrentBar>,
     absolute: Res<AbsoluteBar>,
     mut gate: ResMut<ImprovGate>,
@@ -156,7 +156,7 @@ pub fn accumulate_improv_stats(
     };
     let mut sounding = [false; 256];
     for pitch in &active.0 {
-        if guide.note_to_holes.contains_key(&pitch.midi) {
+        if guide.pitches.contains(&pitch.midi) {
             sounding[pitch.midi as usize] = true;
         }
     }
@@ -165,7 +165,7 @@ pub fn accumulate_improv_stats(
     let chord_tones = &guide.chord_tones_by_bar[current.0];
     let resting = in_rest_window(absolute.0, PHRASE_PLAY_BARS, PHRASE_REST_BARS);
     for p in &active.0 {
-        if !guide.note_to_holes.contains_key(&p.midi) || !gate.0.is_fresh(p.midi, true) {
+        if !guide.pitches.contains(&p.midi) || !gate.0.is_fresh(p.midi, true) {
             continue;
         }
         gate.0.consume(p.midi);

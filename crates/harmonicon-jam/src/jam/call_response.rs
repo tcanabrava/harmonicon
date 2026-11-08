@@ -41,7 +41,7 @@ use harmonicon_gameplay::gameplay::{
 use harmonicon_platform::localization::{Localization, LocalizationExt};
 use harmonicon_song::song::SongManifest;
 
-use super::hole_map::JamHoleGuide;
+use super::hole_map::JamGuide;
 
 pub mod phrase;
 
@@ -308,7 +308,7 @@ pub fn drive_call_response(
     absolute: Res<AbsoluteBar>,
     current: Res<CurrentBar>,
     clock: Res<GameplayClock>,
-    guide: Option<Res<JamHoleGuide>>,
+    guide: Option<Res<JamGuide>>,
     selected: Res<SelectedSong>,
     manifests: Res<Assets<SongManifest>>,
     audio: Res<AudioSettings>,
