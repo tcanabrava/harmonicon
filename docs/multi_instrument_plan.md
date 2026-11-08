@@ -406,16 +406,26 @@ behaviour.
    fingering strip under them, which can be hidden), the Song
    Editor in the same two views, and the trainer's `Register` and
    `Position` tabs. **Open:** a corpus aimed at octave errors.
-5. **Content and progress** (next, not started). Per-instrument packs
-   and DAGs, a per-instrument profile, and per-instrument Jam Session.
-   "My instruments" (tuning, capo, foot joint, flute view) has landed.
+5. **Content and progress** (landed but for Jam Session). "My
+   instruments" (tuning, capo, foot joint, flute view). Per-instrument
+   curricula: one lessons pack with a top-level folder per instrument
+   (harmonica, guitar, flute, piano), loaded one instrument at a time, so
+   each has its own lesson graph; `validate-pack` keeps lesson ids unique
+   across the pack and refuses a prerequisite crossing instruments.
+   Progress is per instrument through its keys: a song record per part's
+   chart, a lesson's pack-unique id, the Note Trainer's `instrument:kind`.
+   Guitar and flute parts ship in the songs pack (`port-part`).
+   **Open:** per-instrument Jam Session, and with it `hole_map`, the one
+   seam still reading holes. Lesson ids are unique within a pack, not
+   across packs: a second pack's lesson for another instrument with an id
+   already in use would share that lesson's progress.
 
 ## Scheduling
 
 Every phase above is required for 1.0 (`ROADMAP.md`). Phases 1–4 have
 landed apart from the two recorded corpora (guitar, flute) and the
-harmonica's move onto the shared trainer; phase 5 has started, with
-"My instruments". rc1–rc2 touch
+harmonica's move onto the shared trainer; phase 5 has landed but for
+per-instrument Jam Session. rc1–rc2 touch
 the same gameplay files, so land each phase in small commits rather than
 one long-lived branch.
 

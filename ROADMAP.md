@@ -258,11 +258,12 @@ phases; `PLAN.md` has them in order.
   the Bending Trainer until its validation pass), offering only the modes
   an instrument has: glides (bends), register selection (flute octaves,
   harmonics), alternate positions, and a plain tuner for all.
-- **Per-instrument lesson packs and progress** (next): per-instrument
-  curricula and profile, per-instrument Jam Session. "My instruments"
-  (Options; the guitar's tuning and capo, the flute's foot joint and
-  flute view, remembered) is in, and song select shows how much of each
-  guitar or flute part that setup reaches.
+- **Per-instrument lessons and progress** (in, but for Jam Session):
+  each instrument has its own curriculum and lesson graph (harmonica,
+  guitar, flute, piano), and its own progress. "My instruments" (Options;
+  the guitar's tuning and capo, the flute's foot joint and flute view,
+  remembered) is in, and song select shows how much of each guitar or
+  flute part that setup reaches. Next: per-instrument Jam Session.
 
 The hurdy gurdy is deferred: drones, the trompette and the keybox each need
 work no other instrument does.

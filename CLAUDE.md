@@ -53,8 +53,8 @@ than accumulating history (git log/commit messages are the historical record):
   1.0. The seam, the guitar's core model and chart format 1.8.0 have
   landed; guitar charts play on a basic horizontal tab highway. The
   flute is in too (chart format 1.9.0, its highway, editor and Note
-  Trainer); what's open is the two recorded corpora and phase 5, content
-  and progress (`PLAN.md`)
+  Trainer), and so are per-instrument curricula and progress; what's open
+  is the two recorded corpora and per-instrument Jam Session (`PLAN.md`)
 - `docs/book/` — player-facing mdBook user guide (`mdbook build`/`mdbook
   serve` from that directory); update it when a user-visible feature
   changes, not just internal ones. `docs/book/src/images/*.png` are real
