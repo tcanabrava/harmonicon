@@ -107,11 +107,13 @@ where
     value
 }
 
-/// `text` over `T`'s defaults, and the top-level fields that had to be left
-/// out, sorted. The whole text is tried first; only if that fails is it
-/// layered in one field at a time, keeping each that still extracts. Text
-/// that isn't a JSON object at all yields the defaults and
-/// `"(the whole file)"`.
+/// `text` over `T`'s defaults, and what had to be left out, sorted. The
+/// whole text is tried first; only if that fails is it layered in one
+/// top-level field at a time, keeping each that still extracts. A field
+/// that fails and is itself an object (a map, or a nested struct) is then
+/// layered in one entry at a time, so only its bad entries are left out,
+/// reported as `"field.entry"`. Text that isn't a JSON object at all yields
+/// the defaults and `"(the whole file)"`.
 pub fn json_over_defaults<T>(text: &str) -> (T, Vec<String>)
 where
     T: serde::Serialize + serde::de::DeserializeOwned + Default,
@@ -127,13 +129,32 @@ where
     };
     let mut figment = defaults();
     let mut dropped = Vec::new();
-    for (key, value) in fields {
-        let one = serde_json::Value::Object([(key.clone(), value)].into_iter().collect());
+    // Merges `{key: value}` into `figment` if `T` still extracts with it.
+    let keep = |figment: &mut Figment, key: &str, value: serde_json::Value| {
+        let one = serde_json::Value::Object([(key.to_string(), value)].into_iter().collect());
         let candidate = figment.clone().merge(Json::string(&one.to_string()));
-        if candidate.extract::<T>().is_ok() {
-            figment = candidate;
-        } else {
+        let ok = candidate.extract::<T>().is_ok();
+        if ok {
+            *figment = candidate;
+        }
+        ok
+    };
+    for (key, value) in fields {
+        if keep(&mut figment, &key, value.clone()) {
+            continue;
+        }
+        // A map (a profile's `songs`, `lessons`) or a nested struct: keep
+        // every entry that still reads, so one bad record doesn't cost all
+        // of them. Figment joins the merged objects key by key.
+        let serde_json::Value::Object(entries) = value else {
             dropped.push(key);
+            continue;
+        };
+        for (entry, inner) in entries {
+            let one = serde_json::Value::Object([(entry.clone(), inner)].into_iter().collect());
+            if !keep(&mut figment, &key, one) {
+                dropped.push(format!("{key}.{entry}"));
+            }
         }
     }
     dropped.sort();

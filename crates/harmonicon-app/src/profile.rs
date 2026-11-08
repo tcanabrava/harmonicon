@@ -413,7 +413,8 @@ fn is_first_run() -> bool {
 }
 
 /// The player's records over the defaults. One field that no longer parses
-/// costs only that field, and the original file is kept beside it
+/// costs only that field, and one bad record in a map (`songs`, `lessons`)
+/// only that record; the original file is kept beside it
 /// (`harmonicon_platform::paths::load_json_over_defaults`): the profile is
 /// saved again on exit, so a wholesale fallback to defaults would have
 /// erased every score, lesson pass and streak on the next quit.
@@ -816,6 +817,19 @@ mod training_tests {
         assert_eq!(profile.songs["a"].best_score, 42);
         assert!(profile.lessons.is_empty());
         assert_eq!(dropped, vec!["lessons".to_string()]);
+    }
+
+    #[test]
+    fn one_unreadable_song_record_keeps_every_other_songs() {
+        // A map is recovered entry by entry: one damaged score must not
+        // cost every other song's.
+        let (profile, dropped) = harmonicon_platform::paths::json_over_defaults::<PlayerProfile>(
+            r#"{"songs":{"a":{"best_score":42},"b":{"best_score":"corrupt"},"c":{"best_score":7}}}"#,
+        );
+        assert_eq!(profile.songs["a"].best_score, 42);
+        assert_eq!(profile.songs["c"].best_score, 7);
+        assert!(!profile.songs.contains_key("b"));
+        assert_eq!(dropped, vec!["songs.b".to_string()]);
     }
 
     #[test]

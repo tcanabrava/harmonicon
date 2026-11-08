@@ -444,11 +444,11 @@ without a pass, and nothing reads `SongManifest::waveform`.
   unreadable field meant launching and quitting once erased every score,
   lesson pass, drill record and the streak. Both files now read through
   `paths::load_json_over_defaults`.
-- **Hazard, open**: recovery is per *top-level* field. One unreadable
-  entry inside `songs` or `lessons` still drops that whole map; the
-  `.unreadable` copy keeps it, but restoring it is manual. Per-entry
-  recovery for the maps would need a `Deserialize` that skips bad
-  entries (a `#[serde(deserialize_with)]` over each map).
+- **Hazard, fixed**: recovery was per *top-level* field, so one
+  unreadable entry inside `songs` or `lessons` still dropped that whole
+  map. `json_over_defaults` now retries a failing object field entry by
+  entry and reports only the bad ones (`songs.<key>`), for settings'
+  nested structs as much as the profile's maps.
 - Checked and sound: streak date maths (missed day, lapse, clock set
   back), `FirstRun` sampled before anything can save, the state enums.
 
