@@ -244,6 +244,18 @@ mod tests {
         }
     }
     #[test]
+    fn every_midi_name_parses_back_to_its_own_semitone() {
+        // `harmonicon-ui`'s `projection::note_spelling` expects on this:
+        // a score note's MIDI number, named, must always parse, including
+        // the negative octave below C0 and anything up to u8::MAX.
+        for midi in 0..=u8::MAX {
+            let name = crate::midi::midi_to_note(i32::from(midi));
+            let spelled = SpelledPitch::parse(&name).unwrap_or_else(|| panic!("{name}"));
+            assert_eq!(spelled.semitone(), Some(i16::from(midi)), "{name}");
+        }
+    }
+
+    #[test]
     fn written_and_sounding_pitch_are_inverses_with_correct_letters() {
         assert_eq!(Transposition::B_FLAT.to_sounding(pitch("C4")), Some(pitch("Bb3")));
         assert_eq!(Transposition::B_FLAT.to_written(pitch("Eb4")), Some(pitch("F4")));
