@@ -116,7 +116,8 @@ gates 1.0. In order:
   prerequisite that crosses instruments. Progress is per instrument by its
   keys (a song record per part's chart, a lesson's pack-unique id, the
   Note Trainer's `instrument:kind`). Next:
-  - check the piano and flute jam maps on screen; the guitar's is checked
+  - check the piano jam map on screen once a song has a piano part (none
+    does yet; its tests cover it). Guitar and flute are checked
     (`docs/multi_instrument_plan.md` § Jam Session per instrument).
 
 ## Mobile (post-1.0, needs hardware)
