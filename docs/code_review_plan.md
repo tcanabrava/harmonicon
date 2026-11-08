@@ -343,12 +343,12 @@ lock); this crate adapts its model. Findings:
   Sources ran `remove_dir_all(packs_dir)`, deleting every pack.
   `RepoSpec::checkout_dir` now builds every pack path and refuses an empty
   slug.
-- **Hazard, open**: `retained_songs::has_chart` keeps its own list of
-  chart extensions, a copy of `harmonicon_score::IMPORT_EXTENSIONS` plus
-  `harpchart`. A format added there and not here makes a removed song in
-  that format be deleted rather than kept. The crate can't take the score
-  crate as a dependency cheaply (it brings `guitarpro`); a test in a crate
-  that sees both would hold them together.
+- **Hazard, fixed**: `retained_songs::has_chart` kept its own copy of
+  the chart extensions, so a format added to
+  `harmonicon_score::IMPORT_EXTENSIONS` and not there would be deleted
+  rather than kept on update. It is now a named `CHART_EXTENSIONS`, held
+  equal to the score crate's list (plus `harpchart`) by a test in
+  `harmonicon-platform`, which sees both.
 - **Hazard, open**: retained songs accumulate in the checkout with no
   bound, and every update counts them against `MAX_PACK_BYTES`. Once they
   cross 1 GiB, every later update fails with "larger than 1024 MB" and

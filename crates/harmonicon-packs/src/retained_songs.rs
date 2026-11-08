@@ -6,6 +6,17 @@ use std::{collections::BTreeSet, fs, io, path::Path};
 
 pub const INDEX: &str = ".harmonicon-retained-songs.json";
 
+/// The extensions that make a folder a song worth keeping: a `.harpchart`,
+/// or any score `harmonicon_score` can import. A copy of
+/// `harmonicon_score::IMPORT_EXTENSIONS` plus `harpchart`, because this
+/// crate can't take the score crate (and its `guitarpro` parser) as a
+/// dependency. A format missing here is deleted rather than kept when a
+/// pack update removes it, so `harmonicon-platform`, which sees both, has a
+/// test holding them equal.
+pub const CHART_EXTENSIONS: &[&str] = &[
+    "harpchart", "mid", "midi", "gp3", "gp4", "gp5", "gpx", "gp", "mscz", "musicxml", "xml", "mxl",
+];
+
 pub fn read_index(root: &Path) -> BTreeSet<String> {
     fs::read(root.join(INDEX))
         .ok()
@@ -29,21 +40,7 @@ fn has_chart(folder: &Path) -> io::Result<bool> {
         if entry.file_type()?.is_file()
             && entry.path().extension().and_then(|extension| extension.to_str()).is_some_and(
                 |extension| {
-                    matches!(
-                        extension.to_ascii_lowercase().as_str(),
-                        "harpchart"
-                            | "mid"
-                            | "midi"
-                            | "gp3"
-                            | "gp4"
-                            | "gp5"
-                            | "gpx"
-                            | "gp"
-                            | "mscz"
-                            | "musicxml"
-                            | "xml"
-                            | "mxl"
-                    )
+                    CHART_EXTENSIONS.contains(&extension.to_ascii_lowercase().as_str())
                 },
             )
         {

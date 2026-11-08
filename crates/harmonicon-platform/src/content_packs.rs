@@ -470,6 +470,18 @@ mod tests {
         EngineSupport { harmonicon: semver::Version::new(0, 5, 0), lesson_format: 1 }
     }
 
+    #[test]
+    fn a_pack_update_keeps_a_removed_song_in_every_chart_format() {
+        // `retained_songs` can't see `harmonicon_score`, so it keeps its own
+        // list; a format missing from it is deleted on update, not kept.
+        let mut expected: Vec<&str> = harmonicon_score::IMPORT_EXTENSIONS.to_vec();
+        expected.push("harpchart");
+        expected.sort_unstable();
+        let mut kept = harmonicon_packs::retained_songs::CHART_EXTENSIONS.to_vec();
+        kept.sort_unstable();
+        assert_eq!(kept, expected);
+    }
+
     fn remote(url: &str) -> RepoSpec {
         RepoSpec::Remote { url: url.into(), git_ref: None }
     }
