@@ -270,11 +270,11 @@ Still Bevy-free (`midly`, `serde`, `serde_json` only).
 - **Cleanup, fixed**: `note_parser` was dead (no caller outside its own
   tests) and could panic on non-UTF-8 input; deleted. `lib.rs` described
   re-export facades the project rules forbid.
-- **Hazard, open**: `LaneLayout::span` recognises a piano layout by
+- **Hazard, fixed**: `LaneLayout::span` recognised a piano layout by
   shape (a vertical axis and every label equal to its pitch's note name)
-  rather than by being told. Today only `keyboard_rows` matches; a
-  future vertical pitch-row layout would silently get white-key spacing.
-  A `LaneLayout` kind field would make it explicit.
+  rather than by being told, so a future vertical pitch-row layout would
+  silently have got white-key spacing. `LaneLayout::white_keys` now says
+  so, set only by `keyboard_rows`.
 - Checked and sound: scoring windows and combo maths, repeat expansion
   (passes clamped, overlaps dropped), WAV parsing (checked throughout),
   atomic config writes, every 1-based hole/string lookup

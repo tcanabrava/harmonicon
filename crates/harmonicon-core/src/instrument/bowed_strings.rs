@@ -234,6 +234,7 @@ impl super::InstrumentModel for BowedStrings {
     fn lane_layout(&self) -> super::LaneLayout {
         super::LaneLayout {
             axis: super::ScrollAxis::Horizontal,
+            white_keys: false,
             lanes: self
                 .strings
                 .iter()

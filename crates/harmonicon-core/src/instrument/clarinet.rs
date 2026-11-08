@@ -197,6 +197,7 @@ impl super::InstrumentModel for Clarinet {
         // detail instead of squeezing 33 pitches into narrow columns.
         super::LaneLayout {
             axis: super::ScrollAxis::Vertical,
+            white_keys: false,
             lanes: vec![super::Lane::new(String::new(), None)],
         }
     }

@@ -292,6 +292,12 @@ impl Lane {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct LaneLayout {
     pub axis: ScrollAxis,
+    /// Whether the lanes are a piano keyboard's keys, so [`span`](Self::span)
+    /// spaces them as white keys with the black ones straddling them. Set
+    /// by [`keyboard_rows`](Self::keyboard_rows) and nowhere else: a layout
+    /// of pitch lanes that is *not* a keyboard must not get it by looking
+    /// like one.
+    pub white_keys: bool,
     pub lanes: Vec<Lane>,
 }
 
@@ -345,6 +351,7 @@ impl LaneLayout {
     pub fn pitch_rows(used: &std::collections::BTreeSet<u8>) -> Self {
         Self {
             axis: ScrollAxis::Horizontal,
+            white_keys: false,
             lanes: used
                 .iter()
                 .rev()
@@ -358,6 +365,7 @@ impl LaneLayout {
     pub fn keyboard_rows(low: u8, high: u8) -> Self {
         Self {
             axis: ScrollAxis::Vertical,
+            white_keys: true,
             lanes: (low.min(high)..=high.max(low))
                 .map(|pitch| Lane::new(crate::midi::midi_to_note(i32::from(pitch)), Some(pitch)))
                 .collect(),
@@ -376,11 +384,7 @@ impl LaneLayout {
     pub fn span(&self, lane: usize) -> (f32, f32) {
         // Piano columns follow white-key spacing; accidentals straddle
         // adjacent whites, matching the horizontal keyboard drawing.
-        if self.axis == ScrollAxis::Vertical
-            && self.lanes.iter().all(|l| {
-                l.pitch.is_some_and(|p| l.label == crate::midi::midi_to_note(i32::from(p)))
-            })
-        {
+        if self.white_keys && self.lanes.iter().all(|l| l.pitch.is_some()) {
             let white = |p: u8| !crate::instrument::piano::is_black(p);
             let total = self.lanes.iter().filter(|l| white(l.pitch.unwrap())).count().max(1) as f32;
             if let Some(own) = self.lanes.get(lane) {
@@ -555,6 +559,7 @@ impl InstrumentModel for Harmonica {
     fn lane_layout(&self) -> LaneLayout {
         LaneLayout {
             axis: ScrollAxis::Vertical,
+            white_keys: false,
             lanes: (1..=self.hole_count()).map(|hole| Lane::new(hole.to_string(), None)).collect(),
         }
     }
@@ -664,6 +669,7 @@ impl InstrumentModel for FrettedInstrument {
     fn lane_layout(&self) -> LaneLayout {
         LaneLayout {
             axis: ScrollAxis::Horizontal,
+            white_keys: false,
             lanes: self.string_labels().into_iter().map(|label| Lane::new(label, None)).collect(),
         }
     }
@@ -721,6 +727,7 @@ impl InstrumentModel for Flute {
     fn lane_layout(&self) -> LaneLayout {
         LaneLayout {
             axis: ScrollAxis::Horizontal,
+            white_keys: false,
             lanes: flute::key_rows(self.foot)
                 .into_iter()
                 .map(|row| Lane {

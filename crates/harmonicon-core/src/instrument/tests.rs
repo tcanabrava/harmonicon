@@ -189,9 +189,21 @@ fn a_centred_note_sits_in_the_middle_of_its_lane() {
 
 #[test]
 fn an_empty_layout_does_not_divide_by_zero() {
-    let layout = LaneLayout { axis: ScrollAxis::Vertical, lanes: Vec::new() };
+    let layout = LaneLayout { axis: ScrollAxis::Vertical, white_keys: false, lanes: Vec::new() };
     assert_eq!(layout.lane_pct(), 100.0);
     assert_eq!(layout.nearest_lane(&hole(3, Action::Blow, Technique::Natural)), 0);
+}
+
+#[test]
+fn only_a_keyboard_layout_is_spaced_as_white_keys() {
+    // Vertical pitch lanes named after their own pitches look exactly like
+    // a keyboard; only being built as one may change their spacing.
+    let keys = LaneLayout::keyboard_rows(60, 62);
+    let lookalike = LaneLayout { white_keys: false, ..keys.clone() };
+    assert!((keys.span(1).1 - keys.span(0).1 * 0.6).abs() < 1e-4, "C# is a narrow black key");
+    for lane in 0..3 {
+        assert_eq!(lookalike.span(lane), (lane as f32 * 100.0 / 3.0, 100.0 / 3.0));
+    }
 }
 
 #[test]
