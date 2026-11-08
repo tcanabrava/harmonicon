@@ -468,11 +468,13 @@ without a pass, and nothing reads `SongManifest::waveform`.
   pressed it *and* saved, closing the dialog twice in a frame.
 - **Bug, fixed `6560e1ba`**: the file dialog's Save label was a raw
   English literal.
-- **Hazard, open**: the localization scan in `build.rs` flags only
-  literals that look like prose (several words); a test there pins
-  `Text({"Retry".to_string()})` as allowed. Single-word labels slip
-  through — "Save" did. Flagging every capitalised word would need an
-  allowlist for asset names and identifiers.
+- **Hazard, fixed**: the localization scan in `build.rs` flagged only
+  literals that look like prose (several words), and a test pinned
+  `Text({"Retry".to_string()})` as allowed, so single-word labels slipped
+  through ("Save" did). It now also flags one capitalised word. Flagging
+  any word of two letters or more was measured first: its five hits were
+  all Fluent keys the lookahead reaches inside `loc.msg(...)`, which the
+  capital-letter rule excludes. It flags nothing in the tree today.
 - **`music_score`, reviewed 2026-11-08 against HEAD `15643ec9`**:
   - **Efficiency, fixed**: `key_signature::rebuild` had no `run_if`, so
     every frame, for every key-signature slot, it resolved the clef,

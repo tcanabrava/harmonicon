@@ -5,8 +5,8 @@
 //
 // 1. Localization: no hardcoded natural-language string may reach the
 //    screen. A string is natural language when it has an ASCII letter and
-//    whitespace outside `{…}` (single words like "Retry" pass; widening
-//    that is a content migration, see TODO.md). Checked sinks:
+//    whitespace outside `{…}`, or is one capitalised word ("Retry",
+//    "Save"; a lowercase Fluent key or a path is not). Checked sinks:
 //    - `Text::new/from("...")`, and `Text`/`TextSpan` given a `format!`
 //      template (only its literal pieces, even split over two lines);
 //    - `bsn!`'s `Text({"..."})`;
@@ -659,8 +659,22 @@ fn is_natural_language(content: &str) -> bool {
             depth == 0 && c != '}'
         })
         .collect();
-    outside.chars().any(|c| c.is_ascii_alphabetic())
-        && outside.chars().any(|c| c.is_ascii_whitespace())
+    (outside.chars().any(|c| c.is_ascii_alphabetic())
+        && outside.chars().any(|c| c.is_ascii_whitespace()))
+        || is_label_word(&outside)
+}
+
+/// A one-word UI label: a capitalised run of letters, perhaps ending in
+/// punctuation (`"Save"`, `"Retry"`, `"Done!"`). What it deliberately
+/// isn't: a Fluent key (lowercase kebab-case, which a
+/// `loc.msg("…")` on a sink's next line hands the lookahead), an asset
+/// path, a note name with its octave (`"C4"`) or a single letter (`"A"`).
+fn is_label_word(text: &str) -> bool {
+    let word = text.trim_end_matches(['.', '!', '?', ':', '…']);
+    let mut chars = word.chars();
+    chars.next().is_some_and(|c| c.is_ascii_uppercase())
+        && word.len() >= 2
+        && chars.all(|c| c.is_ascii_alphabetic() || c == '\'')
 }
 
 #[cfg(target_os = "windows")]
@@ -806,12 +820,29 @@ mod tests {
     }
 
     #[test]
-    fn allows_empty_symbols_and_single_words() {
+    fn allows_empty_symbols_and_non_words() {
         assert!(violations(r#"Text::new("")"#).is_empty());
         assert!(violations(r#"Text::new("&")"#).is_empty());
         assert!(violations(r#"Text::new("↑")"#).is_empty());
         assert!(violations(r#"Text::new("■")"#).is_empty());
-        assert!(violations(r#"Text::new("Retry")"#).is_empty());
+        assert!(violations(r#"Text::new("A")"#).is_empty(), "a single letter");
+        assert!(violations(r#"Text::new("C4")"#).is_empty(), "a note name");
+    }
+
+    #[test]
+    fn flags_a_single_capitalised_word() {
+        assert_eq!(violations(r#"Text::new("Retry")"#).len(), 1);
+        assert_eq!(violations(r#"Text::new("Save")"#).len(), 1);
+        assert_eq!(violations(r#"Text::new("Done!")"#).len(), 1);
+    }
+
+    #[test]
+    fn a_fluent_key_or_path_is_not_a_label_word() {
+        // The lookahead reaches a `loc.msg` key on a sink's next line.
+        let source = "Text::new(\n    loc.msg(\"editor-guitar-string-count\"),\n)";
+        assert!(violations(source).is_empty());
+        assert!(violations(r#"Text::new("themes/default")"#).is_empty());
+        assert!(violations(r#"Text::new("lowercase")"#).is_empty());
     }
 
     #[test]
@@ -895,7 +926,7 @@ mod tests {
     #[test]
     fn flags_natural_language_in_bsn_text_binding() {
         assert_eq!(violations(r#"Text({"Wait for Note: off"})"#).len(), 1);
-        assert!(violations(r#"Text({"Retry".to_string()})"#).is_empty());
+        assert_eq!(violations(r#"Text({"Retry".to_string()})"#).len(), 1);
         assert!(violations(r#"Text({some_expr})"#).is_empty());
     }
 
@@ -937,8 +968,8 @@ mod tests {
     }
 
     #[test]
-    fn allows_known_helper_with_single_word_label() {
-        assert!(violations(r#"button::default("Retry", on_retry)"#).is_empty());
+    fn flags_known_helper_with_single_word_label() {
+        assert_eq!(violations(r#"button::default("Retry", on_retry)"#).len(), 1);
     }
 
     #[test]
