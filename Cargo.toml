@@ -34,7 +34,7 @@ serde_json = "1"
 midly = "0.5"
 # Bevy's `default` is `2d` + `3d` + `ui` + `audio`. Nothing here draws in
 # 3D, and `3d` alone pulls in PBR, lighting, glTF and anti-aliasing.
-bevy = { version = "0.20.0", default-features = false, features = [
+bevy = { version = "0.20.1", default-features = false, features = [
     "2d",
     "ui",
     "audio",
