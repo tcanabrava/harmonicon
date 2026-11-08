@@ -97,9 +97,6 @@ gates 1.0. In order:
   Trainer behind the same menu entry. Next:
   - move the harmonica onto the shared drill model, after its live
     validation pass (above), keeping its drill stats and profile keys.
-- **Seam leftover**: Jam Session's `hole_map` still reads holes directly.
-  Jam Session only offers harmonica parts, so it moves with per-instrument
-  Jam Session (content and progress, below).
 - **Flute**. The model (`instrument::flute`, a C or B foot), the sourced
   Boehm fingering table, chart format 1.9.0, score conversion, a flute
   synth voice, Play 2D (pitch rows with a horizontal fingering strip under
