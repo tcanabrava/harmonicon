@@ -147,6 +147,12 @@ load-bearing about *this* crate.
   Jam Session builds on (`docs/multi_instrument_plan.md` § Jam Session
   per instrument). The detected-note readout names a hole and breath only
   when the harp has one for the pitch.
+  **A jam can be on any instrument: the part's.** The Jam picker offers
+  every part. `session::setup` branches on `EffectiveHarmonica::harp_for`:
+  a harmonica gets the hole map, overlay, compass, harp hint and
+  call-and-response; anything else gets `hole_map::jam_guide` (no holes)
+  and `instrument_map`'s drawing in the right column. Call-and-response
+  and the position cycle return early on a guide without holes.
 
 - **Generated jams continue independently of `JamLoop`.** `JamLoop` remains
   the persistent opt-in behavior for a picked finite song. The presence of

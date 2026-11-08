@@ -322,6 +322,10 @@ pub fn drive_call_response(
     let (Some(guide), Some(manifest)) = (guide, manifests.get(&selected.0)) else {
         return;
     };
+    // Calls are composed in holes; a jam on another instrument has none.
+    if guide.playable.is_empty() {
+        return;
+    }
 
     state.phase = phase_for_bar(absolute.0);
 

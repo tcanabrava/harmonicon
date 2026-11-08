@@ -63,14 +63,14 @@ pub(crate) struct HoleInfo {
     draw_in_scale: bool,
 }
 
-const HOLE_DEFAULT: Color = Color::srgba(0.12, 0.12, 0.16, 0.9);
+pub(crate) const HOLE_DEFAULT: Color = Color::srgba(0.12, 0.12, 0.16, 0.9);
 /// A chord tone of the bar currently sounding — the strongest, most targeted
 /// choice right now (not just "in the scale somewhere").
-const PLAY_CHORD_TONE: Color = Color::srgb(0.95, 0.85, 0.25);
-const PLAY_IN_SCALE: Color = Color::srgb(0.20, 0.80, 0.35);
-const PLAY_OUT_SCALE: Color = Color::srgb(0.90, 0.55, 0.15);
-const LABEL_IN_SCALE: Color = Color::srgb(0.45, 0.85, 0.50);
-const LABEL_OUT_SCALE: Color = Color::srgb(0.50, 0.50, 0.55);
+pub(crate) const PLAY_CHORD_TONE: Color = Color::srgb(0.95, 0.85, 0.25);
+pub(crate) const PLAY_IN_SCALE: Color = Color::srgb(0.20, 0.80, 0.35);
+pub(crate) const PLAY_OUT_SCALE: Color = Color::srgb(0.90, 0.55, 0.15);
+pub(crate) const LABEL_IN_SCALE: Color = Color::srgb(0.45, 0.85, 0.50);
+pub(crate) const LABEL_OUT_SCALE: Color = Color::srgb(0.50, 0.50, 0.55);
 /// A hole used by the current call-and-response lick, shown while nothing's
 /// actually sounding it right now — a visual memory aid for the echo, not a
 /// graded outcome (see `call_response`'s module doc comment).
@@ -103,15 +103,7 @@ pub(crate) fn build_hole_guide(
     scale: Scale,
 ) -> (Vec<HoleInfo>, JamGuide) {
     let dash = "\u{2014}";
-    let scale_classes = scale.classes(key);
-    let chord_tones_by_bar: [HashSet<String>; 12] = {
-        let bars = progression_bars(key, progression);
-        std::array::from_fn(|i| {
-            let (root, quality) = &bars[i];
-            chord_tone_classes(root, *quality)
-        })
-    };
-    let mut note_to_holes: HashMap<u8, Vec<u8>> = HashMap::new();
+    let mut guide = jam_guide(key, progression, scale);
     let mut holes = Vec::with_capacity(harp.hole_count() as usize);
 
     for hole in 1..=harp.hole_count() {
@@ -121,29 +113,36 @@ pub(crate) fn build_hole_guide(
             continue;
         }
         if let Some(m) = harp.wind_direction_midi(hole, &Action::Blow) {
-            note_to_holes.entry(m).or_default().push(hole);
+            guide.note_to_holes.entry(m).or_default().push(hole);
         }
         if let Some(m) = harp.wind_direction_midi(hole, &Action::Draw) {
-            note_to_holes.entry(m).or_default().push(hole);
+            guide.note_to_holes.entry(m).or_default().push(hole);
         }
         holes.push(HoleInfo {
             hole,
-            blow_in_scale: scale_classes.contains(note_class(&blow)),
-            draw_in_scale: scale_classes.contains(note_class(&draw)),
+            blow_in_scale: guide.scale_classes.contains(note_class(&blow)),
+            draw_in_scale: guide.scale_classes.contains(note_class(&draw)),
             blow,
             draw,
         });
     }
+    guide.playable = playable_notes(harp);
+    (holes, guide)
+}
 
-    (
-        holes,
-        JamGuide {
-            note_to_holes,
-            playable: playable_notes(harp),
-            scale_classes,
-            chord_tones_by_bar,
-        },
-    )
+/// The guide for a jam on any instrument: the scale, and each bar's chord
+/// tones, with no holes. [`build_hole_guide`] adds a harmonica's.
+pub(crate) fn jam_guide(key: &str, progression: Progression, scale: Scale) -> JamGuide {
+    let bars = progression_bars(key, progression);
+    JamGuide {
+        note_to_holes: HashMap::new(),
+        playable: Vec::new(),
+        scale_classes: scale.classes(key),
+        chord_tones_by_bar: std::array::from_fn(|i| {
+            let (root, quality) = &bars[i];
+            chord_tone_classes(root, *quality)
+        }),
+    }
 }
 
 /// Spawn the bottom-strip hole map: a row of cells (blow note, hole number, draw

@@ -70,10 +70,6 @@ pub(crate) struct SongPickerState {
     descending: bool,
     pending_delete: Option<String>,
     deletion_error: Option<String>,
-    /// Offer only harmonica parts. Jam Session improvises over the 12-bar
-    /// form on a harmonica's hole map, so a guitar part has nothing to jam
-    /// on there yet. Set from the mode each time the page opens.
-    harmonica_only: bool,
 }
 
 #[derive(Component)]
@@ -195,10 +191,8 @@ pub(crate) fn setup_artist_list(
     theme: Res<LoadedTheme>,
     loc: Res<Localization>,
     mine: Res<harmonicon_platform::settings::MyInstruments>,
-    mode: Res<GameplayMode>,
-    mut state: ResMut<SongPickerState>,
+    state: Res<SongPickerState>,
 ) {
-    state.harmonica_only = *mode == GameplayMode::JamSession;
     let state = &*state;
     let (content, header, root) =
         spawn_menu_root_plain(&mut commands, &loc.msg("select-song"), None, &theme, "SongPicker");
@@ -723,10 +717,8 @@ fn collect_songs(
         .filter(|song| {
             matches_search(query, &[&song.name, &song.artist, &song.genre, &song.instrument])
         })
-        .filter(|song| !state.harmonica_only || song.instrument == "harmonica")
         .filter(|song| {
-            state.harmonica_only
-                || state.instrument_filter.as_ref().is_none_or(|kind| kind == &song.instrument)
+            state.instrument_filter.as_ref().is_none_or(|kind| kind == &song.instrument)
         })
         .filter(|song| {
             let accuracy = preferences(profile, &song.asset_path)
@@ -1373,7 +1365,7 @@ mod tests {
     }
 
     #[test]
-    fn jam_offers_only_harmonica_parts() {
+    fn jam_offers_every_part() {
         let entry = |name: &str, instrument: &str| SongEntry {
             instrument: instrument.into(),
             part: None,
@@ -1397,10 +1389,10 @@ mod tests {
                 .map(|s| s.name)
                 .collect::<Vec<_>>()
         };
-        let mut state = SongPickerState { sort: SongSort::Band, ..default() };
+        // A jam is a backing to improvise over, on whichever instrument the
+        // part is for, so Jam Session lists the same parts Play does.
+        let state = SongPickerState { sort: SongSort::Band, ..default() };
         assert_eq!(names(&state), ["guitar", "harmonica"]);
-        state.harmonica_only = true;
-        assert_eq!(names(&state), ["harmonica"]);
     }
 
     #[test]

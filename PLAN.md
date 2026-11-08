@@ -116,10 +116,8 @@ gates 1.0. In order:
   prerequisite that crosses instruments. Progress is per instrument by its
   keys (a song record per part's chart, a lesson's pack-unique id, the
   Note Trainer's `instrument:kind`). Next:
-  - per-instrument Jam Session (`docs/multi_instrument_plan.md` § Jam
-    Session per instrument): the picker offering every part, and each
-    instrument's own map with its in-scale notes marked. Counting is
-    already instrument-free.
+  - check the piano and flute jam maps on screen; the guitar's is checked
+    (`docs/multi_instrument_plan.md` § Jam Session per instrument).
 
 ## Mobile (post-1.0, needs hardware)
 

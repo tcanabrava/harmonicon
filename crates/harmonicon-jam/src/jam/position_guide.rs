@@ -109,13 +109,16 @@ pub(crate) fn on_position_called(
     mut events: MessageReader<PositionCalled>,
     selected: Res<SelectedSong>,
     manifests: Res<Assets<SongManifest>>,
-    mut guide: ResMut<JamGuide>,
+    guide: Option<ResMut<JamGuide>>,
     loc: Res<Localization>,
     theme: Res<LoadedTheme>,
     slots: Query<(Entity, &PositionCompassSlot)>,
     mut commands: Commands,
 ) {
     let Some(&PositionCalled(called)) = events.read().last() else {
+        return;
+    };
+    let Some(mut guide) = guide else {
         return;
     };
     let Some(manifest) = manifests.get(&selected.0) else {

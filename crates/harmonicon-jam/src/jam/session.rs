@@ -30,7 +30,8 @@ use harmonicon_ui::dialogs::twelve_bar_grid::{GridConfig, spawn_12_bar_grid};
 use harmonicon_ui::spectrogram::{OscMaterial, SpectrogramStyle, spawn_spectrogram};
 
 use super::backing::{JamGenre, generate_ending_stems};
-use super::hole_map::{build_hole_guide, spawn_detected_note, spawn_hole_map};
+use super::hole_map::{build_hole_guide, jam_guide, spawn_detected_note, spawn_hole_map};
+use super::instrument_map::spawn_instrument_map;
 use super::midi_tracks::{JamStemMute, spawn_backing_stem_row};
 use super::position_guide::spawn_position_compass;
 use super::rhythm_guide::spawn_rhythm_guide;
@@ -118,18 +119,28 @@ pub fn setup(
     // before a jam too, and a substituted harp has other notes in the same
     // holes. The backing stays in the chart's key regardless: a jam has no
     // tab to transpose, only holes to name.
-    let Some(harp) = effective.harp_for(chart) else {
-        error!("entered Jam Session with a chart that names no harmonica");
+    //
+    // Any other instrument jams on the same scale and chords, drawn on its
+    // own map (`instrument_map`); the harp hint, the bend overlay, the
+    // position compass and call-and-response are harmonica-only.
+    let harp = effective.harp_for(chart);
+    let instrument = effective.instrument_for(chart);
+    if harp.is_none() && instrument.is_none() {
+        error!("entered Jam Session with a chart that names no instrument");
         return;
+    }
+    let (holes_info, guide) = match harp {
+        Some(harp) => build_hole_guide(harp, key, progression, scale),
+        None => (Vec::new(), jam_guide(key, progression, scale)),
     };
-    let (holes_info, guide) = build_hole_guide(harp, key, progression, scale);
 
     // Which physical harp to grab: a Richter harp's key is its hole-1 blow note.
-    let harp_hint =
-        harmonicon_gameplay::gameplay::harp_banner_text(harp, &effective.song_key_for(chart), &loc);
+    let harp_hint = harp.map(|harp| {
+        harmonicon_gameplay::gameplay::harp_banner_text(harp, &effective.song_key_for(chart), &loc)
+    });
     // Same detection, bare (no banner sentence), plus whichever position the
     // chart itself declares — for the live position compass below.
-    let harp_key = detected_harp_key(harp);
+    let harp_key = harp.and_then(detected_harp_key);
     let position =
         chart.harmonica.as_ref().and_then(Harmonica::position).and_then(Position::from_label);
 
@@ -201,11 +212,13 @@ pub fn setup(
                             TextFont { font_size: {FontSize::Px(20.0)} }
                             TextColor({Color::WHITE})
                         });
-                        left.spawn_empty().apply_scene(bsn! {
-                            Text({harp_hint})
-                            TextFont { font_size: {FontSize::Px(15.0)} }
-                            TextColor({Color::srgb(0.95, 0.80, 0.35)})
-                        });
+                        if let Some(harp_hint) = harp_hint {
+                            left.spawn_empty().apply_scene(bsn! {
+                                Text({harp_hint})
+                                TextFont { font_size: {FontSize::Px(15.0)} }
+                                TextColor({Color::srgb(0.95, 0.80, 0.35)})
+                            });
+                        }
                         if generated.is_some() {
                             left.spawn(Node {
                                 flex_direction: FlexDirection::Row,
@@ -274,7 +287,9 @@ pub fn setup(
                             JamChordPosition
                         });
                         spawn_form_strip(left, key, progression, theme.twelve_bar_colors());
-                        super::call_response::spawn_call_response_banner(left);
+                        if harp.is_some() {
+                            super::call_response::spawn_call_response_banner(left);
+                        }
                         spawn_detected_note(left, &loc);
                         left.spawn(Node {
                             flex_direction: FlexDirection::Row,
@@ -300,6 +315,7 @@ pub fn setup(
                                 JamGuidesLabel
                             });
                         });
+                        if harp.is_some() {
                         left.spawn(Node {
                             flex_direction: FlexDirection::Row,
                             align_items: AlignItems::Center,
@@ -350,6 +366,7 @@ pub fn setup(
                                 ~{super::call_response::CallDensityLabel}
                             });
                         });
+                        }
                         // Only a generated jam has a band that can listen.
                         if generated.is_some() {
                             left.spawn(Node {
@@ -470,16 +487,23 @@ pub fn setup(
                         JamGuidePanel,
                         if guides_visible { Visibility::Visible } else { Visibility::Hidden },
                     ))
-                    .with_children(|right| {
-                        spawn_harmonica_overlay(right, harp, &loc);
-                        spawn_hole_map(right, &holes_info, &loc);
-                        spawn_position_compass(
-                            right,
-                            &loc,
-                            harp_key.as_deref(),
-                            position,
-                            theme.circle_of_fifths_colors(),
-                        );
+                    .with_children(|right| match harp {
+                        Some(harp) => {
+                            spawn_harmonica_overlay(right, harp, &loc);
+                            spawn_hole_map(right, &holes_info, &loc);
+                            spawn_position_compass(
+                                right,
+                                &loc,
+                                harp_key.as_deref(),
+                                position,
+                                theme.circle_of_fifths_colors(),
+                            );
+                        }
+                        None => {
+                            if let Some(instrument) = &instrument {
+                                spawn_instrument_map(right, instrument, &loc);
+                            }
+                        }
                     });
             });
 

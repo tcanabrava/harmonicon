@@ -370,7 +370,7 @@ can't be confused with a detection problem.
   The phase-integration vibrato rule applies to both.
 - **Jam Session**: see the next section.
 
-## Jam Session per instrument
+## Jam Session per instrument (landed)
 
 A jam is a tune playing while the player improvises over it. For every
 instrument the screen shows the backing's form and chords (instrument-free
@@ -385,16 +385,20 @@ scale marked** — what the harmonica's hole map does today.
   "detected note" readout names a hole and breath when the harp has one,
   and the note otherwise.
 - **The instrument is the part's.** The Jam song picker offers every part,
-  and the pre-song page that runs before a jam already asks a guitar for
-  its tuning and a flute for its foot joint.
-- **The map reuses each instrument's own drawing**, tinted by the one fit
-  rule (`classify_note_fit`): in-scale notes marked, the note being played
-  lit by its fit.
-  - harmonica: today's hole strip;
-  - guitar: the fretboard (`guitar_visuals`), which draws the familiar
-    scale boxes without authoring any;
-  - piano: the keyboard (`dialogs::piano_keys`);
-  - flute: its range as note cells, the chord tones and scale marked.
+  and the pre-song page that runs before a jam asks a guitar for its tuning
+  and a flute for its foot joint.
+- **Each instrument is drawn with its in-scale notes marked**
+  (`jam::instrument_map`), and the note being played lit by its fit
+  (`classify_note_fit`, the hole map's rule):
+  - harmonica: the hole strip, as before;
+  - fretted (guitar, bass, cavaquinho): its strings, open to the 12th
+    fret, which draws the familiar scale boxes without authoring any;
+  - piano: the keyboard (`dialogs::piano_keys`), C3 to C6;
+  - anything else (flute, clarinet, bowed strings): its range as note
+    cells, an octave to a row.
+
+  The guitar's was checked on screen; the piano's and flute's are covered
+  by `instrument_map`'s tests only.
 - **Harmonica-only, and staying so:** the "grab a C harp" hint, the bend
   overlay, call-and-response and the position compass.
 
