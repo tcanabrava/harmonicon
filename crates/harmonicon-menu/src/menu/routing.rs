@@ -53,6 +53,7 @@ pub enum MenuPage {
     /// The "Note Trainer" choice on the Play menu: which instrument to
     /// practise (`pages::note_trainer`).
     NoteTrainerMenu,
+    Tuner,
     /// Key/tempo picker for a synthesized Jam Session backing (see
     /// `harmonicon_jam::jam::backing`) — the no-existing-song alternative to
     /// `ArtistList`'s real-song Jam Session flow.
@@ -89,7 +90,7 @@ pub(crate) fn handle_menu_escape(
         }
         MenuPage::LessonTree => MenuPage::LessonInstrument,
         MenuPage::Play | MenuPage::HelpAbout => MenuPage::Main,
-        MenuPage::JamSessionMenu | MenuPage::NoteTrainerMenu => MenuPage::Play,
+        MenuPage::JamSessionMenu | MenuPage::NoteTrainerMenu | MenuPage::Tuner => MenuPage::Play,
         MenuPage::ArtistList => match *mode {
             GameplayMode::JamSession => MenuPage::JamSessionMenu,
             GameplayMode::Play2D => MenuPage::Play,

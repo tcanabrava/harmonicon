@@ -23,3 +23,5 @@ pub(crate) mod play;
 pub(crate) mod theme_picker;
 pub(crate) mod tutorial;
 pub(crate) mod welcome;
+
+pub(crate) mod tuner;

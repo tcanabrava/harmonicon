@@ -58,6 +58,12 @@ pub(crate) fn setup_play_menu(
             page.set(MenuPage::LessonInstrument)
         },
     );
+    spawn_button(
+        &mut commands,
+        root,
+        "Tune instruments",
+        |_: On<Activate>, mut page: ResMut<NextState<MenuPage>>| page.set(MenuPage::Tuner),
+    );
     spawn_back_button(
         &mut commands,
         header,

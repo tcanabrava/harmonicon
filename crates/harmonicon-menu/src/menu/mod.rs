@@ -54,6 +54,7 @@ impl Plugin for MenuPlugin {
             .init_resource::<TourActive>()
             // The Options, Calibration, Credits, and Theme pages own their own lifecycles.
             .add_plugins(pages::options::OptionsPlugin)
+            .add_plugins(pages::tuner::TunerPlugin)
             .add_plugins(pages::calibration::CalibrationPlugin)
             .add_plugins(pages::credits::CreditsPlugin)
             .add_plugins(song_editor::SongEditor2Plugin)
