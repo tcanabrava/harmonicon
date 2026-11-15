@@ -164,6 +164,7 @@ pub(super) fn spawn_mic_combobox(
     devices: &[String],
     connected: Option<&str>,
 ) {
+    spawn_input_meter(commands, parent, loc);
     let root = combobox::spawn_combobox(
         commands,
         parent,
@@ -203,5 +204,94 @@ pub(super) fn sync_mic_combobox(
     if value.0 != connected {
         value.0.clear();
         value.0.push_str(connected);
+    }
+}
+
+#[derive(Component)]
+pub(super) struct InputLevelFill;
+#[derive(Component)]
+pub(super) struct InputLevelText;
+
+fn spawn_input_meter(commands: &mut Commands, parent: Entity, loc: &Localization) {
+    let panel = commands
+        .spawn(Node {
+            width: Val::Px(560.0),
+            max_width: Val::Percent(100.0),
+            flex_direction: FlexDirection::Column,
+            row_gap: Val::Px(6.0),
+            ..default()
+        })
+        .id();
+    let label = commands
+        .spawn((
+            Text::new(loc.msg_args("options-mic-level", &[("percent", "0".to_string())])),
+            TextFont { font_size: FontSize::Px(18.0), ..default() },
+            InputLevelText,
+        ))
+        .id();
+    let track = commands
+        .spawn((
+            Node { width: Val::Percent(100.0), height: Val::Px(20.0), ..default() },
+            BackgroundColor(Color::srgb(0.12, 0.15, 0.2)),
+        ))
+        .id();
+    let fill = commands
+        .spawn((
+            Node { width: Val::Percent(0.0), height: Val::Percent(100.0), ..default() },
+            BackgroundColor(Color::srgb(0.2, 0.85, 0.4)),
+            InputLevelFill,
+        ))
+        .id();
+    commands.entity(track).add_child(fill);
+    commands.entity(panel).add_children(&[label, track]);
+    commands.entity(parent).add_child(panel);
+}
+
+// Map RMS amplitude onto a readable -60 dBFS to 0 dBFS scale.
+fn input_percent(samples: &[f32]) -> f32 {
+    if samples.is_empty() {
+        return 0.0;
+    }
+    let power = samples.iter().map(|s| if s.is_finite() { s * s } else { 0.0 }).sum::<f32>()
+        / samples.len() as f32;
+    ((10.0 * power.max(1e-12).log10() + 60.0) / 60.0 * 100.0).clamp(0.0, 100.0)
+}
+
+pub(super) fn update_input_meter(
+    frame: Res<harmonicon_audio::pitch_detect::AudioFrame>,
+    status: Res<MicStatus>,
+    loc: Res<Localization>,
+    time: Res<Time>,
+    mut level: Local<f32>,
+    mut fills: Query<(&mut Node, &mut BackgroundColor), With<InputLevelFill>>,
+    mut labels: Query<&mut Text, With<InputLevelText>>,
+) {
+    let target = if status.is_connected() { input_percent(&frame.samples) } else { 0.0 };
+    *level = if target >= *level || !status.is_connected() {
+        target
+    } else {
+        target.max(*level - time.delta_secs() * 100.0)
+    };
+    for (mut node, mut color) in &mut fills {
+        node.width = Val::Percent(*level);
+        color.0 =
+            if *level > 95.0 { Color::srgb(1.0, 0.3, 0.2) } else { Color::srgb(0.2, 0.85, 0.4) };
+    }
+    for mut label in &mut labels {
+        **label =
+            loc.msg_args("options-mic-level", &[("percent", format!("{:.0}", *level))]).to_string();
+    }
+}
+
+#[cfg(test)]
+mod level_tests {
+    use super::input_percent;
+    #[test]
+    fn silence_and_louder_input_have_expected_levels() {
+        assert_eq!(input_percent(&[]), 0.0);
+        assert_eq!(input_percent(&[0.0; 32]), 0.0);
+        assert_eq!(input_percent(&[1.0; 32]), 100.0);
+        assert!(input_percent(&[0.1; 32]) > input_percent(&[0.01; 32]));
+        assert_eq!(input_percent(&[f32::NAN]), 0.0);
     }
 }

@@ -1223,3 +1223,5 @@ tuner-tuned = ✓ In tune
 tuner-meter-flat = −50 ¢ · Tune up
 tuner-meter-center = In tune
 tuner-meter-sharp = Tune down · +50 ¢
+
+options-mic-level = Microphone input level: { $percent }%

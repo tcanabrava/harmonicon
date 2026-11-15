@@ -63,6 +63,7 @@ impl Plugin for OptionsPlugin {
                     update_sliders,
                     update_latency_slider,
                     update_mic_banner,
+                    update_input_meter,
                     sync_mic_combobox,
                     update_zoom_slider_visuals,
                     sync_zoom_slider_from_ui_scale,
