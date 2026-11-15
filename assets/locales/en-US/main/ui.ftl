@@ -1196,3 +1196,26 @@ bowed-heard = Hearing { $note }
 note-trainer-instrument-title = Note Trainer — { $instrument }
 
 song-instrument-viola = Viola
+
+# Guided guitar tuner
+tuner-title = Tune instruments
+tuner-subtitle = Standard tuning · A4 = 440 Hz · lowest string first
+tuner-classical = Classical guitar
+tuner-electric = Electric guitar
+tuner-classical-tip = Classical guitar: pluck gently near the sound hole.
+tuner-electric-tip = Electric guitar: use a clean sound, without effects.
+tuner-pluck = Pluck only this open string; mute the others.
+tuner-string = String { $number } · { $note }
+tuner-restart = Start again
+tuner-permission = Allow microphone access to tune.
+tuner-mic-failed = Microphone unavailable: { $reason }. Check audio input in Options.
+tuner-no-mic = No microphone connected. Check audio input in Options.
+tuner-complete = All six strings are in tune! Play a chord, then select any string to recheck.
+tuner-hold = In tune — hold steady ({ $percent }%)
+tuner-tighten = Too low: tighten slowly
+tuner-loosen = Too high: loosen slowly
+tuner-adjust = { $direction } · { $cents } cents · { $frequency } Hz
+tuner-target = String { $number } · { $note } · target { $frequency } Hz
+    { $feedback }
+tuner-row = { $selected } String { $number } · { $note } · { $frequency } Hz { $status }
+tuner-tuned = ✓ In tune

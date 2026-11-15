@@ -61,7 +61,7 @@ pub(crate) fn setup_play_menu(
     spawn_button(
         &mut commands,
         root,
-        "Tune instruments",
+        &loc.msg("tuner-title"),
         |_: On<Activate>, mut page: ResMut<NextState<MenuPage>>| page.set(MenuPage::Tuner),
     );
     spawn_back_button(

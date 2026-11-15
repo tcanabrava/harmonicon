@@ -12,6 +12,7 @@ use harmonicon_audio::{
     pitch_detect::{PitchEvent, PitchRange},
 };
 use harmonicon_core::midi::{midi_to_freq_hz, midi_to_note};
+use harmonicon_platform::localization::{Localization, LocalizationExt};
 use harmonicon_platform::theme::LoadedTheme;
 
 const NOTES: [u8; 6] = [40, 45, 50, 55, 59, 64];
@@ -73,6 +74,7 @@ impl Plugin for TunerPlugin {
 fn setup(
     mut commands: Commands,
     theme: Res<LoadedTheme>,
+    loc: Res<Localization>,
     mut tuner: ResMut<Tuner>,
     mut range: ResMut<PitchRange>,
 ) {
@@ -81,8 +83,8 @@ fn setup(
     *range = PitchRange::from_freqs([65.0, 400.0], 0.0);
     let (root, header, _) = spawn_menu_root(
         &mut commands,
-        "Tune instruments",
-        Some("Standard tuning · A4 = 440 Hz · lowest string first"),
+        &loc.msg("tuner-title"),
+        Some(&loc.msg("tuner-subtitle")),
         &theme,
         "Tuner",
     );
@@ -95,11 +97,11 @@ fn setup(
         })
         .id();
     commands.entity(root).add_child(choices);
-    for (label, electric) in [("Classical guitar", false), ("Electric guitar", true)] {
+    for (label, electric) in [("tuner-classical", false), ("tuner-electric", true)] {
         spawn_button(
             &mut commands,
             choices,
-            label,
+            &loc.msg(label),
             move |_: On<Activate>, mut tuner: ResMut<Tuner>| {
                 let saved_range = tuner.saved_range;
                 *tuner = Tuner { electric, saved_range, ..default() };
@@ -108,7 +110,7 @@ fn setup(
     }
     let readout = commands
         .spawn((
-            Text::new("Pluck the low E string"),
+            Text::new(loc.msg("tuner-pluck")),
             TextFont { font_size: FontSize::Px(22.0), ..default() },
             Readout,
             Node { max_width: Val::Px(740.0), ..default() },
@@ -119,7 +121,10 @@ fn setup(
         let row = spawn_button(
             &mut commands,
             root,
-            &format!("String {} · {}", 6 - i, midi_to_note(*note as i32)),
+            &loc.msg_args(
+                "tuner-string",
+                &[("number", (6 - i).to_string()), ("note", midi_to_note(*note as i32))],
+            ),
             move |_: On<Activate>, mut tuner: ResMut<Tuner>| tuner.select(i),
         );
         commands.entity(row).insert(Node {
@@ -135,7 +140,7 @@ fn setup(
     spawn_button(
         &mut commands,
         root,
-        "Start again",
+        &loc.msg("tuner-restart"),
         |_: On<Activate>, mut tuner: ResMut<Tuner>| {
             tuner.tuned = [false; 6];
             tuner.select(0);
@@ -144,7 +149,7 @@ fn setup(
     spawn_back_button(
         &mut commands,
         header,
-        "Back",
+        &loc.msg("back"),
         |_: On<Activate>, mut page: ResMut<NextState<MenuPage>>| page.set(MenuPage::Play),
     );
 }
@@ -156,6 +161,7 @@ fn restore_range(mut tuner: ResMut<Tuner>, mut range: ResMut<PitchRange>) {
 fn update(
     mut events: MessageReader<PitchEvent>,
     time: Res<Time>,
+    loc: Res<Localization>,
     mic: Option<Res<MicStatus>>,
     mut tuner: ResMut<Tuner>,
     mut readout: Query<&mut Text, With<Readout>>,
@@ -177,38 +183,45 @@ fn update(
     let connected = mic.as_ref().is_some_and(|m| m.is_connected());
     tuner.listen(if connected { frequency } else { None }, dt);
     let i = tuner.selected;
-    let instrument = if tuner.electric {
-        "Electric guitar: use a clean sound, without effects."
-    } else {
-        "Classical guitar: pluck gently near the sound hole."
-    };
+    let instrument =
+        loc.msg(if tuner.electric { "tuner-electric-tip" } else { "tuner-classical-tip" });
     let status = if !connected {
         match mic.as_deref() {
-            Some(MicStatus::AwaitingPermission) => "Allow microphone access to tune.".to_string(),
+            Some(MicStatus::AwaitingPermission) => loc.msg("tuner-permission"),
             Some(MicStatus::Failed { reason }) => {
-                format!("Microphone unavailable: {reason}. Check audio input in Options.")
+                loc.msg_args("tuner-mic-failed", &[("reason", reason.clone())])
             }
-            _ => "No microphone connected. Check audio input in Options.".to_string(),
+            _ => loc.msg("tuner-no-mic"),
         }
     } else if tuner.tuned.iter().all(|v| *v) {
-        "All six strings are in tune! Play a chord, then select any string to recheck.".to_string()
+        loc.msg("tuner-complete")
     } else {
         let feedback = match tuner.cents() {
-            None => "Pluck only this open string; mute the others.".to_string(),
-            Some(c) if c.abs() <= 5.0 => {
-                format!("In tune — hold steady ({:.0}%)", (tuner.held / HOLD * 100.0).min(100.0))
-            }
-            Some(c) => format!(
-                "{} · {c:+.0} cents · {:.1} Hz",
-                if c < 0.0 { "Too low: tighten slowly" } else { "Too high: loosen slowly" },
-                tuner.frequency.unwrap()
+            None => loc.msg("tuner-pluck"),
+            Some(c) if c.abs() <= 5.0 => loc.msg_args(
+                "tuner-hold",
+                &[("percent", format!("{:.0}", (tuner.held / HOLD * 100.0).min(100.0)))],
+            ),
+            Some(c) => loc.msg_args(
+                "tuner-adjust",
+                &[
+                    (
+                        "direction",
+                        loc.msg(if c < 0.0 { "tuner-tighten" } else { "tuner-loosen" }).to_string(),
+                    ),
+                    ("cents", format!("{c:+.0}")),
+                    ("frequency", format!("{:.1}", tuner.frequency.unwrap())),
+                ],
             ),
         };
-        format!(
-            "String {} · {} · target {:.2} Hz\n{feedback}",
-            6 - i,
-            midi_to_note(NOTES[i] as i32),
-            midi_to_freq_hz(NOTES[i] as f32)
+        loc.msg_args(
+            "tuner-target",
+            &[
+                ("number", (6 - i).to_string()),
+                ("note", midi_to_note(NOTES[i] as i32)),
+                ("frequency", format!("{:.2}", midi_to_freq_hz(NOTES[i] as f32))),
+                ("feedback", feedback.to_string()),
+            ],
         )
     };
     for mut text in &mut readout {
@@ -218,14 +231,25 @@ fn update(
         let n = row.0;
         for child in children.iter() {
             if let Ok(mut text) = labels.get_mut(child) {
-                **text = format!(
-                    "{} String {} · {} · {:.2} Hz {}",
-                    if n == i { "→" } else { " " },
-                    6 - n,
-                    midi_to_note(NOTES[n] as i32),
-                    midi_to_freq_hz(NOTES[n] as f32),
-                    if tuner.tuned[n] { "✓ In tune" } else { "" }
-                );
+                **text = loc
+                    .msg_args(
+                        "tuner-row",
+                        &[
+                            ("selected", if n == i { "→" } else { " " }.to_string()),
+                            ("number", (6 - n).to_string()),
+                            ("note", midi_to_note(NOTES[n] as i32)),
+                            ("frequency", format!("{:.2}", midi_to_freq_hz(NOTES[n] as f32))),
+                            (
+                                "status",
+                                if tuner.tuned[n] {
+                                    loc.msg("tuner-tuned").to_string()
+                                } else {
+                                    String::new()
+                                },
+                            ),
+                        ],
+                    )
+                    .to_string();
             }
         }
     }
