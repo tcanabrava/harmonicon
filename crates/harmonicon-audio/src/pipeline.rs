@@ -69,11 +69,13 @@ pub fn process_audio(
     mut last_received: Local<Option<std::time::Duration>>,
     settings: Res<AudioSettings>,
     range: Res<PitchRange>,
+    algorithm_override: Option<Res<super::pitch_detect::PitchAlgorithmOverride>>,
     mut writer: MessageWriter<PitchEvent>,
     mut frame: ResMut<AudioFrame>,
     mut fft: Local<pitch_detect::FftState>,
     #[cfg(feature = "dev")] mut raw_capture: Option<ResMut<RawCaptureBuffer>>,
 ) {
+    let algorithm = algorithm_override.as_ref().map_or(settings.pitch_algorithm, |choice| choice.0);
     let connected = status.as_ref().is_none_or(|status| status.is_connected());
     if capture.is_none() || !connected {
         if let Some(capture) = capture.as_ref() {
@@ -99,7 +101,7 @@ pub fn process_audio(
         if let Some(raw) = raw_capture.as_deref_mut()
             && raw.recording
         {
-            raw.append(&chunk, capture.sample_rate, settings.pitch_algorithm);
+            raw.append(&chunk, capture.sample_rate, algorithm);
         }
         if now.saturating_duration_since(chunk.captured_at) >= CAPTURE_TIMEOUT {
             let _ = capture.free_sender.try_send(chunk.samples);
@@ -113,13 +115,8 @@ pub fn process_audio(
         let samples = chunk.samples;
         let _span = info_span!("process_audio_chunk", samples = samples.len()).entered();
         // One FFT per chunk for the spectrum; pitches use the chosen algorithm.
-        let analysis = pitch_detect::analyze(
-            &samples,
-            capture.sample_rate,
-            &mut fft,
-            settings.pitch_algorithm,
-            **range,
-        );
+        let analysis =
+            pitch_detect::analyze(&samples, capture.sample_rate, &mut fft, algorithm, **range);
         // Placed before `analysis.pitches` moves into the `PitchEvent` below
         // — this needs to read it first.
         #[cfg(feature = "dev")]
@@ -230,6 +227,39 @@ mod tests {
 
     fn a4(frequency: f32) -> PitchInfo {
         PitchInfo { midi: 69, note: "A".to_string(), octave: 4, frequency }
+    }
+
+    #[test]
+    fn temporary_detector_analyzes_guitar_without_changing_settings() {
+        use super::super::pitch_detect::{PitchAlgorithm, PitchAlgorithmOverride};
+        let (mut app, tx) = app();
+        app.insert_resource(PitchAlgorithmOverride(PitchAlgorithm::Yin));
+        app.insert_resource(PitchRange::from_freqs([65.0, 400.0], 0.0));
+        let mut audio = chunk(0.0);
+        for (i, sample) in audio.samples.iter_mut().enumerate() {
+            let phase = std::f32::consts::TAU * 82.40689 * i as f32 / 44100.0;
+            *sample = 0.5 * phase.sin() + 0.15 * (2.0 * phase).sin();
+        }
+        tx.send(audio).unwrap();
+        app.update();
+        let messages: Vec<_> =
+            app.world_mut().resource_mut::<Messages<PitchEvent>>().drain().collect();
+        let pitches = &messages.last().unwrap().0;
+        assert_eq!(pitches.len(), 1);
+        assert!((pitches[0].frequency - 82.40689).abs() < 0.5);
+        assert_eq!(app.world().resource::<AudioSettings>().pitch_algorithm, PitchAlgorithm::Fft);
+        app.world_mut().remove_resource::<PitchAlgorithmOverride>();
+        tx.send(chunk(0.0)).unwrap();
+        app.update();
+        assert!(
+            app.world_mut()
+                .resource_mut::<Messages<PitchEvent>>()
+                .drain()
+                .last()
+                .unwrap()
+                .0
+                .is_empty()
+        );
     }
 
     #[test]

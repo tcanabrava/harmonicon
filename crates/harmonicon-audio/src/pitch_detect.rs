@@ -42,3 +42,8 @@ pub struct AudioFrame {
     pub magnitudes: Vec<f32>,
     pub freq_res: f32,
 }
+
+/// Temporary detector choice for a screen with different analysis needs.
+/// Kept separate from persisted audio settings.
+#[derive(Resource)]
+pub struct PitchAlgorithmOverride(pub PitchAlgorithm);

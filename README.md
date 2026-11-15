@@ -44,7 +44,8 @@ turning MIDI files into playable charts.
   the current phrase.
 - **Instrument tuner** — Play → Tune instruments guides classical and electric
   guitars through standard E–A–D–G–B–E tuning. Select any string to recheck it;
-  hold within five cents for automatic progress to the next string.
+  follow the live microphone meter and Tune up / Tune down / In tune feedback.
+  Hold within five cents for automatic progress to the next string.
 - **Bending Trainer** — per-hole bend/overblow/overdraw drills with progress
   tracked across sessions.
 - **Scoring system** — perfect/good/miss timing windows, combo multipliers with

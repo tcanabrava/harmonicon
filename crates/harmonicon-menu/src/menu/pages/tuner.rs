@@ -9,7 +9,7 @@ use bevy::prelude::*;
 use bevy::ui_widgets::Activate;
 use harmonicon_audio::{
     audio_input::MicStatus,
-    pitch_detect::{PitchEvent, PitchRange},
+    pitch_detect::{PitchAlgorithm, PitchAlgorithmOverride, PitchEvent, PitchRange},
 };
 use harmonicon_core::midi::{midi_to_freq_hz, midi_to_note};
 use harmonicon_platform::localization::{Localization, LocalizationExt};
@@ -61,13 +61,27 @@ impl Tuner {
 struct Readout;
 #[derive(Component)]
 struct StringLabel(usize);
+#[derive(Component)]
+struct MeterNeedle;
+
+/// The meter spans fifty cents either side of the target. More distant
+/// pitches stay at the edge while the numeric readout shows the full error.
+fn meter_position(cents: f32) -> f32 {
+    50.0 + cents.clamp(-50.0, 50.0)
+}
+fn pitch_color(cents: f32) -> Color {
+    if cents.abs() <= 5.0 { Color::srgb(0.2, 0.9, 0.45) } else { Color::srgb(1.0, 0.65, 0.2) }
+}
 
 pub(crate) struct TunerPlugin;
 impl Plugin for TunerPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<Tuner>()
             .add_systems(OnEnter(MenuPage::Tuner), setup)
-            .add_systems(Update, update.run_if(in_state(MenuPage::Tuner)))
+            .add_systems(
+                Update,
+                (listen, sync_meter, update).chain().run_if(in_state(MenuPage::Tuner)),
+            )
             .add_systems(OnExit(MenuPage::Tuner), (scene::cleanup_menu, restore_range));
     }
 }
@@ -78,6 +92,7 @@ fn setup(
     mut tuner: ResMut<Tuner>,
     mut range: ResMut<PitchRange>,
 ) {
+    commands.insert_resource(PitchAlgorithmOverride(PitchAlgorithm::Yin));
     let saved = *range;
     *tuner = Tuner { saved_range: Some(saved), ..default() };
     *range = PitchRange::from_freqs([65.0, 400.0], 0.0);
@@ -108,6 +123,7 @@ fn setup(
             },
         );
     }
+    spawn_meter(&mut commands, root, &loc);
     let readout = commands
         .spawn((
             Text::new(loc.msg("tuner-pluck")),
@@ -153,20 +169,93 @@ fn setup(
         |_: On<Activate>, mut page: ResMut<NextState<MenuPage>>| page.set(MenuPage::Play),
     );
 }
-fn restore_range(mut tuner: ResMut<Tuner>, mut range: ResMut<PitchRange>) {
+fn spawn_meter(commands: &mut Commands, parent: Entity, loc: &Localization) {
+    let panel = commands
+        .spawn(Node {
+            width: Val::Px(470.0),
+            max_width: Val::Percent(100.0),
+            flex_direction: FlexDirection::Column,
+            row_gap: Val::Px(8.0),
+            ..default()
+        })
+        .id();
+    commands.entity(parent).add_child(panel);
+    let captions =
+        commands.spawn(Node { justify_content: JustifyContent::SpaceBetween, ..default() }).id();
+    commands.entity(panel).add_child(captions);
+    for key in ["tuner-meter-flat", "tuner-meter-center", "tuner-meter-sharp"] {
+        let text = commands
+            .spawn((
+                Text::new(loc.msg(key)),
+                TextFont { font_size: FontSize::Px(18.0), ..default() },
+            ))
+            .id();
+        commands.entity(captions).add_child(text);
+    }
+    let track = commands
+        .spawn((
+            Node { width: Val::Percent(100.0), height: Val::Px(44.0), ..default() },
+            BackgroundColor(Color::srgb(0.12, 0.15, 0.2)),
+        ))
+        .id();
+    commands.entity(panel).add_child(track);
+    // The green band is the ±5-cent acceptance window.
+    let center = commands
+        .spawn((
+            Node {
+                position_type: PositionType::Absolute,
+                left: Val::Percent(45.0),
+                width: Val::Percent(10.0),
+                height: Val::Percent(100.0),
+                ..default()
+            },
+            BackgroundColor(Color::srgb(0.12, 0.4, 0.23)),
+        ))
+        .id();
+    commands.entity(track).add_child(center);
+    for percent in [0.0, 25.0, 50.0, 75.0, 100.0] {
+        let tick = commands
+            .spawn((
+                Node {
+                    position_type: PositionType::Absolute,
+                    left: Val::Percent(percent),
+                    width: Val::Px(1.0),
+                    height: Val::Px(12.0),
+                    bottom: Val::Px(0.0),
+                    ..default()
+                },
+                BackgroundColor(Color::WHITE),
+            ))
+            .id();
+        commands.entity(track).add_child(tick);
+    }
+    let needle = commands
+        .spawn((
+            Node {
+                position_type: PositionType::Absolute,
+                left: Val::Percent(50.0),
+                width: Val::Px(4.0),
+                height: Val::Percent(100.0),
+                ..default()
+            },
+            BackgroundColor(Color::WHITE),
+            Visibility::Hidden,
+            MeterNeedle,
+        ))
+        .id();
+    commands.entity(track).add_child(needle);
+}
+fn restore_range(mut commands: Commands, mut tuner: ResMut<Tuner>, mut range: ResMut<PitchRange>) {
+    commands.remove_resource::<PitchAlgorithmOverride>();
     if let Some(saved) = tuner.saved_range.take() {
         *range = saved;
     }
 }
-fn update(
+fn listen(
     mut events: MessageReader<PitchEvent>,
     time: Res<Time>,
-    loc: Res<Localization>,
     mic: Option<Res<MicStatus>>,
     mut tuner: ResMut<Tuner>,
-    mut readout: Query<&mut Text, With<Readout>>,
-    rows: Query<(&StringLabel, &Children)>,
-    mut labels: Query<&mut Text, Without<Readout>>,
 ) {
     let dt = time.delta_secs();
     tuner.age += dt;
@@ -182,6 +271,30 @@ fn update(
     };
     let connected = mic.as_ref().is_some_and(|m| m.is_connected());
     tuner.listen(if connected { frequency } else { None }, dt);
+}
+fn sync_meter(
+    tuner: Res<Tuner>,
+    mut needle: Query<(&mut Node, &mut BackgroundColor, &mut Visibility), With<MeterNeedle>>,
+) {
+    for (mut node, mut color, mut visibility) in &mut needle {
+        if let Some(cents) = tuner.cents() {
+            node.left = Val::Percent(meter_position(cents));
+            color.0 = pitch_color(cents);
+            *visibility = Visibility::Inherited;
+        } else {
+            *visibility = Visibility::Hidden;
+        }
+    }
+}
+fn update(
+    loc: Res<Localization>,
+    mic: Option<Res<MicStatus>>,
+    tuner: Res<Tuner>,
+    mut readout: Query<&mut Text, With<Readout>>,
+    rows: Query<(&StringLabel, &Children)>,
+    mut labels: Query<&mut Text, Without<Readout>>,
+) {
+    let connected = mic.as_ref().is_some_and(|m| m.is_connected());
     let i = tuner.selected;
     let instrument =
         loc.msg(if tuner.electric { "tuner-electric-tip" } else { "tuner-classical-tip" });
@@ -258,6 +371,59 @@ fn update(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn analyzed_guitar_audio_drives_meter_and_silence_hides_it() {
+        use harmonicon_audio::pitch_detect::{FftState, analyze};
+        let mut app = App::new();
+        app.init_resource::<Tuner>()
+            .init_resource::<Time>()
+            .insert_resource(MicStatus::Connected { device_name: "test".into() })
+            .add_message::<PitchEvent>()
+            .add_systems(Update, (listen, sync_meter).chain());
+        let needle = app
+            .world_mut()
+            .spawn((
+                Node::default(),
+                BackgroundColor(Color::WHITE),
+                Visibility::Hidden,
+                MeterNeedle,
+            ))
+            .id();
+        let mut fft = FftState::default();
+        for cents in [-20.0_f32, 20.0, 0.0] {
+            let frequency = midi_to_freq_hz(40.0) * 2.0_f32.powf(cents / 1200.0);
+            let samples: Vec<_> = (0..4096)
+                .map(|i| {
+                    let phase = std::f32::consts::TAU * frequency * i as f32 / 44100.0;
+                    0.5 * phase.sin() + 0.15 * (2.0 * phase).sin()
+                })
+                .collect();
+            let result = analyze(
+                &samples,
+                44100,
+                &mut fft,
+                PitchAlgorithm::Yin,
+                *PitchRange::from_freqs([65.0, 400.0], 0.0),
+            );
+            assert_eq!(result.pitches.len(), 1);
+            app.world_mut()
+                .resource_mut::<Time>()
+                .advance_by(std::time::Duration::from_millis(100));
+            app.world_mut().write_message(PitchEvent(result.pitches));
+            app.update();
+            let detected = app.world().resource::<Tuner>().cents().unwrap();
+            assert!((detected - cents).abs() < 3.0, "{detected} vs {cents}");
+            let entity = app.world().entity(needle);
+            assert_eq!(entity.get::<Visibility>(), Some(&Visibility::Inherited));
+            assert_eq!(entity.get::<Node>().unwrap().left, Val::Percent(meter_position(detected)));
+            assert_eq!(entity.get::<BackgroundColor>().unwrap().0, pitch_color(cents));
+        }
+        app.world_mut().write_message(PitchEvent(Vec::new()));
+        app.update();
+        assert_eq!(app.world().entity(needle).get::<Visibility>(), Some(&Visibility::Hidden));
+        assert_eq!(meter_position(-1200.0), 0.0);
+        assert_eq!(meter_position(1200.0), 100.0);
+    }
     #[test]
     fn requires_continuous_correct_pitch_and_advances_all_strings() {
         let mut tuner = Tuner::default();

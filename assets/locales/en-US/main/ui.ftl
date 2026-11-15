@@ -1212,10 +1212,14 @@ tuner-mic-failed = Microphone unavailable: { $reason }. Check audio input in Opt
 tuner-no-mic = No microphone connected. Check audio input in Options.
 tuner-complete = All six strings are in tune! Play a chord, then select any string to recheck.
 tuner-hold = In tune — hold steady ({ $percent }%)
-tuner-tighten = Too low: tighten slowly
-tuner-loosen = Too high: loosen slowly
+tuner-tighten = Tune up — tighten slowly
+tuner-loosen = Tune down — loosen slowly
 tuner-adjust = { $direction } · { $cents } cents · { $frequency } Hz
 tuner-target = String { $number } · { $note } · target { $frequency } Hz
     { $feedback }
 tuner-row = { $selected } String { $number } · { $note } · { $frequency } Hz { $status }
 tuner-tuned = ✓ In tune
+
+tuner-meter-flat = −50 ¢ · Tune up
+tuner-meter-center = In tune
+tuner-meter-sharp = Tune down · +50 ¢
