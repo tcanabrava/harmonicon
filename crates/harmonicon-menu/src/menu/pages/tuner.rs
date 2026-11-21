@@ -54,6 +54,7 @@ struct Tuner {
     held: f32,
     frequency: Option<f32>,
     age: f32,
+    candidate: Option<(f32, u8)>,
     saved_range: Option<PitchRange>,
 }
 impl Default for Tuner {
@@ -70,6 +71,7 @@ impl Tuner {
             held: 0.0,
             frequency: None,
             age: 0.0,
+            candidate: None,
             saved_range: None,
         }
     }
@@ -82,6 +84,7 @@ impl Tuner {
         self.held = 0.0;
         self.frequency = None;
         self.age = 0.0;
+        self.candidate = None;
         self.tuned[index] = false;
     }
     fn listen(&mut self, frequency: Option<f32>, dt: f32) {
@@ -121,6 +124,8 @@ const MINT: Color = Color::srgb(0.42, 0.87, 0.72);
 struct InputFill;
 #[derive(Component)]
 struct StringLabel(usize);
+#[derive(Component)]
+struct StringWire(usize);
 #[derive(Component)]
 struct MeterNeedle;
 
@@ -172,7 +177,7 @@ fn setup(
     let card = commands
         .spawn((
             Node {
-                width: Val::Px(650.0),
+                width: Val::Px(860.0),
                 max_width: Val::Percent(100.0),
                 padding: UiRect::all(Val::Px(28.0)),
                 flex_direction: FlexDirection::Column,
@@ -200,14 +205,55 @@ fn setup(
     commands.entity(tabs).insert(wrapping_row());
     let picker = commands.spawn((Node::default(), PresetPicker(page))).id();
     commands.entity(card).add_child(picker);
-    spawn_readout(&mut commands, card, Readout::Target, 15.0, 24.0, MUTED);
-    spawn_readout(&mut commands, card, Readout::Note, 72.0, 88.0, INK);
-    spawn_meter(&mut commands, card, &loc);
-    spawn_readout(&mut commands, card, Readout::Verdict, 29.0, 38.0, MINT);
-    spawn_readout(&mut commands, card, Readout::Detail, 16.0, 43.0, MUTED);
+    let workspace = commands
+        .spawn(Node {
+            width: Val::Percent(100.0),
+            flex_wrap: FlexWrap::Wrap,
+            justify_content: JustifyContent::SpaceEvenly,
+            align_items: AlignItems::Center,
+            column_gap: Val::Px(18.0),
+            row_gap: Val::Px(12.0),
+            ..default()
+        })
+        .id();
+    commands.entity(card).add_child(workspace);
+    let display = commands
+        .spawn(Node {
+            width: Val::Px(390.0),
+            max_width: Val::Percent(100.0),
+            flex_direction: FlexDirection::Column,
+            align_items: AlignItems::Center,
+            row_gap: Val::Px(12.0),
+            ..default()
+        })
+        .id();
+    commands.entity(workspace).add_child(display);
+    spawn_readout(&mut commands, display, Readout::Target, 15.0, 24.0, MUTED);
+    spawn_readout(&mut commands, display, Readout::Note, 72.0, 88.0, INK);
+    spawn_meter(&mut commands, display, &loc);
+    spawn_readout(&mut commands, display, Readout::Verdict, 29.0, 38.0, MINT);
+    spawn_readout(&mut commands, display, Readout::Detail, 16.0, 43.0, MUTED);
 
-    let strings = commands.spawn((wrapping_row(), StringPicker)).id();
-    commands.entity(card).add_child(strings);
+    let instrument = commands
+        .spawn(Node {
+            flex_direction: FlexDirection::Column,
+            align_items: AlignItems::Center,
+            row_gap: Val::Px(6.0),
+            ..default()
+        })
+        .id();
+    commands.entity(workspace).add_child(instrument);
+    let caption = commands
+        .spawn((
+            Text::new(loc.msg("tuner-peg-caption")),
+            TextFont { font_size: FontSize::Px(14.0), ..default() },
+            TextColor(MUTED),
+        ))
+        .id();
+    let strings = commands
+        .spawn((Node { width: Val::Px(242.0), height: Val::Px(284.0), ..default() }, StringPicker))
+        .id();
+    commands.entity(instrument).add_children(&[caption, strings]);
     spawn_readout(&mut commands, card, Readout::Signal, 13.0, 24.0, MUTED);
     let track = commands
         .spawn((
@@ -351,19 +397,107 @@ fn rebuild_pickers(
     *tuner = Tuner { saved_range, ..Tuner::new(preset) };
     *range = tuner.range();
     commands.entity(strings).despawn_related::<Children>();
-    for (i, &note) in tuner.notes.iter().enumerate() {
-        let tile = spawn_button(
-            &mut commands,
-            strings,
-            &midi_to_note(note as i32),
-            move |_: On<Activate>, mut tuner: ResMut<Tuner>| tuner.select(i),
-        );
-        commands.entity(tile).insert((
-            StringLabel(i),
+    spawn_headstock(&mut commands, strings, &tuner.notes, choice.instrument == 0);
+}
+
+/// A schematic with the nut at the bottom. Classical setups have three
+/// tuners on each side, and electric and bass use an inline reference.
+fn spawn_headstock(commands: &mut Commands, parent: Entity, notes: &[u8], split: bool) {
+    let wood = if split { Color::srgb(0.30, 0.17, 0.12) } else { Color::srgb(0.36, 0.25, 0.16) };
+    let body_left = if split { 68.0 } else { 81.0 };
+    let body = commands
+        .spawn((
             Node {
-                width: Val::Px(62.0),
-                height: Val::Px(56.0),
-                border_radius: BorderRadius::all(Val::Px(10.0)),
+                position_type: PositionType::Absolute,
+                left: Val::Px(body_left),
+                top: Val::Px(6.0),
+                width: Val::Px(106.0),
+                height: Val::Px(252.0),
+                border_radius: BorderRadius::all(Val::Px(if split { 16.0 } else { 30.0 })),
+                border: UiRect::all(Val::Px(1.0)),
+                ..default()
+            },
+            BackgroundColor(wood),
+            BorderColor::all(Color::srgb(0.60, 0.43, 0.29)),
+            Pickable::IGNORE,
+        ))
+        .id();
+    commands.entity(parent).add_child(body);
+    let center = body_left + 53.0;
+    let nut = commands
+        .spawn((
+            Node {
+                position_type: PositionType::Absolute,
+                left: Val::Px(center - 29.0),
+                top: Val::Px(246.0),
+                width: Val::Px(58.0),
+                height: Val::Px(8.0),
+                border_radius: BorderRadius::all(Val::Px(2.0)),
+                ..default()
+            },
+            BackgroundColor(Color::srgb(0.82, 0.77, 0.64)),
+            Pickable::IGNORE,
+        ))
+        .id();
+    commands.entity(parent).add_child(nut);
+
+    for (index, &note) in notes.iter().enumerate() {
+        let right = split && index >= notes.len() / 2;
+        let position = if right { notes.len() - 1 - index } else { index };
+        let y =
+            225.0 - position as f32 * if split { 86.0 } else { 190.0 / (notes.len() - 1) as f32 };
+        let post_x = if right { body_left + 93.0 } else { body_left + 13.0 };
+        let nut_x = center - 22.0 + index as f32 * 44.0 / (notes.len() - 1) as f32;
+        let delta = Vec2::new(post_x - nut_x, y - 250.0);
+        let wire = commands
+            .spawn((
+                Node {
+                    position_type: PositionType::Absolute,
+                    left: Val::Px((nut_x + post_x - delta.length()) / 2.0),
+                    top: Val::Px((250.0 + y) / 2.0 - 1.0),
+                    width: Val::Px(delta.length()),
+                    height: Val::Px(2.0),
+                    ..default()
+                },
+                UiTransform::from_rotation(bevy::math::Rot2::radians(delta.y.atan2(delta.x))),
+                BackgroundColor(MUTED),
+                StringWire(index),
+                Pickable::IGNORE,
+            ))
+            .id();
+        commands.entity(parent).add_child(wire);
+        let post = commands
+            .spawn((
+                Node {
+                    position_type: PositionType::Absolute,
+                    left: Val::Px(post_x - 5.0),
+                    top: Val::Px(y - 5.0),
+                    width: Val::Px(10.0),
+                    height: Val::Px(10.0),
+                    border_radius: BorderRadius::all(Val::Px(5.0)),
+                    ..default()
+                },
+                BackgroundColor(MUTED),
+                StringWire(index),
+                Pickable::IGNORE,
+            ))
+            .id();
+        commands.entity(parent).add_child(post);
+        let peg = spawn_button(
+            commands,
+            parent,
+            &midi_to_note(note as i32),
+            move |_: On<Activate>, mut tuner: ResMut<Tuner>| tuner.select(index),
+        );
+        commands.entity(peg).insert((
+            StringLabel(index),
+            Node {
+                position_type: PositionType::Absolute,
+                left: Val::Px(if right { body_left + 106.0 } else { body_left - 58.0 }),
+                top: Val::Px(y - 13.0),
+                width: Val::Px(58.0),
+                height: Val::Px(26.0),
+                border_radius: BorderRadius::all(Val::Px(8.0)),
                 justify_content: JustifyContent::Center,
                 align_items: AlignItems::Center,
                 ..default()
@@ -468,18 +602,33 @@ fn listen(
 ) {
     let dt = time.delta_secs();
     tuner.age += dt;
-    let latest = events.read().last();
-    let frequency = if let Some(event) = latest {
-        tuner.age = 0.0;
-        // Multiple simultaneous pitches cannot reliably identify an open string.
-        if event.0.len() == 1 { Some(event.0[0].frequency) } else { None }
-    } else if tuner.age <= 0.15 {
-        tuner.frequency
-    } else {
-        None
-    };
     let connected = mic.as_ref().is_some_and(|m| m.is_connected());
-    tuner.listen(if connected { frequency } else { None }, dt);
+    let mut frequency = tuner.frequency;
+    for event in events.read() {
+        tuner.age = 0.0;
+        let reading = match event.0.as_slice() {
+            [pitch] if connected && pitch.frequency.is_finite() && pitch.frequency > 0.0 => {
+                Some(pitch.frequency)
+            }
+            _ => None,
+        };
+        // Require distinct, agreeing capture frames before advising a turn.
+        // An isolated transient or a render frame with no new audio cannot
+        // count as another reading.
+        tuner.candidate = reading.map(|hz| {
+            let count = tuner
+                .candidate
+                .filter(|(previous, _)| (1200.0 * (hz / previous).log2()).abs() <= 22.0)
+                .map_or(1, |(_, count)| count.saturating_add(1));
+            (hz, count)
+        });
+        frequency = tuner.candidate.filter(|(_, count)| *count >= 3).map(|(hz, _)| hz);
+    }
+    if !connected || tuner.age > 0.15 {
+        tuner.candidate = None;
+        frequency = None;
+    }
+    tuner.listen(frequency, dt);
 }
 fn sync_meter(
     tuner: Res<Tuner>,
@@ -502,7 +651,8 @@ fn update(
     mic: Option<Res<MicStatus>>,
     tuner: Res<Tuner>,
     mut readout: Query<(&Readout, &mut Text, &mut TextColor)>,
-    mut rows: Query<(&StringLabel, &Children, &mut BackgroundColor)>,
+    mut rows: Query<(&StringLabel, &Children, &mut BackgroundColor), Without<StringWire>>,
+    mut wires: Query<(&StringWire, &mut BackgroundColor), Without<StringLabel>>,
     mut labels: Query<(&mut Text, &mut TextColor), Without<Readout>>,
 ) {
     let connected = mic.as_ref().is_some_and(|m| m.is_connected());
@@ -564,9 +714,9 @@ fn update(
             ),
             Some(c) => {
                 let key = if c < -5.0 {
-                    "tuner-tune-up"
+                    "tuner-tighten-peg"
                 } else if c > 5.0 {
-                    "tuner-tune-down"
+                    "tuner-loosen-peg"
                 } else {
                     "tuner-meter-center"
                 };
@@ -609,6 +759,12 @@ fn update(
             }
         }
     }
+    for (wire, mut color) in &mut wires {
+        let tint = if wire.0 == i { MINT } else { Color::srgba(0.68, 0.72, 0.71, 0.50) };
+        if color.0 != tint {
+            color.0 = tint;
+        }
+    }
     for (row, children, mut background) in &mut rows {
         let n = row.0;
         let Some(&note) = tuner.notes.get(n) else { continue };
@@ -619,36 +775,12 @@ fn update(
         }
         for child in children.iter() {
             if let Ok((mut text, mut color)) = labels.get_mut(child) {
-                let value = loc
-                    .msg_args(
-                        "tuner-string-tile",
-                        &[
-                            ("number", (tuner.notes.len() - n).to_string()),
-                            ("note", midi_to_note(note as i32)),
-                            (
-                                "marker",
-                                if tuner.tuned[n] {
-                                    "✓"
-                                } else if n == i {
-                                    "▶"
-                                } else {
-                                    " "
-                                }
-                                .to_string(),
-                            ),
-                        ],
-                    )
-                    .to_string();
+                let note = midi_to_note(note as i32);
+                let value = if tuner.tuned[n] { format!("{note} ✓") } else { note };
                 if text.0 != value {
                     text.0 = value;
                 }
-                let tint = if tuner.tuned[n] {
-                    MINT
-                } else if n == i {
-                    MINT
-                } else {
-                    Color::WHITE
-                };
+                let tint = if tuner.tuned[n] || n == i { MINT } else { Color::WHITE };
                 if color.0 != tint {
                     color.0 = tint;
                 }
@@ -729,11 +861,22 @@ mod tests {
                 INPUT_THRESHOLD,
             );
             assert_eq!(result.pitches.len(), 1);
-            app.world_mut()
-                .resource_mut::<Time>()
-                .advance_by(std::time::Duration::from_millis(100));
-            app.world_mut().write_message(PitchEvent(result.pitches));
-            app.update();
+            app.world_mut().resource_mut::<Time>().advance_by(std::time::Duration::from_millis(20));
+            for frame in 0..3 {
+                let pitch = &result.pitches[0];
+                app.world_mut().write_message(PitchEvent(vec![
+                    harmonicon_audio::pitch_detect::PitchInfo {
+                        frequency: pitch.frequency,
+                        midi: pitch.midi,
+                        note: pitch.note.clone(),
+                        octave: pitch.octave,
+                    },
+                ]));
+                app.update();
+                if frame == 0 && cents == -20.0 {
+                    assert!(app.world().resource::<Tuner>().cents().is_none());
+                }
+            }
             let detected = app.world().resource::<Tuner>().cents().unwrap();
             assert!((detected - cents).abs() < 3.0, "{detected} vs {cents}");
             let entity = app.world().entity(needle);

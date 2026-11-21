@@ -1246,3 +1246,6 @@ tuner-tune-down = Tune down
 tuner-pitch-detail = { $cents } cents · { $frequency } Hz
 tuner-ready = Ready to tune
 tuner-tuning-label = Tuning
+tuner-peg-caption = Select a tuning peg
+tuner-tighten-peg = Too low · Tighten string
+tuner-loosen-peg = Too high · Loosen string
