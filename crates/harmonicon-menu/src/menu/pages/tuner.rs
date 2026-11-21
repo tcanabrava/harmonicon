@@ -14,25 +14,68 @@ use harmonicon_audio::{
         PitchSilenceThreshold,
     },
 };
-use harmonicon_core::midi::{midi_to_freq_hz, midi_to_note};
+use harmonicon_core::instrument::{
+    bass,
+    guitar::{self, Tuning},
+};
+use harmonicon_core::midi::{freq_to_midi, midi_to_freq_hz, midi_to_note};
 use harmonicon_platform::localization::{Localization, LocalizationExt};
 use harmonicon_platform::theme::LoadedTheme;
+use harmonicon_ui::dialogs::tab_bar::{TabSelect, spawn_tab_bar};
 
-const NOTES: [u8; 6] = [40, 45, 50, 55, 59, 64];
+const INSTRUMENTS: [&str; 3] = ["tuner-classical", "tuner-electric", "song-instrument-bass"];
+const EXTENDED_GUITAR: &[Tuning] = &[
+    Tuning { id: "seven-string", strings: &[64, 59, 55, 50, 45, 40, 35] },
+    Tuning { id: "eight-string", strings: &[64, 59, 55, 50, 45, 40, 35, 30] },
+];
+fn presets(instrument: usize) -> impl Iterator<Item = &'static Tuning> {
+    let base = if instrument == 2 { bass::TUNINGS } else { guitar::TUNINGS };
+    base.iter().chain(EXTENDED_GUITAR.iter().filter(move |_| instrument == 1))
+}
+#[derive(Resource, Default)]
+struct SetupChoice {
+    instrument: usize,
+    preset: usize,
+}
+#[derive(Component)]
+struct PresetPicker;
+#[derive(Component)]
+struct StringPicker;
 const HOLD: f32 = 0.8;
+const MAX_ADJUST_CENTS: f32 = 250.0;
 const INPUT_THRESHOLD: f32 = 0.0002;
 
-#[derive(Resource, Default)]
+#[derive(Resource)]
 struct Tuner {
-    electric: bool,
+    notes: Vec<u8>,
     selected: usize,
-    tuned: [bool; 6],
+    tuned: Vec<bool>,
     held: f32,
     frequency: Option<f32>,
     age: f32,
     saved_range: Option<PitchRange>,
 }
+impl Default for Tuner {
+    fn default() -> Self {
+        Self::new(&guitar::TUNINGS[0])
+    }
+}
 impl Tuner {
+    fn new(preset: &Tuning) -> Self {
+        Self {
+            notes: preset.strings.iter().rev().copied().collect(),
+            tuned: vec![false; preset.strings.len()],
+            selected: 0,
+            held: 0.0,
+            frequency: None,
+            age: 0.0,
+            saved_range: None,
+        }
+    }
+    fn range(&self) -> PitchRange {
+        PitchRange::from_freqs(self.notes.iter().map(|&note| midi_to_freq_hz(note as f32)), 5.0)
+    }
+
     fn select(&mut self, index: usize) {
         self.selected = index;
         self.held = 0.0;
@@ -58,7 +101,8 @@ impl Tuner {
         }
     }
     fn cents(&self) -> Option<f32> {
-        self.frequency.map(|f| 1200.0 * (f / midi_to_freq_hz(NOTES[self.selected] as f32)).log2())
+        self.frequency
+            .map(|f| 1200.0 * (f / midi_to_freq_hz(self.notes[self.selected] as f32)).log2())
     }
 }
 #[derive(Component)]
@@ -83,10 +127,13 @@ pub(crate) struct TunerPlugin;
 impl Plugin for TunerPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<Tuner>()
+            .init_resource::<SetupChoice>()
             .add_systems(OnEnter(MenuPage::Tuner), setup)
             .add_systems(
                 Update,
-                (listen, sync_meter, update).chain().run_if(in_state(MenuPage::Tuner)),
+                (rebuild_pickers, listen, sync_meter, update)
+                    .chain()
+                    .run_if(in_state(MenuPage::Tuner)),
             )
             .add_systems(OnExit(MenuPage::Tuner), (scene::cleanup_menu, restore_range));
     }
@@ -97,12 +144,14 @@ fn setup(
     loc: Res<Localization>,
     mut tuner: ResMut<Tuner>,
     mut range: ResMut<PitchRange>,
+    mut choice: ResMut<SetupChoice>,
 ) {
     commands.insert_resource(PitchSilenceThreshold(INPUT_THRESHOLD));
     commands.insert_resource(PitchAlgorithmOverride(PitchAlgorithm::Yin));
     let saved = *range;
     *tuner = Tuner { saved_range: Some(saved), ..default() };
-    *range = PitchRange::from_freqs([65.0, 400.0], 0.0);
+    *choice = SetupChoice::default();
+    *range = tuner.range();
     let (root, header, _) = spawn_menu_root(
         &mut commands,
         &loc.msg("tuner-title"),
@@ -110,26 +159,19 @@ fn setup(
         &theme,
         "Tuner",
     );
-    let choices = commands
-        .spawn(Node {
-            flex_direction: FlexDirection::Row,
-            flex_wrap: FlexWrap::Wrap,
-            column_gap: Val::Px(12.0),
-            ..default()
-        })
-        .id();
-    commands.entity(root).add_child(choices);
-    for (label, electric) in [("tuner-classical", false), ("tuner-electric", true)] {
-        spawn_button(
-            &mut commands,
-            choices,
-            &loc.msg(label),
-            move |_: On<Activate>, mut tuner: ResMut<Tuner>| {
-                let saved_range = tuner.saved_range;
-                *tuner = Tuner { electric, saved_range, ..default() };
-            },
-        );
-    }
+    let labels = INSTRUMENTS.map(|key| loc.msg(key).to_string());
+    let tabs = spawn_tab_bar(
+        &mut commands,
+        root,
+        &labels,
+        0,
+        |ev: On<TabSelect>, mut choice: ResMut<SetupChoice>| {
+            *choice = SetupChoice { instrument: ev.index, preset: 0 };
+        },
+    );
+    commands.entity(tabs).insert(wrapping_row());
+    let picker = commands.spawn((Node::default(), PresetPicker)).id();
+    commands.entity(root).add_child(picker);
     let instructions = commands
         .spawn((
             Text::new(loc.msg("tuner-instructions")),
@@ -165,36 +207,24 @@ fn setup(
             Text::new(loc.msg("tuner-pluck")),
             TextFont { font_size: FontSize::Px(22.0), ..default() },
             Readout,
-            Node { max_width: Val::Px(740.0), ..default() },
+            Node {
+                width: Val::Px(560.0),
+                max_width: Val::Percent(100.0),
+                height: Val::Px(116.0),
+                flex_shrink: 0.0,
+                ..default()
+            },
         ))
         .id();
     commands.entity(root).add_child(readout);
-    for (i, note) in NOTES.iter().enumerate() {
-        let row = spawn_button(
-            &mut commands,
-            root,
-            &loc.msg_args(
-                "tuner-string",
-                &[("number", (6 - i).to_string()), ("note", midi_to_note(*note as i32))],
-            ),
-            move |_: On<Activate>, mut tuner: ResMut<Tuner>| tuner.select(i),
-        );
-        commands.entity(row).insert(Node {
-            width: Val::Px(470.0),
-            max_width: Val::Percent(100.0),
-            padding: UiRect::all(Val::Px(6.0)),
-            justify_content: JustifyContent::Center,
-            ..default()
-        });
-        // The button helper's label is its direct Text child; mark it for live progress.
-        commands.entity(row).insert(StringLabel(i));
-    }
+    let strings = commands.spawn((wrapping_row(), StringPicker)).id();
+    commands.entity(root).add_child(strings);
     spawn_button(
         &mut commands,
         root,
         &loc.msg("tuner-restart"),
         |_: On<Activate>, mut tuner: ResMut<Tuner>| {
-            tuner.tuned = [false; 6];
+            tuner.tuned.fill(false);
             tuner.select(0);
         },
     );
@@ -204,6 +234,75 @@ fn setup(
         &loc.msg("back"),
         |_: On<Activate>, mut page: ResMut<NextState<MenuPage>>| page.set(MenuPage::Play),
     );
+}
+fn wrapping_row() -> Node {
+    Node {
+        width: Val::Px(560.0),
+        max_width: Val::Percent(100.0),
+        flex_wrap: FlexWrap::Wrap,
+        justify_content: JustifyContent::Center,
+        column_gap: Val::Px(6.0),
+        row_gap: Val::Px(6.0),
+        ..default()
+    }
+}
+fn rebuild_pickers(
+    mut commands: Commands,
+    choice: Res<SetupChoice>,
+    loc: Res<Localization>,
+    mut tuner: ResMut<Tuner>,
+    mut range: ResMut<PitchRange>,
+    preset_picker: Query<(Entity, Ref<PresetPicker>)>,
+    string_picker: Query<Entity, With<StringPicker>>,
+    mut last: Local<Option<(usize, usize)>>,
+) {
+    let (Ok((picker, marker)), Ok(strings)) = (preset_picker.single(), string_picker.single())
+    else {
+        return;
+    };
+    let selection = (choice.instrument, choice.preset);
+    let picker_new = marker.is_added();
+    if *last == Some(selection) && !picker_new {
+        return;
+    }
+    if last.is_none_or(|old| old.0 != selection.0) || picker_new {
+        commands.entity(picker).despawn_related::<Children>();
+        let labels: Vec<_> = presets(choice.instrument)
+            .map(|preset| loc.msg(&format!("guitar-tuning-{}", preset.id)).to_string())
+            .collect();
+        let tabs = spawn_tab_bar(
+            &mut commands,
+            picker,
+            &labels,
+            choice.preset,
+            |ev: On<TabSelect>, mut choice: ResMut<SetupChoice>| choice.preset = ev.index,
+        );
+        commands.entity(tabs).insert(wrapping_row());
+    }
+    *last = Some(selection);
+    let preset = presets(choice.instrument).nth(choice.preset).expect("valid tuning tab");
+    let saved_range = tuner.saved_range;
+    *tuner = Tuner { saved_range, ..Tuner::new(preset) };
+    *range = tuner.range();
+    commands.entity(strings).despawn_related::<Children>();
+    for (i, &note) in tuner.notes.iter().enumerate() {
+        let tile = spawn_button(
+            &mut commands,
+            strings,
+            &midi_to_note(note as i32),
+            move |_: On<Activate>, mut tuner: ResMut<Tuner>| tuner.select(i),
+        );
+        commands.entity(tile).insert((
+            StringLabel(i),
+            Node {
+                width: Val::Px(64.0),
+                height: Val::Px(54.0),
+                justify_content: JustifyContent::Center,
+                align_items: AlignItems::Center,
+                ..default()
+            },
+        ));
+    }
 }
 fn spawn_meter(commands: &mut Commands, parent: Entity, loc: &Localization) {
     let panel = commands
@@ -319,7 +418,7 @@ fn sync_meter(
     mut needle: Query<(&mut Node, &mut BackgroundColor, &mut Visibility), With<MeterNeedle>>,
 ) {
     for (mut node, mut color, mut visibility) in &mut needle {
-        if let Some(cents) = tuner.cents() {
+        if let Some(cents) = tuner.cents().filter(|c| c.abs() <= MAX_ADJUST_CENTS) {
             node.left = Val::Percent(meter_position(cents));
             color.0 = pitch_color(cents);
             *visibility = Visibility::Inherited;
@@ -336,7 +435,7 @@ fn update(
     tuner: Res<Tuner>,
     mut readout: Query<&mut Text, With<Readout>>,
     rows: Query<(&StringLabel, &Children)>,
-    mut labels: Query<&mut Text, Without<Readout>>,
+    mut labels: Query<(&mut Text, &mut TextColor), Without<Readout>>,
 ) {
     let connected = mic.as_ref().is_some_and(|m| m.is_connected());
     let rms = (frame.samples.iter().map(|s| s * s).sum::<f32>()
@@ -364,8 +463,6 @@ fn update(
         ],
     );
     let i = tuner.selected;
-    let instrument =
-        loc.msg(if tuner.electric { "tuner-electric-tip" } else { "tuner-classical-tip" });
     let status = if !connected {
         match mic.as_deref() {
             Some(MicStatus::AwaitingPermission) => loc.msg("tuner-permission"),
@@ -381,6 +478,13 @@ fn update(
             None => {
                 loc.msg(if rms >= INPUT_THRESHOLD { "tuner-unclear" } else { "tuner-listening" })
             }
+            Some(c) if c.abs() > MAX_ADJUST_CENTS => loc.msg_args(
+                "tuner-other-note",
+                &[(
+                    "note",
+                    tuner.frequency.and_then(freq_to_midi).map(midi_to_note).unwrap_or_default(),
+                )],
+            ),
             Some(c) if c.abs() <= 5.0 => loc.msg_args(
                 "tuner-hold",
                 &[("percent", format!("{:.0}", (tuner.held / HOLD * 100.0).min(100.0)))],
@@ -397,42 +501,60 @@ fn update(
                 ],
             ),
         };
-        loc.msg_args(
-            "tuner-target",
-            &[
-                ("number", (6 - i).to_string()),
-                ("note", midi_to_note(NOTES[i] as i32)),
-                ("frequency", format!("{:.2}", midi_to_freq_hz(NOTES[i] as f32))),
-                ("feedback", feedback.to_string()),
-            ],
-        )
+        feedback
     };
+    let target = loc.msg_args(
+        "tuner-current-target",
+        &[
+            ("number", (tuner.notes.len() - i).to_string()),
+            ("note", midi_to_note(tuner.notes[i] as i32)),
+            ("frequency", format!("{:.1}", midi_to_freq_hz(tuner.notes[i] as f32))),
+        ],
+    );
     for mut text in &mut readout {
-        **text = format!("{signal}\n{instrument}\n{status}");
+        let value = format!("{target}\n{status}\n{signal}");
+        if text.0 != value {
+            text.0 = value;
+        }
     }
     for (row, children) in &rows {
         let n = row.0;
+        let Some(&note) = tuner.notes.get(n) else { continue };
         for child in children.iter() {
-            if let Ok(mut text) = labels.get_mut(child) {
-                **text = loc
+            if let Ok((mut text, mut color)) = labels.get_mut(child) {
+                let value = loc
                     .msg_args(
-                        "tuner-row",
+                        "tuner-string-tile",
                         &[
-                            ("selected", if n == i { "→" } else { " " }.to_string()),
-                            ("number", (6 - n).to_string()),
-                            ("note", midi_to_note(NOTES[n] as i32)),
-                            ("frequency", format!("{:.2}", midi_to_freq_hz(NOTES[n] as f32))),
+                            ("number", (tuner.notes.len() - n).to_string()),
+                            ("note", midi_to_note(note as i32)),
                             (
-                                "status",
+                                "marker",
                                 if tuner.tuned[n] {
-                                    loc.msg("tuner-tuned").to_string()
+                                    "✓"
+                                } else if n == i {
+                                    "▶"
                                 } else {
-                                    String::new()
-                                },
+                                    " "
+                                }
+                                .to_string(),
                             ),
                         ],
                     )
                     .to_string();
+                if text.0 != value {
+                    text.0 = value;
+                }
+                let tint = if tuner.tuned[n] {
+                    Color::srgb(0.2, 0.9, 0.45)
+                } else if n == i {
+                    Color::srgb(0.5, 0.83, 1.0)
+                } else {
+                    Color::WHITE
+                };
+                if color.0 != tint {
+                    color.0 = tint;
+                }
             }
         }
     }
@@ -442,10 +564,39 @@ fn update(
 mod tests {
     use super::*;
     #[test]
+    fn presets_preserve_string_counts_and_detect_low_bass_b() {
+        use harmonicon_audio::pitch_detect::{FftState, analyze_with_silence_threshold};
+        assert_eq!(presets(0).next().unwrap().strings.len(), 6);
+        assert_eq!(presets(1).last().unwrap().strings.len(), 8);
+        assert_eq!(presets(2).next().unwrap().strings.len(), 4);
+        let tuner = Tuner::new(presets(2).nth(1).unwrap());
+        assert_eq!(tuner.notes, [23, 28, 33, 38, 43]);
+        for sample_rate in [44100, 48000] {
+            let target = midi_to_freq_hz(23.0);
+            let samples: Vec<_> = (0..4096)
+                .map(|i| {
+                    let phase = std::f32::consts::TAU * target * i as f32 / sample_rate as f32;
+                    0.02 * phase.sin() + 0.03 * (2.0 * phase).sin()
+                })
+                .collect();
+            let result = analyze_with_silence_threshold(
+                &samples,
+                sample_rate,
+                &mut FftState::default(),
+                PitchAlgorithm::Yin,
+                *tuner.range(),
+                INPUT_THRESHOLD,
+            );
+            assert_eq!(result.pitches.len(), 1);
+            assert!((result.pitches[0].frequency - target).abs() < 0.1);
+        }
+    }
+    #[test]
     fn analyzed_guitar_audio_drives_meter_and_silence_hides_it() {
         use harmonicon_audio::pitch_detect::{FftState, analyze, analyze_with_silence_threshold};
         let mut app = App::new();
         app.init_resource::<Tuner>()
+            .init_resource::<SetupChoice>()
             .init_resource::<Time>()
             .insert_resource(MicStatus::Connected { device_name: "test".into() })
             .add_message::<PitchEvent>()
@@ -506,7 +657,7 @@ mod tests {
         tuner.listen(None, 0.1);
         tuner.listen(Some(midi_to_freq_hz(40.0)), 0.5);
         assert!(!tuner.tuned[0]);
-        for note in NOTES {
+        for note in tuner.notes.clone() {
             for _ in 0..10 {
                 tuner.listen(Some(midi_to_freq_hz(note as f32)), 0.1);
             }

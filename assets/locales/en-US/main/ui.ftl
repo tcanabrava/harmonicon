@@ -1199,7 +1199,7 @@ song-instrument-viola = Viola
 
 # Guided guitar tuner
 tuner-title = Tune instruments
-tuner-subtitle = Standard tuning · A4 = 440 Hz · lowest string first
+tuner-subtitle = Open strings · A4 = 440 Hz
 tuner-classical = Classical guitar
 tuner-electric = Electric guitar
 tuner-classical-tip = Classical guitar: pluck gently near the sound hole.
@@ -1210,7 +1210,7 @@ tuner-restart = Start again
 tuner-permission = Allow microphone access to tune.
 tuner-mic-failed = Microphone unavailable: { $reason }. Check audio input in Options.
 tuner-no-mic = No microphone connected. Check audio input in Options.
-tuner-complete = All six strings are in tune! Play a chord, then select any string to recheck.
+tuner-complete = All strings in tune. Select a string to recheck it.
 tuner-hold = In tune — hold steady ({ $percent }%)
 tuner-tighten = Tune up — tighten slowly
 tuner-loosen = Tune down — loosen slowly
@@ -1226,7 +1226,13 @@ tuner-meter-sharp = Tune down · +50 ¢
 
 options-mic-level = Microphone input level: { $percent }%
 
-tuner-instructions = Select a string below, then pluck it without fretting. The input bar shows sound reaching the microphone. Follow Tune up / Tune down until the needle is green; holding in tune advances to the next string.
+tuner-instructions = Select a string. Pluck it open and let it ring.
 tuner-input = Microphone: { $device } · Input: { $percent }%
 tuner-listening = Listening — pluck the selected open string near the microphone.
-tuner-unclear = Sound received, but no stable guitar pitch yet. Mute the other strings, pluck again, and let the note ring. For electric guitar, place the microphone near a clean amplifier.
+tuner-unclear = Sound detected. Mute the other strings and pluck again.
+guitar-tuning-seven-string = 7-string standard
+guitar-tuning-eight-string = 8-string standard
+tuner-current-target = String { $number } · { $note } · Target { $frequency } Hz
+tuner-string-tile = { $number } { $marker }
+    { $note }
+tuner-other-note = Heard { $note }. Check the selected string.
