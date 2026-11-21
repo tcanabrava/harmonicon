@@ -9,7 +9,10 @@ use bevy::prelude::*;
 use bevy::ui_widgets::Activate;
 use harmonicon_audio::{
     audio_input::MicStatus,
-    pitch_detect::{PitchAlgorithm, PitchAlgorithmOverride, PitchEvent, PitchRange},
+    pitch_detect::{
+        AudioFrame, PitchAlgorithm, PitchAlgorithmOverride, PitchEvent, PitchRange,
+        PitchSilenceThreshold,
+    },
 };
 use harmonicon_core::midi::{midi_to_freq_hz, midi_to_note};
 use harmonicon_platform::localization::{Localization, LocalizationExt};
@@ -17,6 +20,7 @@ use harmonicon_platform::theme::LoadedTheme;
 
 const NOTES: [u8; 6] = [40, 45, 50, 55, 59, 64];
 const HOLD: f32 = 0.8;
+const INPUT_THRESHOLD: f32 = 0.0002;
 
 #[derive(Resource, Default)]
 struct Tuner {
@@ -60,6 +64,8 @@ impl Tuner {
 #[derive(Component)]
 struct Readout;
 #[derive(Component)]
+struct InputFill;
+#[derive(Component)]
 struct StringLabel(usize);
 #[derive(Component)]
 struct MeterNeedle;
@@ -92,6 +98,7 @@ fn setup(
     mut tuner: ResMut<Tuner>,
     mut range: ResMut<PitchRange>,
 ) {
+    commands.insert_resource(PitchSilenceThreshold(INPUT_THRESHOLD));
     commands.insert_resource(PitchAlgorithmOverride(PitchAlgorithm::Yin));
     let saved = *range;
     *tuner = Tuner { saved_range: Some(saved), ..default() };
@@ -123,6 +130,35 @@ fn setup(
             },
         );
     }
+    let instructions = commands
+        .spawn((
+            Text::new(loc.msg("tuner-instructions")),
+            TextFont { font_size: FontSize::Px(18.0), ..default() },
+            Node { max_width: Val::Px(700.0), ..default() },
+        ))
+        .id();
+    commands.entity(root).add_child(instructions);
+    let track = commands
+        .spawn((
+            Node {
+                width: Val::Px(470.0),
+                max_width: Val::Percent(100.0),
+                height: Val::Px(12.0),
+                flex_shrink: 0.0,
+                ..default()
+            },
+            BackgroundColor(Color::srgb(0.12, 0.15, 0.2)),
+        ))
+        .id();
+    let fill = commands
+        .spawn((
+            Node { width: Val::Percent(0.0), height: Val::Percent(100.0), ..default() },
+            BackgroundColor(Color::srgb(0.2, 0.85, 0.4)),
+            InputFill,
+        ))
+        .id();
+    commands.entity(track).add_child(fill);
+    commands.entity(root).add_child(track);
     spawn_meter(&mut commands, root, &loc);
     let readout = commands
         .spawn((
@@ -194,7 +230,12 @@ fn spawn_meter(commands: &mut Commands, parent: Entity, loc: &Localization) {
     }
     let track = commands
         .spawn((
-            Node { width: Val::Percent(100.0), height: Val::Px(44.0), ..default() },
+            Node {
+                width: Val::Percent(100.0),
+                height: Val::Px(44.0),
+                flex_shrink: 0.0,
+                ..default()
+            },
             BackgroundColor(Color::srgb(0.12, 0.15, 0.2)),
         ))
         .id();
@@ -247,6 +288,7 @@ fn spawn_meter(commands: &mut Commands, parent: Entity, loc: &Localization) {
 }
 fn restore_range(mut commands: Commands, mut tuner: ResMut<Tuner>, mut range: ResMut<PitchRange>) {
     commands.remove_resource::<PitchAlgorithmOverride>();
+    commands.remove_resource::<PitchSilenceThreshold>();
     if let Some(saved) = tuner.saved_range.take() {
         *range = saved;
     }
@@ -287,6 +329,8 @@ fn sync_meter(
     }
 }
 fn update(
+    frame: Res<AudioFrame>,
+    mut input: Query<&mut Node, With<InputFill>>,
     loc: Res<Localization>,
     mic: Option<Res<MicStatus>>,
     tuner: Res<Tuner>,
@@ -295,6 +339,30 @@ fn update(
     mut labels: Query<&mut Text, Without<Readout>>,
 ) {
     let connected = mic.as_ref().is_some_and(|m| m.is_connected());
+    let rms = (frame.samples.iter().map(|s| s * s).sum::<f32>()
+        / frame.samples.len().max(1) as f32)
+        .sqrt();
+    let percent = if connected {
+        ((20.0 * rms.max(1e-12).log10() + 80.0) / 80.0 * 100.0).clamp(0.0, 100.0)
+    } else {
+        0.0
+    };
+    for mut node in &mut input {
+        node.width = Val::Percent(percent);
+    }
+    let signal = loc.msg_args(
+        "tuner-input",
+        &[
+            ("percent", format!("{percent:.0}")),
+            (
+                "device",
+                match mic.as_deref() {
+                    Some(MicStatus::Connected { device_name }) => device_name.clone(),
+                    _ => String::new(),
+                },
+            ),
+        ],
+    );
     let i = tuner.selected;
     let instrument =
         loc.msg(if tuner.electric { "tuner-electric-tip" } else { "tuner-classical-tip" });
@@ -310,7 +378,9 @@ fn update(
         loc.msg("tuner-complete")
     } else {
         let feedback = match tuner.cents() {
-            None => loc.msg("tuner-pluck"),
+            None => {
+                loc.msg(if rms >= INPUT_THRESHOLD { "tuner-unclear" } else { "tuner-listening" })
+            }
             Some(c) if c.abs() <= 5.0 => loc.msg_args(
                 "tuner-hold",
                 &[("percent", format!("{:.0}", (tuner.held / HOLD * 100.0).min(100.0)))],
@@ -338,7 +408,7 @@ fn update(
         )
     };
     for mut text in &mut readout {
-        **text = format!("{instrument}\n{status}");
+        **text = format!("{signal}\n{instrument}\n{status}");
     }
     for (row, children) in &rows {
         let n = row.0;
@@ -373,7 +443,7 @@ mod tests {
     use super::*;
     #[test]
     fn analyzed_guitar_audio_drives_meter_and_silence_hides_it() {
-        use harmonicon_audio::pitch_detect::{FftState, analyze};
+        use harmonicon_audio::pitch_detect::{FftState, analyze, analyze_with_silence_threshold};
         let mut app = App::new();
         app.init_resource::<Tuner>()
             .init_resource::<Time>()
@@ -395,15 +465,20 @@ mod tests {
             let samples: Vec<_> = (0..4096)
                 .map(|i| {
                     let phase = std::f32::consts::TAU * frequency * i as f32 / 44100.0;
-                    0.5 * phase.sin() + 0.15 * (2.0 * phase).sin()
+                    0.002 * phase.sin() + 0.0006 * (2.0 * phase).sin()
                 })
                 .collect();
-            let result = analyze(
+            let range = *PitchRange::from_freqs([65.0, 400.0], 0.0);
+            assert!(
+                analyze(&samples, 44100, &mut fft, PitchAlgorithm::Yin, range).pitches.is_empty()
+            );
+            let result = analyze_with_silence_threshold(
                 &samples,
                 44100,
                 &mut fft,
                 PitchAlgorithm::Yin,
-                *PitchRange::from_freqs([65.0, 400.0], 0.0),
+                range,
+                INPUT_THRESHOLD,
             );
             assert_eq!(result.pitches.len(), 1);
             app.world_mut()

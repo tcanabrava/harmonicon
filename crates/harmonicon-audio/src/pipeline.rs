@@ -69,6 +69,7 @@ pub fn process_audio(
     mut last_received: Local<Option<std::time::Duration>>,
     settings: Res<AudioSettings>,
     range: Res<PitchRange>,
+    threshold: Option<Res<super::pitch_detect::PitchSilenceThreshold>>,
     algorithm_override: Option<Res<super::pitch_detect::PitchAlgorithmOverride>>,
     mut writer: MessageWriter<PitchEvent>,
     mut frame: ResMut<AudioFrame>,
@@ -115,8 +116,18 @@ pub fn process_audio(
         let samples = chunk.samples;
         let _span = info_span!("process_audio_chunk", samples = samples.len()).entered();
         // One FFT per chunk for the spectrum; pitches use the chosen algorithm.
-        let analysis =
-            pitch_detect::analyze(&samples, capture.sample_rate, &mut fft, algorithm, **range);
+        let analysis = if let Some(threshold) = threshold.as_ref() {
+            pitch_detect::analyze_with_silence_threshold(
+                &samples,
+                capture.sample_rate,
+                &mut fft,
+                algorithm,
+                **range,
+                threshold.0,
+            )
+        } else {
+            pitch_detect::analyze(&samples, capture.sample_rate, &mut fft, algorithm, **range)
+        };
         // Placed before `analysis.pitches` moves into the `PitchEvent` below
         // — this needs to read it first.
         #[cfg(feature = "dev")]

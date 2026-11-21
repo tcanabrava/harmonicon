@@ -264,6 +264,18 @@ pub fn analyze(
     algorithm: PitchAlgorithm,
     range: PitchRange,
 ) -> Analysis {
+    analyze_with_silence_threshold(samples, sample_rate, state, algorithm, range, SILENCE_THRESHOLD)
+}
+
+/// Analyze quieter input without changing the gameplay silence gate.
+pub fn analyze_with_silence_threshold(
+    samples: &[f32],
+    sample_rate: u32,
+    state: &mut FftState,
+    algorithm: PitchAlgorithm,
+    range: PitchRange,
+    silence_threshold: f32,
+) -> Analysis {
     let n = samples.len();
     let freq_res = if n > 0 { sample_rate as f32 / n as f32 } else { 0.0 };
     let silent = Analysis { pitches: vec![], magnitudes: vec![], freq_res };
@@ -272,7 +284,7 @@ pub fn analyze(
         return silent;
     }
     let rms = (samples.iter().map(|&s| s * s).sum::<f32>() / n as f32).sqrt();
-    if rms < SILENCE_THRESHOLD {
+    if rms < silence_threshold {
         return silent;
     }
 

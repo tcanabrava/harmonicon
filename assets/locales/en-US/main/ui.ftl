@@ -1225,3 +1225,8 @@ tuner-meter-center = In tune
 tuner-meter-sharp = Tune down · +50 ¢
 
 options-mic-level = Microphone input level: { $percent }%
+
+tuner-instructions = Select a string below, then pluck it without fretting. The input bar shows sound reaching the microphone. Follow Tune up / Tune down until the needle is green; holding in tune advances to the next string.
+tuner-input = Microphone: { $device } · Input: { $percent }%
+tuner-listening = Listening — pluck the selected open string near the microphone.
+tuner-unclear = Sound received, but no stable guitar pitch yet. Mute the other strings, pluck again, and let the note ring. For electric guitar, place the microphone near a clean amplifier.

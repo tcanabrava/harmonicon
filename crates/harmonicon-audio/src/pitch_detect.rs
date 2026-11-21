@@ -9,7 +9,7 @@ use bevy::prelude::{Deref, DerefMut, Message, Resource};
 
 pub use harmonicon_dsp::{
     Analysis, FftState, PITCH_RANGE_MARGIN_SEMITONES, PitchAlgorithm, PitchInfo, WINDOW_FUNCTION,
-    analyze,
+    analyze, analyze_with_silence_threshold,
 };
 
 /// The frequency window pitch detection searches, as an ECS resource.
@@ -47,3 +47,7 @@ pub struct AudioFrame {
 /// Kept separate from persisted audio settings.
 #[derive(Resource)]
 pub struct PitchAlgorithmOverride(pub PitchAlgorithm);
+
+/// Screen-specific sensitivity; independent of saved microphone settings.
+#[derive(Resource)]
+pub struct PitchSilenceThreshold(pub f32);
