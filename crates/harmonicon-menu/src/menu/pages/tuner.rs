@@ -33,10 +33,37 @@ fn presets(instrument: usize) -> impl Iterator<Item = &'static Tuning> {
     let base = if instrument == 2 { bass::TUNINGS } else { guitar::TUNINGS };
     base.iter().chain(EXTENDED_GUITAR.iter().filter(move |_| instrument == 1))
 }
-#[derive(Resource, Default)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+enum PegLayout {
+    #[default]
+    Inline,
+    Split,
+    Reverse,
+}
+impl PegLayout {
+    const ALL: [Self; 3] = [Self::Inline, Self::Split, Self::Reverse];
+    const LABELS: [&'static str; 3] =
+        ["tuner-layout-inline", "tuner-layout-split", "tuner-layout-reverse"];
+
+    fn peg(self, index: usize, count: usize) -> (bool, f32) {
+        let left_count = count.div_ceil(2);
+        let (right, rank, side_count) = match self {
+            Self::Split if index >= left_count => (true, count - 1 - index, count - left_count),
+            Self::Split => (false, index, left_count),
+            Self::Inline => (false, index, count),
+            Self::Reverse => (true, index, count),
+        };
+        let spacing = 190.0 / side_count.saturating_sub(1).max(1) as f32;
+        (right, 225.0 - rank as f32 * spacing)
+    }
+}
+
+#[derive(Resource, Clone, Copy, Default, PartialEq, Eq)]
 struct SetupChoice {
     instrument: usize,
     preset: usize,
+    capo: u8,
+    layout: PegLayout,
 }
 #[derive(Component)]
 struct PresetPicker(Entity);
@@ -74,6 +101,12 @@ impl Tuner {
             candidate: None,
             saved_range: None,
         }
+    }
+    fn with_capo(mut self, fret: u8) -> Self {
+        for note in &mut self.notes {
+            *note += fret;
+        }
+        self
     }
     fn range(&self) -> PitchRange {
         PitchRange::from_freqs(self.notes.iter().map(|&note| midi_to_freq_hz(note as f32)), 5.0)
@@ -165,7 +198,7 @@ fn setup(
     commands.insert_resource(PitchAlgorithmOverride(PitchAlgorithm::Yin));
     let saved = *range;
     *tuner = Tuner { saved_range: Some(saved), ..default() };
-    *choice = SetupChoice::default();
+    *choice = SetupChoice { layout: PegLayout::Split, ..default() };
     *range = tuner.range();
     let (root, header, page) = spawn_menu_root(
         &mut commands,
@@ -199,11 +232,25 @@ fn setup(
         &labels,
         0,
         |ev: On<TabSelect>, mut choice: ResMut<SetupChoice>| {
-            *choice = SetupChoice { instrument: ev.index, preset: 0 };
+            *choice = SetupChoice {
+                instrument: ev.index,
+                layout: if ev.index == 0 { PegLayout::Split } else { PegLayout::Inline },
+                ..default()
+            };
         },
     );
     commands.entity(tabs).insert(wrapping_row());
-    let picker = commands.spawn((Node::default(), PresetPicker(page))).id();
+    let picker = commands
+        .spawn((
+            Node {
+                flex_direction: FlexDirection::Column,
+                row_gap: Val::Px(6.0),
+                max_width: Val::Percent(100.0),
+                ..default()
+            },
+            PresetPicker(page),
+        ))
+        .id();
     commands.entity(card).add_child(picker);
     let workspace = commands
         .spawn(Node {
@@ -251,7 +298,7 @@ fn setup(
         ))
         .id();
     let strings = commands
-        .spawn((Node { width: Val::Px(242.0), height: Val::Px(284.0), ..default() }, StringPicker))
+        .spawn((Node { width: Val::Px(256.0), height: Val::Px(300.0), ..default() }, StringPicker))
         .id();
     commands.entity(instrument).add_children(&[caption, strings]);
     spawn_readout(&mut commands, card, Readout::Signal, 13.0, 24.0, MUTED);
@@ -346,19 +393,19 @@ fn rebuild_pickers(
     mut range: ResMut<PitchRange>,
     preset_picker: Query<(Entity, Ref<PresetPicker>)>,
     string_picker: Query<Entity, With<StringPicker>>,
-    mut last: Local<Option<(usize, usize)>>,
+    mut last: Local<Option<SetupChoice>>,
     mut backdrop_host: Local<Option<Entity>>,
 ) {
     let (Ok((picker, marker)), Ok(strings)) = (preset_picker.single(), string_picker.single())
     else {
         return;
     };
-    let selection = (choice.instrument, choice.preset);
+    let selection = *choice;
     let picker_new = marker.is_added();
     if *last == Some(selection) && !picker_new {
         return;
     }
-    if last.is_none_or(|old| old.0 != selection.0) || picker_new {
+    if last.is_none_or(|old| old.instrument != selection.instrument) || picker_new {
         commands.entity(picker).despawn_related::<Children>();
         let labels: Vec<_> = presets(choice.instrument)
             .map(|preset| loc.msg(&format!("guitar-tuning-{}", preset.id)).to_string())
@@ -390,21 +437,93 @@ fn rebuild_pickers(
             &labels[choice.preset],
             |ev: On<ComboboxSelect>, mut choice: ResMut<SetupChoice>| choice.preset = ev.index,
         );
+        let layout_labels = PegLayout::LABELS.map(|key| loc.msg(key).to_string());
+        let current_layout =
+            PegLayout::ALL.iter().position(|layout| *layout == choice.layout).unwrap_or(0);
+        spawn_combobox(
+            &mut commands,
+            picker,
+            host,
+            &loc.msg("tuner-layout-label"),
+            &layout_labels,
+            &layout_labels[current_layout],
+            |ev: On<ComboboxSelect>, mut choice: ResMut<SetupChoice>| {
+                choice.layout = PegLayout::ALL[ev.index]
+            },
+        );
+        if choice.instrument != 2 {
+            let capo_labels: Vec<_> = std::iter::once(loc.msg("guitar-capo-none").to_string())
+                .chain((1..=12).map(|fret| {
+                    loc.msg_args("guitar-capo-fret", &[("fret", fret.to_string())]).to_string()
+                }))
+                .collect();
+            spawn_combobox(
+                &mut commands,
+                picker,
+                host,
+                &loc.msg("tuner-capo-label"),
+                &capo_labels,
+                &capo_labels[usize::from(choice.capo)],
+                |ev: On<ComboboxSelect>, mut choice: ResMut<SetupChoice>| {
+                    choice.capo = ev.index as u8
+                },
+            );
+        }
     }
+    let layout_only = last.is_some_and(|old| {
+        !picker_new
+            && old.instrument == selection.instrument
+            && old.preset == selection.preset
+            && old.capo == selection.capo
+    });
     *last = Some(selection);
     let preset = presets(choice.instrument).nth(choice.preset).expect("valid tuning tab");
-    let saved_range = tuner.saved_range;
-    *tuner = Tuner { saved_range, ..Tuner::new(preset) };
-    *range = tuner.range();
+    if !layout_only {
+        let (saved_range, selected) = (tuner.saved_range, tuner.selected);
+        *tuner = Tuner { saved_range, ..Tuner::new(preset).with_capo(choice.capo) };
+        if !picker_new {
+            let index = selected.min(tuner.notes.len() - 1);
+            tuner.select(index);
+        }
+        *range = tuner.range();
+    }
     commands.entity(strings).despawn_related::<Children>();
-    spawn_headstock(&mut commands, strings, &tuner.notes, choice.instrument == 0);
+    spawn_headstock(&mut commands, strings, &tuner.notes, choice.layout, choice.capo);
 }
 
-/// A schematic with the nut at the bottom. Classical setups have three
-/// tuners on each side, and electric and bass use an inline reference.
-fn spawn_headstock(commands: &mut Commands, parent: Entity, notes: &[u8], split: bool) {
+/// Strings run from the nut to the posts in physical string order.
+/// Each bank chooses its spacing independently for odd string counts.
+fn spawn_headstock(
+    commands: &mut Commands,
+    parent: Entity,
+    notes: &[u8],
+    layout: PegLayout,
+    capo: u8,
+) {
+    let split = layout == PegLayout::Split;
     let wood = if split { Color::srgb(0.30, 0.17, 0.12) } else { Color::srgb(0.36, 0.25, 0.16) };
-    let body_left = if split { 68.0 } else { 81.0 };
+    let body_left = match layout {
+        PegLayout::Split => 75.0,
+        PegLayout::Inline => 91.0,
+        PegLayout::Reverse => 59.0,
+    };
+    let center = body_left + 53.0;
+    let neck = commands
+        .spawn((
+            Node {
+                position_type: PositionType::Absolute,
+                left: Val::Px(center - 29.0),
+                top: Val::Px(242.0),
+                width: Val::Px(58.0),
+                height: Val::Px(57.0),
+                border_radius: BorderRadius::all(Val::Px(5.0)),
+                ..default()
+            },
+            BackgroundColor(Color::srgb(0.15, 0.11, 0.09)),
+            Pickable::IGNORE,
+        ))
+        .id();
+    commands.entity(parent).add_child(neck);
     let body = commands
         .spawn((
             Node {
@@ -423,7 +542,6 @@ fn spawn_headstock(commands: &mut Commands, parent: Entity, notes: &[u8], split:
         ))
         .id();
     commands.entity(parent).add_child(body);
-    let center = body_left + 53.0;
     let nut = commands
         .spawn((
             Node {
@@ -442,12 +560,25 @@ fn spawn_headstock(commands: &mut Commands, parent: Entity, notes: &[u8], split:
     commands.entity(parent).add_child(nut);
 
     for (index, &note) in notes.iter().enumerate() {
-        let right = split && index >= notes.len() / 2;
-        let position = if right { notes.len() - 1 - index } else { index };
-        let y =
-            225.0 - position as f32 * if split { 86.0 } else { 190.0 / (notes.len() - 1) as f32 };
+        let (right, y) = layout.peg(index, notes.len());
         let post_x = if right { body_left + 93.0 } else { body_left + 13.0 };
         let nut_x = center - 22.0 + index as f32 * 44.0 / (notes.len() - 1) as f32;
+        let neck_wire = commands
+            .spawn((
+                Node {
+                    position_type: PositionType::Absolute,
+                    left: Val::Px(nut_x - 0.5),
+                    top: Val::Px(251.0),
+                    width: Val::Px(1.0),
+                    height: Val::Px(48.0),
+                    ..default()
+                },
+                BackgroundColor(MUTED),
+                StringWire(index),
+                Pickable::IGNORE,
+            ))
+            .id();
+        commands.entity(parent).add_child(neck_wire);
         let delta = Vec2::new(post_x - nut_x, y - 250.0);
         let wire = commands
             .spawn((
@@ -483,6 +614,22 @@ fn spawn_headstock(commands: &mut Commands, parent: Entity, notes: &[u8], split:
             ))
             .id();
         commands.entity(parent).add_child(post);
+        let shaft = commands
+            .spawn((
+                Node {
+                    position_type: PositionType::Absolute,
+                    left: Val::Px(if right { post_x } else { body_left - 3.0 }),
+                    top: Val::Px(y - 1.0),
+                    width: Val::Px(16.0),
+                    height: Val::Px(2.0),
+                    ..default()
+                },
+                BackgroundColor(MUTED),
+                StringWire(index),
+                Pickable::IGNORE,
+            ))
+            .id();
+        commands.entity(parent).add_child(shaft);
         let peg = spawn_button(
             commands,
             parent,
@@ -503,6 +650,24 @@ fn spawn_headstock(commands: &mut Commands, parent: Entity, notes: &[u8], split:
                 ..default()
             },
         ));
+    }
+    if capo > 0 {
+        let clamp = commands
+            .spawn((
+                Node {
+                    position_type: PositionType::Absolute,
+                    left: Val::Px(center - 34.0),
+                    top: Val::Px(268.0),
+                    width: Val::Px(68.0),
+                    height: Val::Px(9.0),
+                    border_radius: BorderRadius::all(Val::Px(4.0)),
+                    ..default()
+                },
+                BackgroundColor(Color::srgb(0.48, 0.67, 0.66)),
+                Pickable::IGNORE,
+            ))
+            .id();
+        commands.entity(parent).add_child(clamp);
     }
 }
 fn spawn_meter(commands: &mut Commands, parent: Entity, loc: &Localization) {
@@ -792,6 +957,24 @@ fn update(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn capo_transposes_open_targets_and_split_layout_handles_odd_string_counts() {
+        let tuner = Tuner::new(&guitar::TUNINGS[0]).with_capo(2);
+        assert_eq!(tuner.notes, [42, 47, 52, 57, 61, 66]);
+        assert_eq!(guitar::TUNINGS[0].strings[5], 40);
+        for count in 4..=8 {
+            for layout in PegLayout::ALL {
+                let positions: Vec<_> = (0..count).map(|index| layout.peg(index, count)).collect();
+                for (index, (side, y)) in positions.iter().copied().enumerate() {
+                    assert!((35.0..=225.0).contains(&y));
+                    for (other_side, other_y) in &positions[index + 1..] {
+                        assert!(side != *other_side || (y - other_y).abs() >= 26.0);
+                    }
+                }
+            }
+        }
+    }
+
     #[test]
     fn presets_preserve_string_counts_and_detect_low_bass_b() {
         use harmonicon_audio::pitch_detect::{FftState, analyze_with_silence_threshold};
