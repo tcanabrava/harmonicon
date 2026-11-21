@@ -47,7 +47,7 @@ pub(super) fn decode_note(
         state.expression_intensities.insert(id, intensity.to_string());
     }
     Some(GridNote::new(id, tick, len, expr, target).with_performance(
-        harmonicon_core::note_performance::PerformanceInstructions::from_bow(event.bow),
+        harmonicon_core::note_performance::PerformanceInstructions::from_event(&event),
     ))
 }
 
@@ -69,6 +69,7 @@ pub(super) fn encode_note(
     };
     let original = NoteEvent {
         bow: note.performance.bowed(),
+        fretting: note.performance.fretting(),
         hole: None,
         action: None,
         position: None,
@@ -87,6 +88,48 @@ pub(super) fn encode_note(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn full_f_barre_and_other_fingers_round_trip_on_the_same_beat() {
+        use harmonicon_core::instrument::guitar::{Guitar, GuitarBody};
+        let instrument = Guitar::standard(GuitarBody::Acoustic).into();
+        let mut state = EditorState::default();
+        for (i, (fret, pitch, finger)) in
+            [(1, "F4", 1), (1, "C4", 1), (2, "A3", 2), (3, "F3", 4), (3, "C3", 3), (1, "F2", 1)]
+                .into_iter()
+                .enumerate()
+        {
+            let mut event = serde_json::json!({
+                "note": pitch, "position": {"string": i + 1, "fret": fret},
+                "fretting": {"finger": finger}
+            });
+            if i == 0 {
+                event["fretting"]["barre"] = serde_json::json!({
+                    "fret": 1, "first_string": 1, "last_string": 6
+                });
+            }
+            let decoded = decode_note(&event, &instrument, i as u32, 0, 12, &mut state).unwrap();
+            assert_eq!(encode_note(&state, &decoded, &instrument), event);
+        }
+    }
+
+    #[test]
+    fn bass_barre_span_must_fit_the_instrument_and_include_the_anchor() {
+        let instrument =
+            harmonicon_core::instrument::fretted_strings::FrettedInstrument::bass().into();
+        let mut state = EditorState::default();
+        let mut event = serde_json::json!({
+            "note":"F1", "position":{"string":4,"fret":1},
+            "fretting":{"barre":{"fret":1,"first_string":3,"last_string":4}}
+        });
+        let decoded = decode_note(&event, &instrument, 0, 0, 12, &mut state).unwrap();
+        assert_eq!(encode_note(&state, &decoded, &instrument), event);
+        event["fretting"]["barre"]["last_string"] = serde_json::json!(5);
+        assert!(decode_note(&event, &instrument, 0, 0, 12, &mut state).is_none());
+        event["fretting"]["barre"]["last_string"] = serde_json::json!(3);
+        event["fretting"]["barre"]["first_string"] = serde_json::json!(1);
+        assert!(decode_note(&event, &instrument, 0, 0, 12, &mut state).is_none());
+    }
+
     #[test]
     fn harmonica_bend_is_encoded_once_and_legacy_expression_rates_survive() {
         use super::super::state::{Dir, Expr, HarpTechnique};

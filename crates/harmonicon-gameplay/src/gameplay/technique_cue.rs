@@ -97,17 +97,21 @@ pub(super) fn is_coachable(modifier: &Modifier) -> bool {
 /// The localized cue drawn beside a note head, or `None` for a plain note.
 pub(super) fn note_cue(loc: &Localization, note: &ScheduledNote) -> Option<String> {
     let parts = cue_parts(&note.modifiers, note.expected_pitch);
-    if parts.is_empty() {
-        return None;
-    }
-    let text: Vec<String> = parts
+    let mut text: Vec<String> = parts
         .iter()
         .map(|p| {
             let args: Vec<(&str, String)> = p.args.iter().map(|(k, v)| (*k, v.clone())).collect();
             String::from(loc.msg_args(p.key, &args))
         })
         .collect();
-    Some(text.join("  "))
+    if let Some(hint) = note.performance.fretting() {
+        if let Some(barre) = hint.barre {
+            text.push(barre.label());
+        } else if let Some(finger) = hint.finger {
+            text.push(format!("({finger})"));
+        }
+    }
+    (!text.is_empty()).then(|| text.join("  "))
 }
 
 // ── Live coaching ────────────────────────────────────────────────────────────

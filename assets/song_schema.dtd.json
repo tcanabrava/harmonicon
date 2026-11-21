@@ -596,6 +596,24 @@
                   }
                 },
 
+                "fretting": {
+                  "type": "object",
+                  "description": "Optional fretting-hand guidance for a fretted note. Barre strings form a contiguous inclusive span, with string 1 the highest.",
+                  "additionalProperties": false,
+                  "properties": {
+                    "finger": { "type": "integer", "minimum": 1, "maximum": 4 },
+                    "barre": {
+                      "type": "object",
+                      "required": ["fret", "first_string", "last_string"],
+                      "additionalProperties": false,
+                      "properties": {
+                        "fret": { "type": "integer", "minimum": 1, "maximum": 255 },
+                        "first_string": { "type": "integer", "minimum": 1, "maximum": 255 },
+                        "last_string": { "type": "integer", "minimum": 2, "maximum": 255 }
+                      }
+                    }
+                  }
+                },
                 "fingerboard": {
                   "type": "object",
                   "required": ["string"],

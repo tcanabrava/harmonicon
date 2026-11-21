@@ -76,6 +76,17 @@ document empty.
 
 ![Guitar chart in the Song Editor](images/song-editor-guitar.png)
 
+### Fretting fingers and barres
+
+On guitar and bass, select a fretted note to show **Fretting finger** and
+**Barre** above the grid. Fingers 1–4 mean index, middle, ring and little.
+For a barre, select a note played by the index finger and choose the string
+span that it covers. `CI (1–6)` means a barre at fret 1 across strings 1–6.
+For a full F major, enter `1–3–3–2–1–1` from thickest to thinnest string, then
+put `CI (1–6)` on one of the fret-1 notes. Assign the other fingers to their
+own notes. The barre follows the selected note's timing and leaves the
+sounding frets and pitches as authored. Frets count from any physical capo.
+
 ## Flute charts
 
 Choose **Flute** for a new document to start a flute chart;

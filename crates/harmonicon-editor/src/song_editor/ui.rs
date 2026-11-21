@@ -733,6 +733,18 @@ fn on_editor_tab_select(
 /// is the left sidebar beside it (`mod_panel::spawn_mod_panel`).
 fn spawn_fixed_chrome(root: &mut ChildSpawnerCommands, colors: SongEditorColors, hole_count: u8) {
     root.spawn((
+        super::fretting_controls::FrettingControls,
+        Node {
+            display: Display::None,
+            width: Val::Percent(100.0),
+            flex_wrap: FlexWrap::Wrap,
+            column_gap: Val::Px(8.0),
+            row_gap: Val::Px(6.0),
+            flex_shrink: 0.0,
+            ..default()
+        },
+    ));
+    root.spawn((
         super::bowed_controls::BowedControls,
         Node {
             display: Display::None,

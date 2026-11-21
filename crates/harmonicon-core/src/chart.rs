@@ -305,7 +305,7 @@ impl HarpChart {
 /// spec than this build supports up front, with a clear error, instead of
 /// failing on some confusing downstream `additionalProperties` schema
 /// rejection or (worse) silently misreading a field whose meaning changed.
-pub const CURRENT_FORMAT_VERSION: &str = "1.15.0";
+pub const CURRENT_FORMAT_VERSION: &str = "1.16.0";
 
 /// Parses a `"MAJOR.MINOR.PATCH"` version string into a comparable tuple.
 /// `None` for anything that isn't exactly three dot-separated integers.
@@ -773,6 +773,8 @@ pub enum PlayMode {
 /// validation checks it matches the chart's instrument.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct NoteEvent {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fretting: Option<crate::note_performance::Fretting>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub fingerboard: Option<crate::instrument::bowed_strings::BowedPlacement>,
     #[serde(default, skip_serializing_if = "Option::is_none")]

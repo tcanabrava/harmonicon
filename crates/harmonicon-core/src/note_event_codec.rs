@@ -33,6 +33,9 @@ pub fn decode_for(
     {
         return Err(PlacementError::Unplayable);
     }
+    if event.fretting.is_some() && !matches!(instrument, Instrument::Fretted(_)) {
+        return Err(PlacementError::Unplayable);
+    }
     let modifiers = event.modifiers.as_deref().unwrap_or(&[]);
     let pitch_modifiers = modifiers
         .iter()
@@ -59,7 +62,7 @@ pub fn decode_for(
             target.candidates(instrument)?;
             Ok(target)
         }
-        Instrument::Fretted(_) => {
+        Instrument::Fretted(guitar) => {
             if event.hole.is_some()
                 || event.action.is_some()
                 || event.fingering.is_some()
@@ -70,6 +73,12 @@ pub fn decode_for(
                 return Err(PlacementError::Unplayable);
             }
             let at = event.position.ok_or(PlacementError::Unplayable)?;
+            if event.fretting.is_some_and(|hint| {
+                !hint.valid_for(at, guitar.strings.len())
+                    || modifiers.iter().any(|modifier| matches!(modifier, Modifier::Harmonic))
+            }) {
+                return Err(PlacementError::Unplayable);
+            }
             let position = PlayPosition::Fret(FretAssignment {
                 string: at.string,
                 fret: at.fret,
@@ -145,6 +154,15 @@ pub fn encode(
     let position = target.position().ok_or(PlacementError::Unplayable)?;
     target.with_placement(instrument, position)?;
     let mut result = original.clone();
+    result.fretting = match (instrument, position) {
+        (Instrument::Fretted(guitar), PlayPosition::Fret(at))
+            if at.technique != StringTechnique::Harmonic =>
+        {
+            let position = FretPosition { string: at.string, fret: at.fret };
+            original.fretting.filter(|hint| hint.valid_for(position, guitar.strings.len()))
+        }
+        _ => None,
+    };
     result.fingering = None;
     result.fingerboard = None;
     if !matches!(instrument, Instrument::Bowed(_)) {

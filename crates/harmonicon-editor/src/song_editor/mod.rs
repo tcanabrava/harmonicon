@@ -38,6 +38,7 @@ mod clarinet_setup;
 #[cfg(feature = "dev")]
 mod expected_notes;
 mod flute_note;
+mod fretting_controls;
 mod grid;
 mod grid_cache;
 mod guitar_note;
@@ -400,6 +401,7 @@ impl Plugin for SongEditor2Plugin {
                     guitar_setup::sync_tuning,
                     guitar_setup::sync,
                     bowed_controls::sync,
+                    fretting_controls::sync,
                     clarinet_setup::sync,
                     clarinet_setup::sync_hint,
                 )

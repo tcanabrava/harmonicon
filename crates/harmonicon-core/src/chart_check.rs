@@ -89,6 +89,12 @@ pub fn instrument_problems(chart: &HarpChart) -> Vec<String> {
                 ));
                 continue;
             }
+            if event.fretting.is_some()
+                && crate::note_event_codec::decode_for(&instrument, event).is_err()
+            {
+                problems.push(format!("{at}: invalid fretting-hand fingering or barre span"));
+                continue;
+            }
             let problem = match &instrument {
                 Instrument::Harmonica(_) => harmonica_event_problem(event),
                 Instrument::Fretted(guitar) => guitar_event_problem(guitar, event),

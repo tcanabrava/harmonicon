@@ -704,7 +704,19 @@ pub(super) fn note_face(note: &GridNote) -> (Color, String) {
         ),
         Some(PlayPosition::Fret(fret)) => (
             harmonicon_gameplay::gameplay::guitar_visuals::string_color(fret.string),
-            fret.tab_label(),
+            note.performance
+                .fretting()
+                .filter(|hint| {
+                    fret.technique != harmonicon_core::instrument::guitar::StringTechnique::Harmonic
+                        && hint.valid_for(
+                            harmonicon_core::chart::FretPosition {
+                                string: fret.string,
+                                fret: fret.fret,
+                            },
+                            usize::from(u8::MAX),
+                        )
+                })
+                .map_or_else(|| fret.tab_label(), |hint| hint.annotate(fret.tab_label())),
         ),
         // A flute note's name, and which alternate when it isn't the
         // standard fingering (`D6·1`).

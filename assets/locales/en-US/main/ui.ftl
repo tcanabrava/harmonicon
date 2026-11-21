@@ -1254,3 +1254,12 @@ tuner-layout-label = Headstock
 tuner-layout-inline = Inline
 tuner-layout-split = Split sides
 tuner-layout-reverse = Reverse inline
+
+# Fretting-hand instructions
+editor-fretting-finger = Fretting finger
+editor-finger-index = 1 · Index
+editor-finger-middle = 2 · Middle
+editor-finger-ring = 3 · Ring
+editor-finger-little = 4 · Little
+editor-barre = Barre
+editor-no-barre = No barre

@@ -336,7 +336,7 @@ pub fn build_scheduled_notes(
             Vec<Modifier>,
             Option<u8>,
             bool,
-            Option<harmonicon_core::instrument::bowed_strings::BowGesture>,
+            harmonicon_core::note_performance::PerformanceInstructions,
         )> =
             item.events
                 .iter()
@@ -414,7 +414,14 @@ pub fn build_scheduled_notes(
                         }
                     })()
                     .map(|(position, modifiers, pitch, playable)| {
-                        (position, modifiers, pitch, playable, event.bow)
+                        let performance = if substituted.is_some() && event.fretting.is_some() {
+                            Default::default()
+                        } else {
+                            harmonicon_core::note_performance::PerformanceInstructions::from_event(
+                                event,
+                            )
+                        };
+                        (position, modifiers, pitch, playable, performance)
                     })
                 })
                 .collect();
@@ -430,15 +437,14 @@ pub fn build_scheduled_notes(
         } else {
             Vec::new()
         };
-        for (position, modifiers, expected_pitch, playable, bow) in event_data {
+        for (position, modifiers, expected_pitch, playable, performance) in event_data {
             let (unlocked, section) = flags.next().unwrap_or((true, 0));
             if !unlocked {
                 continue;
             }
             combined.push((
                 ScheduledNote {
-                    performance:
-                        harmonicon_core::note_performance::PerformanceInstructions::from_bow(bow),
+                    performance,
                     time: t,
                     duration: item.duration,
                     position,
