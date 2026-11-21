@@ -21,6 +21,7 @@ use harmonicon_core::instrument::{
 use harmonicon_core::midi::{freq_to_midi, midi_to_freq_hz, midi_to_note};
 use harmonicon_platform::localization::{Localization, LocalizationExt};
 use harmonicon_platform::theme::LoadedTheme;
+use harmonicon_ui::dialogs::combobox::{ComboboxSelect, spawn_combobox};
 use harmonicon_ui::dialogs::tab_bar::{TabSelect, spawn_tab_bar};
 
 const INSTRUMENTS: [&str; 3] = ["tuner-classical", "tuner-electric", "song-instrument-bass"];
@@ -38,7 +39,7 @@ struct SetupChoice {
     preset: usize,
 }
 #[derive(Component)]
-struct PresetPicker;
+struct PresetPicker(Entity);
 #[derive(Component)]
 struct StringPicker;
 const HOLD: f32 = 0.8;
@@ -106,7 +107,16 @@ impl Tuner {
     }
 }
 #[derive(Component)]
-struct Readout;
+enum Readout {
+    Note,
+    Target,
+    Verdict,
+    Detail,
+    Signal,
+}
+const INK: Color = Color::srgb(0.91, 0.96, 0.97);
+const MUTED: Color = Color::srgb(0.61, 0.72, 0.77);
+const MINT: Color = Color::srgb(0.42, 0.87, 0.72);
 #[derive(Component)]
 struct InputFill;
 #[derive(Component)]
@@ -120,7 +130,7 @@ fn meter_position(cents: f32) -> f32 {
     50.0 + cents.clamp(-50.0, 50.0)
 }
 fn pitch_color(cents: f32) -> Color {
-    if cents.abs() <= 5.0 { Color::srgb(0.2, 0.9, 0.45) } else { Color::srgb(1.0, 0.65, 0.2) }
+    if cents.abs() <= 5.0 { MINT } else { Color::srgb(1.0, 0.65, 0.2) }
 }
 
 pub(crate) struct TunerPlugin;
@@ -152,17 +162,35 @@ fn setup(
     *tuner = Tuner { saved_range: Some(saved), ..default() };
     *choice = SetupChoice::default();
     *range = tuner.range();
-    let (root, header, _) = spawn_menu_root(
+    let (root, header, page) = spawn_menu_root(
         &mut commands,
         &loc.msg("tuner-title"),
         Some(&loc.msg("tuner-subtitle")),
         &theme,
         "Tuner",
     );
+    let card = commands
+        .spawn((
+            Node {
+                width: Val::Px(650.0),
+                max_width: Val::Percent(100.0),
+                padding: UiRect::all(Val::Px(28.0)),
+                flex_direction: FlexDirection::Column,
+                align_items: AlignItems::Center,
+                row_gap: Val::Px(12.0),
+                border: UiRect::all(Val::Px(1.0)),
+                border_radius: BorderRadius::all(Val::Px(22.0)),
+                ..default()
+            },
+            BackgroundColor(Color::srgb(0.047, 0.078, 0.104)),
+            BorderColor::all(Color::srgb(0.20, 0.32, 0.36)),
+        ))
+        .id();
+    commands.entity(root).add_child(card);
     let labels = INSTRUMENTS.map(|key| loc.msg(key).to_string());
     let tabs = spawn_tab_bar(
         &mut commands,
-        root,
+        card,
         &labels,
         0,
         |ev: On<TabSelect>, mut choice: ResMut<SetupChoice>| {
@@ -170,64 +198,57 @@ fn setup(
         },
     );
     commands.entity(tabs).insert(wrapping_row());
-    let picker = commands.spawn((Node::default(), PresetPicker)).id();
-    commands.entity(root).add_child(picker);
-    let instructions = commands
-        .spawn((
-            Text::new(loc.msg("tuner-instructions")),
-            TextFont { font_size: FontSize::Px(18.0), ..default() },
-            Node { max_width: Val::Px(700.0), ..default() },
-        ))
-        .id();
-    commands.entity(root).add_child(instructions);
+    let picker = commands.spawn((Node::default(), PresetPicker(page))).id();
+    commands.entity(card).add_child(picker);
+    spawn_readout(&mut commands, card, Readout::Target, 15.0, 24.0, MUTED);
+    spawn_readout(&mut commands, card, Readout::Note, 72.0, 88.0, INK);
+    spawn_meter(&mut commands, card, &loc);
+    spawn_readout(&mut commands, card, Readout::Verdict, 29.0, 38.0, MINT);
+    spawn_readout(&mut commands, card, Readout::Detail, 16.0, 43.0, MUTED);
+
+    let strings = commands.spawn((wrapping_row(), StringPicker)).id();
+    commands.entity(card).add_child(strings);
+    spawn_readout(&mut commands, card, Readout::Signal, 13.0, 24.0, MUTED);
     let track = commands
         .spawn((
             Node {
-                width: Val::Px(470.0),
-                max_width: Val::Percent(100.0),
-                height: Val::Px(12.0),
+                width: Val::Percent(100.0),
+                height: Val::Px(5.0),
                 flex_shrink: 0.0,
+                border_radius: BorderRadius::all(Val::Px(3.0)),
                 ..default()
             },
-            BackgroundColor(Color::srgb(0.12, 0.15, 0.2)),
+            BackgroundColor(Color::srgb(0.13, 0.21, 0.25)),
         ))
         .id();
+    commands.entity(card).add_child(track);
     let fill = commands
         .spawn((
-            Node { width: Val::Percent(0.0), height: Val::Percent(100.0), ..default() },
-            BackgroundColor(Color::srgb(0.2, 0.85, 0.4)),
+            Node {
+                width: Val::Percent(0.0),
+                height: Val::Percent(100.0),
+                border_radius: BorderRadius::all(Val::Px(3.0)),
+                ..default()
+            },
+            BackgroundColor(MINT),
             InputFill,
         ))
         .id();
     commands.entity(track).add_child(fill);
-    commands.entity(root).add_child(track);
-    spawn_meter(&mut commands, root, &loc);
-    let readout = commands
-        .spawn((
-            Text::new(loc.msg("tuner-pluck")),
-            TextFont { font_size: FontSize::Px(22.0), ..default() },
-            Readout,
-            Node {
-                width: Val::Px(560.0),
-                max_width: Val::Percent(100.0),
-                height: Val::Px(116.0),
-                flex_shrink: 0.0,
-                ..default()
-            },
-        ))
-        .id();
-    commands.entity(root).add_child(readout);
-    let strings = commands.spawn((wrapping_row(), StringPicker)).id();
-    commands.entity(root).add_child(strings);
-    spawn_button(
+    let restart = spawn_button(
         &mut commands,
-        root,
+        card,
         &loc.msg("tuner-restart"),
         |_: On<Activate>, mut tuner: ResMut<Tuner>| {
             tuner.tuned.fill(false);
             tuner.select(0);
         },
     );
+    commands.entity(restart).insert(Node {
+        padding: UiRect::axes(Val::Px(16.0), Val::Px(7.0)),
+        border_radius: BorderRadius::all(Val::Px(8.0)),
+        ..default()
+    });
     spawn_back_button(
         &mut commands,
         header,
@@ -235,9 +256,34 @@ fn setup(
         |_: On<Activate>, mut page: ResMut<NextState<MenuPage>>| page.set(MenuPage::Play),
     );
 }
+fn spawn_readout(
+    commands: &mut Commands,
+    parent: Entity,
+    slot: Readout,
+    size: f32,
+    height: f32,
+    color: Color,
+) {
+    let row = commands
+        .spawn((
+            Text::default(),
+            TextFont { font_size: FontSize::Px(size), ..default() },
+            TextLayout::justify(Justify::Center),
+            TextColor(color),
+            slot,
+            Node {
+                width: Val::Percent(100.0),
+                height: Val::Px(height),
+                flex_shrink: 0.0,
+                ..default()
+            },
+        ))
+        .id();
+    commands.entity(parent).add_child(row);
+}
 fn wrapping_row() -> Node {
     Node {
-        width: Val::Px(560.0),
+        width: Val::Percent(100.0),
         max_width: Val::Percent(100.0),
         flex_wrap: FlexWrap::Wrap,
         justify_content: JustifyContent::Center,
@@ -255,6 +301,7 @@ fn rebuild_pickers(
     preset_picker: Query<(Entity, Ref<PresetPicker>)>,
     string_picker: Query<Entity, With<StringPicker>>,
     mut last: Local<Option<(usize, usize)>>,
+    mut backdrop_host: Local<Option<Entity>>,
 ) {
     let (Ok((picker, marker)), Ok(strings)) = (preset_picker.single(), string_picker.single())
     else {
@@ -270,14 +317,33 @@ fn rebuild_pickers(
         let labels: Vec<_> = presets(choice.instrument)
             .map(|preset| loc.msg(&format!("guitar-tuning-{}", preset.id)).to_string())
             .collect();
-        let tabs = spawn_tab_bar(
+        // The overlay sits outside the scrolling card. Replace it along
+        // with the picker when switching instrument families.
+        if let Some(old_host) = backdrop_host.take().filter(|_| !picker_new) {
+            commands.entity(old_host).despawn();
+        }
+        let host = commands
+            .spawn((
+                Node {
+                    position_type: PositionType::Absolute,
+                    width: Val::Percent(100.0),
+                    height: Val::Percent(100.0),
+                    ..default()
+                },
+                Pickable::IGNORE,
+            ))
+            .id();
+        commands.entity(marker.0).add_child(host);
+        *backdrop_host = Some(host);
+        spawn_combobox(
             &mut commands,
             picker,
+            host,
+            &loc.msg("tuner-tuning-label"),
             &labels,
-            choice.preset,
-            |ev: On<TabSelect>, mut choice: ResMut<SetupChoice>| choice.preset = ev.index,
+            &labels[choice.preset],
+            |ev: On<ComboboxSelect>, mut choice: ResMut<SetupChoice>| choice.preset = ev.index,
         );
-        commands.entity(tabs).insert(wrapping_row());
     }
     *last = Some(selection);
     let preset = presets(choice.instrument).nth(choice.preset).expect("valid tuning tab");
@@ -295,8 +361,9 @@ fn rebuild_pickers(
         commands.entity(tile).insert((
             StringLabel(i),
             Node {
-                width: Val::Px(64.0),
-                height: Val::Px(54.0),
+                width: Val::Px(62.0),
+                height: Val::Px(56.0),
+                border_radius: BorderRadius::all(Val::Px(10.0)),
                 justify_content: JustifyContent::Center,
                 align_items: AlignItems::Center,
                 ..default()
@@ -307,7 +374,7 @@ fn rebuild_pickers(
 fn spawn_meter(commands: &mut Commands, parent: Entity, loc: &Localization) {
     let panel = commands
         .spawn(Node {
-            width: Val::Px(470.0),
+            width: Val::Percent(88.0),
             max_width: Val::Percent(100.0),
             flex_direction: FlexDirection::Column,
             row_gap: Val::Px(8.0),
@@ -331,7 +398,8 @@ fn spawn_meter(commands: &mut Commands, parent: Entity, loc: &Localization) {
         .spawn((
             Node {
                 width: Val::Percent(100.0),
-                height: Val::Px(44.0),
+                height: Val::Px(30.0),
+                border_radius: BorderRadius::all(Val::Px(6.0)),
                 flex_shrink: 0.0,
                 ..default()
             },
@@ -433,8 +501,8 @@ fn update(
     loc: Res<Localization>,
     mic: Option<Res<MicStatus>>,
     tuner: Res<Tuner>,
-    mut readout: Query<&mut Text, With<Readout>>,
-    rows: Query<(&StringLabel, &Children)>,
+    mut readout: Query<(&Readout, &mut Text, &mut TextColor)>,
+    mut rows: Query<(&StringLabel, &Children, &mut BackgroundColor)>,
     mut labels: Query<(&mut Text, &mut TextColor), Without<Readout>>,
 ) {
     let connected = mic.as_ref().is_some_and(|m| m.is_connected());
@@ -449,77 +517,106 @@ fn update(
     for mut node in &mut input {
         node.width = Val::Percent(percent);
     }
-    let signal = loc.msg_args(
-        "tuner-input",
+    let signal = if let Some(MicStatus::Connected { device_name }) = mic.as_deref() {
+        loc.msg_args(
+            "tuner-input",
+            &[("percent", format!("{percent:.0}")), ("device", device_name.clone())],
+        )
+    } else {
+        loc.msg("tuner-mic-inactive")
+    };
+    let i = tuner.selected;
+    let note = midi_to_note(tuner.notes[i] as i32);
+    let target = loc.msg_args(
+        "tuner-target-caption",
         &[
-            ("percent", format!("{percent:.0}")),
-            (
-                "device",
-                match mic.as_deref() {
-                    Some(MicStatus::Connected { device_name }) => device_name.clone(),
-                    _ => String::new(),
-                },
-            ),
+            ("number", (tuner.notes.len() - i).to_string()),
+            ("frequency", format!("{:.1}", midi_to_freq_hz(tuner.notes[i] as f32))),
         ],
     );
-    let i = tuner.selected;
-    let status = if !connected {
-        match mic.as_deref() {
+    let cents = tuner.cents();
+    let (verdict, detail) = if !connected {
+        let detail = match mic.as_deref() {
             Some(MicStatus::AwaitingPermission) => loc.msg("tuner-permission"),
             Some(MicStatus::Failed { reason }) => {
                 loc.msg_args("tuner-mic-failed", &[("reason", reason.clone())])
             }
             _ => loc.msg("tuner-no-mic"),
-        }
-    } else if tuner.tuned.iter().all(|v| *v) {
-        loc.msg("tuner-complete")
-    } else {
-        let feedback = match tuner.cents() {
-            None => {
-                loc.msg(if rms >= INPUT_THRESHOLD { "tuner-unclear" } else { "tuner-listening" })
-            }
-            Some(c) if c.abs() > MAX_ADJUST_CENTS => loc.msg_args(
-                "tuner-other-note",
-                &[(
-                    "note",
-                    tuner.frequency.and_then(freq_to_midi).map(midi_to_note).unwrap_or_default(),
-                )],
-            ),
-            Some(c) if c.abs() <= 5.0 => loc.msg_args(
-                "tuner-hold",
-                &[("percent", format!("{:.0}", (tuner.held / HOLD * 100.0).min(100.0)))],
-            ),
-            Some(c) => loc.msg_args(
-                "tuner-adjust",
-                &[
-                    (
-                        "direction",
-                        loc.msg(if c < 0.0 { "tuner-tighten" } else { "tuner-loosen" }).to_string(),
-                    ),
-                    ("cents", format!("{c:+.0}")),
-                    ("frequency", format!("{:.1}", tuner.frequency.unwrap())),
-                ],
-            ),
         };
-        feedback
+        (loc.msg("tuner-mic-inactive"), detail)
+    } else if tuner.tuned.iter().all(|v| *v) {
+        (loc.msg("tuner-all-tuned"), loc.msg("tuner-recheck"))
+    } else {
+        match cents {
+            Some(c) if c.abs() > MAX_ADJUST_CENTS => (
+                loc.msg("tuner-check-string"),
+                loc.msg_args(
+                    "tuner-other-note",
+                    &[(
+                        "note",
+                        tuner
+                            .frequency
+                            .and_then(freq_to_midi)
+                            .map(midi_to_note)
+                            .unwrap_or_default(),
+                    )],
+                ),
+            ),
+            Some(c) => {
+                let key = if c < -5.0 {
+                    "tuner-tune-up"
+                } else if c > 5.0 {
+                    "tuner-tune-down"
+                } else {
+                    "tuner-meter-center"
+                };
+                (
+                    loc.msg(key),
+                    loc.msg_args(
+                        "tuner-pitch-detail",
+                        &[
+                            ("cents", format!("{c:+.0}")),
+                            ("frequency", format!("{:.1}", tuner.frequency.unwrap())),
+                        ],
+                    ),
+                )
+            }
+            None => (
+                loc.msg("tuner-ready"),
+                loc.msg(if rms >= INPUT_THRESHOLD {
+                    "tuner-unclear"
+                } else {
+                    "tuner-instructions"
+                }),
+            ),
+        }
     };
-    let target = loc.msg_args(
-        "tuner-current-target",
-        &[
-            ("number", (tuner.notes.len() - i).to_string()),
-            ("note", midi_to_note(tuner.notes[i] as i32)),
-            ("frequency", format!("{:.1}", midi_to_freq_hz(tuner.notes[i] as f32))),
-        ],
-    );
-    for mut text in &mut readout {
-        let value = format!("{target}\n{status}\n{signal}");
+    for (slot, mut text, mut color) in &mut readout {
+        let value: &str = match slot {
+            Readout::Note => &note,
+            Readout::Target => &target,
+            Readout::Verdict => &verdict,
+            Readout::Detail => &detail,
+            Readout::Signal => &signal,
+        };
         if text.0 != value {
-            text.0 = value;
+            text.0 = value.to_string();
+        }
+        if matches!(slot, Readout::Verdict) {
+            let tint = cents.filter(|c| c.abs() <= MAX_ADJUST_CENTS).map_or(MINT, pitch_color);
+            if color.0 != tint {
+                color.0 = tint;
+            }
         }
     }
-    for (row, children) in &rows {
+    for (row, children, mut background) in &mut rows {
         let n = row.0;
         let Some(&note) = tuner.notes.get(n) else { continue };
+        let surface =
+            if n == i { Color::srgb(0.12, 0.29, 0.28) } else { Color::srgb(0.09, 0.15, 0.19) };
+        if background.0 != surface {
+            background.0 = surface;
+        }
         for child in children.iter() {
             if let Ok((mut text, mut color)) = labels.get_mut(child) {
                 let value = loc
@@ -546,9 +643,9 @@ fn update(
                     text.0 = value;
                 }
                 let tint = if tuner.tuned[n] {
-                    Color::srgb(0.2, 0.9, 0.45)
+                    MINT
                 } else if n == i {
-                    Color::srgb(0.5, 0.83, 1.0)
+                    MINT
                 } else {
                     Color::WHITE
                 };

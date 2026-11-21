@@ -1220,9 +1220,9 @@ tuner-target = String { $number } · { $note } · target { $frequency } Hz
 tuner-row = { $selected } String { $number } · { $note } · { $frequency } Hz { $status }
 tuner-tuned = ✓ In tune
 
-tuner-meter-flat = −50 ¢ · Tune up
+tuner-meter-flat = −50 ¢ · Flat
 tuner-meter-center = In tune
-tuner-meter-sharp = Tune down · +50 ¢
+tuner-meter-sharp = Sharp · +50 ¢
 
 options-mic-level = Microphone input level: { $percent }%
 
@@ -1236,3 +1236,13 @@ tuner-current-target = String { $number } · { $note } · Target { $frequency } 
 tuner-string-tile = { $number } { $marker }
     { $note }
 tuner-other-note = Heard { $note }. Check the selected string.
+tuner-target-caption = String { $number } · Target { $frequency } Hz
+tuner-mic-inactive = Microphone unavailable
+tuner-all-tuned = All strings in tune
+tuner-recheck = Select any string to check it again.
+tuner-check-string = Check the string
+tuner-tune-up = Tune up
+tuner-tune-down = Tune down
+tuner-pitch-detail = { $cents } cents · { $frequency } Hz
+tuner-ready = Ready to tune
+tuner-tuning-label = Tuning
