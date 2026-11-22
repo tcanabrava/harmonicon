@@ -1198,3 +1198,67 @@ song-instrument-viola = Viola
 theme-light = Claro
 theme-dark = Oscuro
 theme-subtitle = Elige la apariencia de todo Harmonicon.
+
+# Afinador de instrumentos
+tuner-title = Afinar instrumentos
+tuner-subtitle = Cuerdas al aire · La₄ = 440 Hz
+tuner-classical = Guitarra clásica
+tuner-electric = Guitarra eléctrica
+tuner-classical-tip = Guitarra clásica: pulsa la cuerda suavemente cerca de la boca.
+tuner-electric-tip = Guitarra eléctrica: usa un sonido limpio, sin efectos.
+tuner-pluck = Toca solo esta cuerda al aire y silencia las demás.
+tuner-string = Cuerda { $number } · { $note }
+tuner-restart = Volver a empezar
+tuner-permission = Permite el acceso al micrófono para afinar.
+tuner-mic-failed = Micrófono no disponible: { $reason }. Revisa la entrada de audio en Opciones.
+tuner-no-mic = No hay ningún micrófono conectado. Revisa la entrada de audio en Opciones.
+tuner-complete = Todas las cuerdas están afinadas. Selecciona una para comprobarla de nuevo.
+tuner-hold = Afinada — deja que siga sonando ({ $percent }%)
+tuner-tighten = Sube la afinación — tensa la cuerda poco a poco
+tuner-loosen = Baja la afinación — afloja la cuerda poco a poco
+tuner-adjust = { $direction } · { $cents } cents · { $frequency } Hz
+tuner-target = Cuerda { $number } · { $note } · objetivo: { $frequency } Hz
+    { $feedback }
+tuner-row = { $selected } Cuerda { $number } · { $note } · { $frequency } Hz { $status }
+tuner-tuned = ✓ Afinada
+tuner-meter-flat = −50 ¢ · Baja
+tuner-meter-center = Afinada
+tuner-meter-sharp = Alta · +50 ¢
+options-mic-level = Nivel de entrada del micrófono: { $percent }%
+tuner-instructions = Selecciona una cuerda. Tócala al aire y deja que suene.
+tuner-input = Micrófono: { $device } · Entrada: { $percent }%
+tuner-listening = Escuchando — toca al aire la cuerda seleccionada cerca del micrófono.
+tuner-unclear = Se ha detectado sonido. Silencia las otras cuerdas y vuelve a tocar.
+guitar-tuning-seven-string = Estándar de 7 cuerdas
+guitar-tuning-eight-string = Estándar de 8 cuerdas
+tuner-current-target = Cuerda { $number } · { $note } · Objetivo: { $frequency } Hz
+tuner-string-tile = { $number } { $marker }
+    { $note }
+tuner-other-note = Nota detectada: { $note }. Comprueba la cuerda seleccionada.
+tuner-target-caption = Cuerda { $number } · Objetivo: { $frequency } Hz
+tuner-mic-inactive = Micrófono no disponible
+tuner-all-tuned = Todas las cuerdas están afinadas
+tuner-recheck = Selecciona cualquier cuerda para comprobarla de nuevo.
+tuner-check-string = Comprueba la cuerda
+tuner-tune-up = Sube la afinación
+tuner-tune-down = Baja la afinación
+tuner-pitch-detail = { $cents } cents · { $frequency } Hz
+tuner-ready = Listo para afinar
+tuner-tuning-label = Afinación
+tuner-peg-caption = Selecciona una clavija
+tuner-tighten-peg = Demasiado baja · Tensa la cuerda
+tuner-loosen-peg = Demasiado alta · Afloja la cuerda
+tuner-capo-label = Cejilla
+tuner-layout-label = Pala
+tuner-layout-inline = En línea
+tuner-layout-split = A ambos lados
+tuner-layout-reverse = En línea invertida
+
+# Digitación de la mano que pisa las cuerdas
+editor-fretting-finger = Dedo que pisa la cuerda
+editor-finger-index = 1 · Índice
+editor-finger-middle = 2 · Corazón
+editor-finger-ring = 3 · Anular
+editor-finger-little = 4 · Meñique
+editor-barre = Cejilla con el dedo
+editor-no-barre = Sin cejilla con el dedo

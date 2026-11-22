@@ -1196,3 +1196,67 @@ song-instrument-viola = Viola
 theme-light = Claro
 theme-dark = Escuro
 theme-subtitle = Escolha a aparência de todo o Harmonicon.
+
+# Afinador de instrumentos
+tuner-title = Afinar instrumentos
+tuner-subtitle = Cordas soltas · Lá₄ = 440 Hz
+tuner-classical = Violão clássico
+tuner-electric = Guitarra elétrica
+tuner-classical-tip = Violão clássico: toque a corda de leve perto da boca do violão.
+tuner-electric-tip = Guitarra elétrica: use um som limpo, sem efeitos.
+tuner-pluck = Toque apenas esta corda solta e abafe as outras.
+tuner-string = Corda { $number } · { $note }
+tuner-restart = Recomeçar
+tuner-permission = Permita o acesso ao microfone para afinar.
+tuner-mic-failed = Microfone indisponível: { $reason }. Verifique a entrada de áudio em Opções.
+tuner-no-mic = Nenhum microfone conectado. Verifique a entrada de áudio em Opções.
+tuner-complete = Todas as cordas estão afinadas. Selecione uma corda para conferi-la novamente.
+tuner-hold = Afinada — deixe a corda soar ({ $percent }%)
+tuner-tighten = Suba a afinação — aperte a corda aos poucos
+tuner-loosen = Baixe a afinação — afrouxe a corda aos poucos
+tuner-adjust = { $direction } · { $cents } cents · { $frequency } Hz
+tuner-target = Corda { $number } · { $note } · alvo: { $frequency } Hz
+    { $feedback }
+tuner-row = { $selected } Corda { $number } · { $note } · { $frequency } Hz { $status }
+tuner-tuned = ✓ Afinada
+tuner-meter-flat = −50 ¢ · Baixa
+tuner-meter-center = Afinada
+tuner-meter-sharp = Alta · +50 ¢
+options-mic-level = Nível de entrada do microfone: { $percent }%
+tuner-instructions = Selecione uma corda. Toque-a solta e deixe soar.
+tuner-input = Microfone: { $device } · Entrada: { $percent }%
+tuner-listening = Ouvindo — toque a corda selecionada solta perto do microfone.
+tuner-unclear = Som detectado. Abafe as outras cordas e toque novamente.
+guitar-tuning-seven-string = Padrão de 7 cordas
+guitar-tuning-eight-string = Padrão de 8 cordas
+tuner-current-target = Corda { $number } · { $note } · Alvo: { $frequency } Hz
+tuner-string-tile = { $number } { $marker }
+    { $note }
+tuner-other-note = Nota detectada: { $note }. Confira a corda selecionada.
+tuner-target-caption = Corda { $number } · Alvo: { $frequency } Hz
+tuner-mic-inactive = Microfone indisponível
+tuner-all-tuned = Todas as cordas estão afinadas
+tuner-recheck = Selecione qualquer corda para conferi-la novamente.
+tuner-check-string = Confira a corda
+tuner-tune-up = Suba a afinação
+tuner-tune-down = Baixe a afinação
+tuner-pitch-detail = { $cents } cents · { $frequency } Hz
+tuner-ready = Pronto para afinar
+tuner-tuning-label = Afinação
+tuner-peg-caption = Selecione uma tarraxa
+tuner-tighten-peg = Muito baixa · Aperte a corda
+tuner-loosen-peg = Muito alta · Afrouxe a corda
+tuner-capo-label = Capotraste
+tuner-layout-label = Cabeça do instrumento
+tuner-layout-inline = Em linha
+tuner-layout-split = Nos dois lados
+tuner-layout-reverse = Em linha invertida
+
+# Digitação da mão que pressiona as cordas
+editor-fretting-finger = Dedo que pressiona a corda
+editor-finger-index = 1 · Indicador
+editor-finger-middle = 2 · Médio
+editor-finger-ring = 3 · Anelar
+editor-finger-little = 4 · Mínimo
+editor-barre = Pestana
+editor-no-barre = Sem pestana
