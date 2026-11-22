@@ -9,7 +9,7 @@ use bevy::ui_widgets::Activate;
 use bevy::ui_widgets::Button as WidgetButton;
 
 pub fn color_default() -> Color {
-    Color::srgb(0.14, 0.14, 0.22)
+    harmonicon_platform::theme::Appearance::Dark.palette().control
 }
 
 /// Background for a "this option is currently selected" choice button —
@@ -125,18 +125,25 @@ fn mouse_drag_end(ev: On<PointerDragEnd>, mut states: Query<&mut ButtonInteracti
 /// hover/press observers alike, since both write one of those two.
 /// Registered once app-wide by [`ButtonVisualsPlugin`].
 fn apply_button_visuals(
-    mut buttons: Query<
-        (&BaseButtonColor, &ButtonInteractionState, &mut BackgroundColor),
-        Or<(Changed<BaseButtonColor>, Changed<ButtonInteractionState>)>,
-    >,
+    theme: Option<Res<harmonicon_platform::theme::LoadedTheme>>,
+    mut buttons: Query<(Ref<BaseButtonColor>, Ref<ButtonInteractionState>, &mut BackgroundColor)>,
 ) {
+    let palette = theme
+        .as_deref()
+        .map(|theme| theme.palette())
+        .unwrap_or_else(|| harmonicon_platform::theme::Appearance::Dark.palette());
+    let theme_changed = theme.as_ref().is_some_and(|theme| theme.is_changed());
     for (base, interaction, mut bg) in &mut buttons {
+        if !theme_changed && !base.is_changed() && !interaction.is_changed() {
+            continue;
+        }
+        let base = if base.0 == color_default() { palette.control } else { base.0 };
         let color = if interaction.pressed {
-            darken(base.0)
+            darken(base)
         } else if interaction.hovered {
-            brighten(base.0)
+            brighten(base)
         } else {
-            base.0
+            base
         };
         if bg.0 != color {
             bg.0 = color;

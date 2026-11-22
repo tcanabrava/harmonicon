@@ -18,7 +18,7 @@ pub(crate) fn setup_main_menu(
     loc: Res<Localization>,
 ) {
     let (root, _header, _page_root) =
-        spawn_menu_root(&mut commands, &loc.msg("app-title"), None, &theme, "Main");
+        spawn_menu_root(&mut commands, &loc.msg("app-title"), None, &theme);
     spawn_button(
         &mut commands,
         root,

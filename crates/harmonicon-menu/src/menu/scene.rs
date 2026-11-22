@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 
 //! Shared menu scene helpers: the full-screen root container every page
-//! spawns into (with its background image), the shared button helper,
+//! spawns into (with its canvas color), the shared button helper,
 //! and the `MenuRoot` marker `cleanup_menu` despawns on page exit.
 //!
 //! Every page follows the same top-level shape:
@@ -35,7 +35,7 @@ use harmonicon_ui::dialogs::page_chrome::{header_scene, heading_scene, title_col
 // Re-exported so this module stays the one place a *menu page* reaches for
 // page chrome; the definitions live in `dialogs` because non-menu screens
 // need them too (see `dialogs::page_chrome`).
-use harmonicon_platform::theme::LoadedTheme;
+use harmonicon_platform::theme::{LoadedTheme, ThemeSurface};
 pub use harmonicon_ui::dialogs::page_chrome::spawn_back_button;
 use harmonicon_ui::dialogs::scroll_area::spawn_scroll_area;
 
@@ -49,14 +49,10 @@ const SCROLLBAR_THUMB_COLOR: Color = Color::srgba(1.0, 1.0, 1.0, 0.35);
 #[derive(Component, Default, Clone)]
 pub struct MenuRoot;
 
-fn menu_bg() -> Color {
-    Color::srgb(0.05, 0.05, 0.08)
-}
-
 /// The menu root container as a `bsn!` [`Scene`]: a plain full-screen
 /// column — `header`/`body` (see [`spawn_menu_root`]) own their own
 /// alignment, so the root itself doesn't need to center anything.
-fn menu_root_scene() -> impl Scene {
+fn menu_root_scene(canvas: Color) -> impl Scene {
     bsn! {
         Node {
             width: {Val::Percent(100.0)},
@@ -74,7 +70,7 @@ fn menu_root_scene() -> impl Scene {
             min_height: {Val::Px(0.0)},
             flex_direction: {FlexDirection::Column},
         }
-        BackgroundColor({menu_bg()})
+        BackgroundColor({canvas})
         MenuRoot
     }
 }
@@ -123,7 +119,7 @@ fn body_scene() -> impl Scene {
 /// Shared scaffolding between [`spawn_menu_root`] and
 /// [`spawn_menu_root_plain`] — the full-screen root, header (title/
 /// subtitle, plus whatever back button a caller adds via
-/// [`spawn_back_button`]), background image, and `TabGroup`. Callers attach
+/// [`spawn_back_button`]), canvas color, and `TabGroup`. Callers attach
 /// their own `body` child of the returned `page_root` immediately after —
 /// see [`body_scene`] for the flex shape a body should follow to fill the
 /// remaining space correctly. Returns `(page_root, header)`.
@@ -132,9 +128,11 @@ fn spawn_menu_chrome(
     title: &str,
     subtitle: Option<&str>,
     theme: &LoadedTheme,
-    menu_id: &str,
 ) -> (Entity, Entity) {
-    let root = commands.spawn_scene(menu_root_scene()).id();
+    let root = commands
+        .spawn_scene(menu_root_scene(theme.palette().canvas))
+        .insert(ThemeSurface::Canvas)
+        .id();
 
     let title_column = if let Some(sub) = subtitle {
         commands
@@ -146,25 +144,6 @@ fn spawn_menu_chrome(
     let header = commands.spawn_scene(header_scene()).id();
     commands.entity(header).add_child(title_column);
     commands.entity(root).add_child(header);
-
-    // Background image behind all other content. Inserted at index 0 so it stays
-    // the lowest layer regardless of when this command is applied.
-    if let Some(bg) = theme.background_for(menu_id) {
-        let bg_layer = commands
-            .spawn((
-                ImageNode::new(bg.clone()),
-                Node {
-                    position_type: PositionType::Absolute,
-                    left: Val::Px(0.0),
-                    right: Val::Px(0.0),
-                    top: Val::Px(0.0),
-                    bottom: Val::Px(0.0),
-                    ..default()
-                },
-            ))
-            .id();
-        commands.entity(root).insert_children(0, &[bg_layer]);
-    }
 
     // Scopes Tab/Shift+Tab cycling to this page's header (its Back button)
     // and body content together — on `root`, not just `content`, since the
@@ -197,9 +176,8 @@ pub fn spawn_menu_root(
     title: &str,
     subtitle: Option<&str>,
     theme: &LoadedTheme,
-    menu_id: &str,
 ) -> (Entity, Entity, Entity) {
-    let (root, header) = spawn_menu_chrome(commands, title, subtitle, theme, menu_id);
+    let (root, header) = spawn_menu_chrome(commands, title, subtitle, theme);
 
     let body = commands.spawn_scene(body_scene()).id();
     commands.entity(root).add_child(body);
@@ -224,9 +202,8 @@ pub fn spawn_menu_root_plain(
     title: &str,
     subtitle: Option<&str>,
     theme: &LoadedTheme,
-    menu_id: &str,
 ) -> (Entity, Entity, Entity) {
-    let (root, header) = spawn_menu_chrome(commands, title, subtitle, theme, menu_id);
+    let (root, header) = spawn_menu_chrome(commands, title, subtitle, theme);
 
     let body = commands.spawn_scene(body_scene()).id();
     commands.entity(root).add_child(body);

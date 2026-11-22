@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: MIT
 
-//! Scrolling credits over the theme's Credits background.
+//! Scrolling credits on a plain background.
 
 use bevy::{input_focus::tab_navigation::TabGroup, prelude::*, ui_widgets::Activate};
 use pulldown_cmark::{Event, HeadingLevel, Options, Parser, Tag, TagEnd};
 
 use harmonicon_platform::localization::{Localization, LocalizationExt};
-use harmonicon_platform::theme::LoadedTheme;
+use harmonicon_platform::theme::ThemeSurface;
 
 use crate::menu::scene::spawn_back_button;
 use harmonicon_app::app::AppState;
@@ -47,19 +47,7 @@ impl Plugin for CreditsPlugin {
 
 // ── Lifecycle ─────────────────────────────────────────────────────────────────
 
-fn setup(mut commands: Commands, loc: Res<Localization>, theme: Res<LoadedTheme>) {
-    if let Some(background) = theme.background_for("Credits") {
-        commands.spawn((
-            Node {
-                position_type: PositionType::Absolute,
-                width: Val::Percent(100.0),
-                height: Val::Percent(100.0),
-                ..default()
-            },
-            ImageNode::new(background.clone()),
-            CreditsRoot,
-        ));
-    }
+fn setup(mut commands: Commands, loc: Res<Localization>) {
     spawn_ui(&mut commands, &loc);
 }
 
@@ -72,7 +60,7 @@ fn cleanup(mut commands: Commands, roots: Query<Entity, With<CreditsRoot>>) {
 // ── UI overlay ────────────────────────────────────────────────────────────────
 
 fn spawn_ui(commands: &mut Commands, loc: &Localization) {
-    // Full-screen dark overlay that clips the scrolling text.
+    // Centered text column clipped to the viewport.
     let overlay = commands
         .spawn((
             Node {
@@ -84,7 +72,7 @@ fn spawn_ui(commands: &mut Commands, loc: &Localization) {
                 overflow: Overflow::clip_y(),
                 ..default()
             },
-            BackgroundColor(Color::srgba(0.02, 0.02, 0.05, 0.82)),
+            ThemeSurface::Panel,
             GlobalZIndex(10),
             CreditsRoot,
         ))

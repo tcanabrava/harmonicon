@@ -28,7 +28,7 @@ pub(crate) fn setup_play_menu(
     loc: Res<Localization>,
 ) {
     let (root, header, _page_root) =
-        spawn_menu_root(&mut commands, &loc.msg("menu-play"), None, &theme, "Play");
+        spawn_menu_root(&mut commands, &loc.msg("menu-play"), None, &theme);
     spawn_button(&mut commands, root, &loc.msg("play-song"), open_song_picker);
     spawn_button(
         &mut commands,

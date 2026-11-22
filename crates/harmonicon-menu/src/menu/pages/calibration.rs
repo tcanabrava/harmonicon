@@ -546,7 +546,7 @@ fn setup_ui(mut commands: Commands, loc: Res<Localization>) {
                 row_gap: Val::Px(20.0),
                 ..default()
             },
-            BackgroundColor(Color::srgb(0.05, 0.05, 0.08)),
+            harmonicon_platform::theme::ThemeSurface::Canvas,
             TabGroup::default(),
             CalRoot,
         ))

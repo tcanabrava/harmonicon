@@ -137,13 +137,6 @@ participant "load_inner" as loader
 participant "load_context" as ctx
 
 loader -> ctx : parse + schema-validate\nthe .harpchart itself (hard dependency)
-loader -> ctx : read_asset_bytes(background.png)
-alt found
-  ctx --> loader : load::<Image>(...)
-else missing
-  loader -> loader : generate_background_image(seed)\n(in-memory gradient, keyed by artist+title)
-end
-
 loader -> ctx : read_asset_bytes(elements.png)
 alt found
   ctx --> loader : load::<Image>(...)

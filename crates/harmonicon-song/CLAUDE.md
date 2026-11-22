@@ -105,9 +105,7 @@ load-bearing about *this* crate.
     `*.harpchart` file under its `song/` subfolder — any filename, not a
     fixed `chart.harpchart` — and `song::loader::SongChartLoader` mirrors
     that tolerance for everything else a song folder can ship:
-    `background.png` (falls back to a generated in-memory gradient, seeded
-    from the chart's own artist/title so different art-less songs still
-    look distinct — `generate_background_image`), `elements.png` (unused by
+    `elements.png` (unused by
     gameplay today; falls back to `Handle::default()`), `song/music.ogg`
     — falling back to `song/music.wav`, then `song/music.mid` (see
     `SongManifest::backing_stems`, further below, for what that last one

@@ -1195,3 +1195,6 @@ bowed-heard = Se oye { $note }
 note-trainer-instrument-title = Entrenamiento de notas — { $instrument }
 
 song-instrument-viola = Viola
+theme-light = Claro
+theme-dark = Oscuro
+theme-subtitle = Elige la apariencia de todo Harmonicon.

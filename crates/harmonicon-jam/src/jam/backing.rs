@@ -908,31 +908,17 @@ pub fn build_generated_manifest(
     genre: Genre,
     energy: BandEnergy,
     seed: u64,
-    background: Handle<Image>,
     elements: Handle<Image>,
     sources: &mut Assets<AudioSource>,
 ) -> SongManifest {
     let rendered = render_generated_backing(key, bpm, progression, genre, energy, seed);
-    assemble_generated_manifest(
-        rendered,
-        key,
-        bpm,
-        progression,
-        position,
-        genre,
-        background,
-        elements,
-        sources,
-    )
+    assemble_generated_manifest(rendered, key, bpm, progression, position, genre, elements, sources)
 }
 
 /// Registers each rendered stem as an `AudioSource` and assembles the chart
 /// around them. `key`/`bpm`/`progression`/`genre` must be the values the
-/// backing was rendered with. `background`/`elements` are the caller's
-/// choice of placeholder art — Jam Session never reads `elements` at all;
-/// `background` paints behind the hole map/12-bar grid (see
-/// `jam::session::setup`), so a theme's generic `default_background` is the
-/// natural choice.
+/// backing was rendered with. `elements` is the caller's
+/// choice of placeholder art for the manifest.
 pub fn assemble_generated_manifest(
     rendered: RenderedBacking,
     key: &str,
@@ -940,7 +926,6 @@ pub fn assemble_generated_manifest(
     progression: Progression,
     position: Position,
     genre: Genre,
-    background: Handle<Image>,
     elements: Handle<Image>,
     sources: &mut Assets<AudioSource>,
 ) -> SongManifest {
@@ -956,7 +941,6 @@ pub fn assemble_generated_manifest(
     SongManifest {
         path: PathBuf::from(format!("generated/{key}")),
         chart: generated_chart(key, bpm, progression, position, genre, music_duration_secs),
-        background,
         music: None,
         backing_stems: Some(backing_stems),
         music_duration_secs,
@@ -1376,7 +1360,6 @@ mod tests {
             Genre::Blues,
             BandEnergy::Medium,
             42,
-            Handle::default(),
             Handle::default(),
             &mut sources,
         );

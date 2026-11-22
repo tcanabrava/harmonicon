@@ -1263,3 +1263,6 @@ editor-finger-ring = 3 · Ring
 editor-finger-little = 4 · Little
 editor-barre = Barre
 editor-no-barre = No barre
+theme-light = Light
+theme-dark = Dark
+theme-subtitle = Choose the appearance used throughout Harmonicon.

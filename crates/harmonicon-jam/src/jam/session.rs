@@ -157,7 +157,7 @@ pub fn setup(
                 flex_direction: FlexDirection::Column,
                 ..default()
             },
-            ImageNode::new(manifest.background.clone()),
+            harmonicon_platform::theme::ThemeSurface::Canvas,
             // Background painted first (this node itself), Main Layout second
             // — everything else here is a child, so it always paints above
             // the background. The song-progress bar (`BAR_Z_INDEX`) still
@@ -167,16 +167,6 @@ pub fn setup(
             GameplayRoot,
         ))
         .with_children(|root| {
-            // Dark overlay for legibility.
-            root.spawn_empty().apply_scene(bsn! {
-                Node {
-                    position_type: {PositionType::Absolute},
-                    width: {Val::Percent(100.0)},
-                    height: {Val::Percent(100.0)},
-                }
-                BackgroundColor({Color::srgba(0.04, 0.04, 0.06, 0.70)})
-            });
-
             // The two side-by-side columns below, wrapped in their own
             // Row-direction, flex-growing container so the MIDI-track mute
             // row (added after this closes) can sit below both of them as a
@@ -316,15 +306,14 @@ pub fn setup(
                             });
                         });
                         if harp.is_some() {
-                        left.spawn(Node {
-                            flex_direction: FlexDirection::Row,
-                            align_items: AlignItems::Center,
-                            column_gap: Val::Px(8.0),
-                            ..default()
-                        })
-                        .with_children(|row| {
-                            row.spawn_empty().apply_scene(
-                                button::small(
+                            left.spawn(Node {
+                                flex_direction: FlexDirection::Row,
+                                align_items: AlignItems::Center,
+                                column_gap: Val::Px(8.0),
+                                ..default()
+                            })
+                            .with_children(|row| {
+                                row.spawn_empty().apply_scene(button::small(
                                     &loc.msg("jam-call-response-button"),
                                     |_: On<Activate>,
                                      mut enabled: ResMut<
@@ -332,40 +321,43 @@ pub fn setup(
                                     >| {
                                         enabled.0 = !enabled.0;
                                     },
-                                ),
-                            );
-                            row.spawn_empty().apply_scene(bsn! {
-                                Text({String::from(loc.msg("jam-call-response-off"))})
-                                TextFont { font_size: {FontSize::Px(15.0)} }
-                                TextColor({Color::srgb(0.70, 0.70, 0.80)})
-                                ~{super::call_response::CallResponseLabel}
+                                ));
+                                row.spawn_empty().apply_scene(bsn! {
+                                    Text({String::from(loc.msg("jam-call-response-off"))})
+                                    TextFont { font_size: {FontSize::Px(15.0)} }
+                                    TextColor({Color::srgb(0.70, 0.70, 0.80)})
+                                    ~{super::call_response::CallResponseLabel}
+                                });
                             });
-                        });
-                        // The one musical control over the calls: how busy
-                        // they are. A cycle button, not a level picker.
-                        left.spawn(Node {
-                            flex_direction: FlexDirection::Row,
-                            align_items: AlignItems::Center,
-                            column_gap: Val::Px(8.0),
-                            ..default()
-                        })
-                        .with_children(|row| {
-                            row.spawn_empty().apply_scene(button::small(
-                                &loc.msg("jam-call-density-button"),
-                                |_: On<Activate>,
-                                 mut density: ResMut<super::call_response::JamCallDensity>| {
-                                    density.0 = density.0.next();
-                                },
-                            ));
-                            row.spawn_empty().apply_scene(bsn! {
-                                Text({String::from(
-                                    loc.msg(super::call_response::density_key(call_density.0)),
-                                )})
-                                TextFont { font_size: {FontSize::Px(15.0)} }
-                                TextColor({Color::srgb(0.70, 0.70, 0.80)})
-                                ~{super::call_response::CallDensityLabel}
+                            // The one musical control over the calls: how busy
+                            // they are. A cycle button, not a level picker.
+                            left.spawn(Node {
+                                flex_direction: FlexDirection::Row,
+                                align_items: AlignItems::Center,
+                                column_gap: Val::Px(8.0),
+                                ..default()
+                            })
+                            .with_children(|row| {
+                                row.spawn_empty().apply_scene(
+                                    button::small(
+                                        &loc.msg("jam-call-density-button"),
+                                        |_: On<Activate>,
+                                         mut density: ResMut<
+                                            super::call_response::JamCallDensity,
+                                        >| {
+                                            density.0 = density.0.next();
+                                        },
+                                    ),
+                                );
+                                row.spawn_empty().apply_scene(bsn! {
+                                    Text({String::from(
+                                        loc.msg(super::call_response::density_key(call_density.0)),
+                                    )})
+                                    TextFont { font_size: {FontSize::Px(15.0)} }
+                                    TextColor({Color::srgb(0.70, 0.70, 0.80)})
+                                    ~{super::call_response::CallDensityLabel}
+                                });
                             });
-                        });
                         }
                         // Only a generated jam has a band that can listen.
                         if generated.is_some() {

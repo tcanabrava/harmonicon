@@ -110,7 +110,7 @@ pub(super) fn spawn_highway(hw: &mut ChildSpawnerCommands, layout: &LaneLayout, 
         if h > 0 {
             hw.spawn((
                 placed(axis, 0.0, full, start_pct, Val::Px(1.0)),
-                BackgroundColor(Color::srgba(1.0, 1.0, 1.0, 0.08)),
+                harmonicon_platform::theme::ThemeSurface::Divider,
             ));
         }
     }
@@ -119,15 +119,15 @@ pub(super) fn spawn_highway(hw: &mut ChildSpawnerCommands, layout: &LaneLayout, 
     // edge that is the actual judgment instant.
     hw.spawn((
         placed(axis, 0.0, Val::Percent(HIT_H_PCT), 0.0, full),
-        BackgroundColor(Color::srgba(1.0, 1.0, 0.55, 0.14)),
+        harmonicon_platform::theme::ThemeSurface::HitZone,
     ));
-    // Full width, and warmer and heavier than a beat guide. This is the one
+    // Full width, in the palette accent, and heavier than a beat guide. This is the one
     // line on the highway that means "now"; the guides crossing it are
     // white, thinner and far dimmer, so the two can't be mistaken for each
     // other as they scroll past.
     hw.spawn((
         placed(axis, HIT_H_PCT, Val::Px(3.0), 0.0, full),
-        BackgroundColor(Color::srgba(1.0, 0.98, 0.62, 0.85)),
+        harmonicon_platform::theme::ThemeSurface::HitLine,
     ));
 
     // A horizontal highway names its rows where tab does, at their start:

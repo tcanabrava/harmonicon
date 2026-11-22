@@ -44,7 +44,7 @@ package in the layering, and the only cdylib.
 ## Assets live inside the APK
 
 An APK's assets are inside the archive, reachable only through the JNI
-`AssetManager`. `std::fs::read_dir("assets/themes")` returns `Err`, so the
+`AssetManager`. `std::fs::read_dir("assets/notes/2d")` returns `Err`, so the
 runtime scans find nothing at all. (Songs and lessons are not affected:
 they are packs downloaded into the app's private data directory, which is
 an ordinary filesystem — see [Content Packs](content-packs.md).)

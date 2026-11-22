@@ -22,7 +22,7 @@ pub(crate) fn setup_note_trainer_menu(
     loc: Res<Localization>,
 ) {
     let (root, header, _page_root) =
-        spawn_menu_root(&mut commands, &loc.msg("note-trainer"), None, &theme, "NoteTrainerMenu");
+        spawn_menu_root(&mut commands, &loc.msg("note-trainer"), None, &theme);
     spawn_button(
         &mut commands,
         root,

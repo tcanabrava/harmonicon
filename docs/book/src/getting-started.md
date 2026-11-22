@@ -71,14 +71,12 @@ accurate.
 
 Harmonicon also reads from `~/Harmonicon` (a folder in your home
 directory) as another source of songs, lessons and themes, alongside the
-ones it downloads — drop a song folder or a theme folder in there and it shows
-up in the song list / theme picker without needing to reinstall anything.
+ones it downloads. Drop a song folder in there and it shows up in the
+song list.
 See [Song Editor](song-editor.md) for how to author a chart of your own.
 
 A song folder only strictly needs one thing: a `.harpchart` file (any
 filename) inside its `song/` subfolder. Everything else is optional —
-`background.png`, `song/*.ogg` for the backing track, and the `2d/` note
-art folder — Harmonicon fills in a generated background, plays no backing
-track, and falls back to the selected note theme respectively for
-whatever's missing, rather than refusing to load the song. (A `3d/` folder
-is accepted but ignored.)
+`song/*.ogg` for the backing track and the `2d/` note art folder. If those
+are absent, the chart plays without backing and uses the selected note
+theme.

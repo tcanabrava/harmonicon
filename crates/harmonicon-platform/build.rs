@@ -44,7 +44,6 @@ fn generate_bundled_asset_manifest() {
     }
 
     println!("cargo:rerun-if-env-changed=HARMONICON_SONGS_DIR");
-    println!("cargo:rerun-if-changed=../../assets/themes");
     println!("cargo:rerun-if-changed=../../assets/notes");
 
     let out_dir = std::env::var("OUT_DIR").expect("OUT_DIR not set by cargo");
@@ -67,7 +66,6 @@ fn generate_bundled_asset_manifest() {
     } else {
         Vec::new()
     };
-    let themes = scan_theme_dir_names(Path::new("../../assets/themes"));
     let notes_2d = scan_ext_stems(Path::new("../../assets/notes/2d"), "png");
 
     let mut out = String::new();
@@ -80,7 +78,6 @@ fn generate_bundled_asset_manifest() {
     }
     out.push_str("];\n\n");
 
-    write_str_slice(&mut out, "THEMES", &themes);
     write_str_slice(&mut out, "NOTE_THEMES_2D", &notes_2d);
 
     std::fs::write(&dest, out).expect("failed to write asset manifest");
@@ -153,22 +150,6 @@ fn scan_songs_for_manifest(
     }
     out.sort();
     out
-}
-
-/// Names of subfolders under `root` that contain a `theme.json` — mirrors
-/// `assets_management::scan_theme_names`.
-fn scan_theme_dir_names(root: &Path) -> Vec<String> {
-    let Ok(entries) = std::fs::read_dir(root) else {
-        return Vec::new();
-    };
-    let mut names: Vec<String> = entries
-        .flatten()
-        .filter(|e| e.file_type().map(|t| t.is_dir()).unwrap_or(false))
-        .filter(|e| e.path().join("theme.json").exists())
-        .map(|e| e.file_name().to_string_lossy().into_owned())
-        .collect();
-    names.sort();
-    names
 }
 
 /// `<name>` stems of files with extension `ext` directly under `dir` —

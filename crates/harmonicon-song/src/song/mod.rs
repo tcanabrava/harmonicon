@@ -20,10 +20,6 @@ use bevy::{asset::AssetPath, audio::AudioSource, image::Image, prelude::*};
 pub struct SongManifest {
     pub path: PathBuf,
     pub chart: HarpChart,
-    /// Always present — a generated placeholder gradient when the song
-    /// doesn't ship its own `background.png` (see `song::loader`), so this
-    /// never needs to be optional.
-    pub background: Handle<Image>,
     /// `None` when the song doesn't ship a `song/*.ogg`/`*.wav` — a
     /// scored/jam session then plays no backing track (the chart-timed
     /// clock free-runs instead of anchoring to a sink; see `gameplay::
@@ -91,7 +87,6 @@ pub fn training_manifest(chart: HarpChart) -> SongManifest {
     SongManifest {
         path: PathBuf::from(format!("training/{}", chart.song.title)),
         chart,
-        background: Handle::default(),
         music: None,
         backing_stems: None,
         music_duration_secs: 0.0,

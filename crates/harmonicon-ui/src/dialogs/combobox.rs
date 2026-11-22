@@ -37,6 +37,7 @@ use bevy::ui_widgets::popover::{Popover, PopoverAlign, PopoverPlacement, Popover
 use bevy::ui_widgets::{ControlOrientation, ScrollArea, Scrollbar, ScrollbarThumb};
 
 use super::button;
+use harmonicon_platform::theme::ThemeSurface;
 
 const PANEL_BG: Color = Color::srgba(0.08, 0.08, 0.12, 0.98);
 const PANEL_BORDER: Color = Color::srgb(0.30, 0.30, 0.40);
@@ -188,7 +189,11 @@ pub fn spawn_combobox<M: 'static>(
     // nested in a `with_children` closure) so its `Entity` id is available
     // below, for the dropdown list to parent itself to directly — see the
     // `list` comment for why.
-    let toggle = commands.spawn_empty().apply_scene(toggle_scene()).insert(ComboboxRoot(root)).id();
+    let toggle = commands
+        .spawn_empty()
+        .apply_scene(toggle_scene())
+        .insert((ComboboxRoot(root), ThemeSurface::Control))
+        .id();
     commands.entity(row).add_child(toggle);
     commands.entity(toggle).with_children(|t| {
         t.spawn_empty()
@@ -250,6 +255,7 @@ pub fn spawn_combobox<M: 'static>(
             ~{BorderColor::all(PANEL_BORDER)}
             GlobalZIndex(250)
         })
+        .insert(ThemeSurface::Panel)
         .insert(Popover {
             positions: vec![
                 PopoverPlacement {
@@ -490,14 +496,14 @@ fn item_over(
     ev: On<PointerOver>,
     items: Query<&ComboboxItemButton>,
     values: Query<&ComboboxValue>,
-    mut colors: Query<&mut BackgroundColor>,
+    mut surfaces: Query<&mut ThemeSurface>,
 ) {
     let Ok(item) = items.get(ev.entity) else {
         return;
     };
     let is_selected = values.get(item.root).is_ok_and(|v| v.0 == item.value);
-    if !is_selected && let Ok(mut bg) = colors.get_mut(ev.entity) {
-        *bg = BackgroundColor(button::CHOICE_HOVER);
+    if !is_selected && let Ok(mut surface) = surfaces.get_mut(ev.entity) {
+        *surface = ThemeSurface::Hover;
     }
 }
 
@@ -505,14 +511,14 @@ fn item_out(
     ev: On<PointerOut>,
     items: Query<&ComboboxItemButton>,
     values: Query<&ComboboxValue>,
-    mut colors: Query<&mut BackgroundColor>,
+    mut surfaces: Query<&mut ThemeSurface>,
 ) {
     let Ok(item) = items.get(ev.entity) else {
         return;
     };
     let is_selected = values.get(item.root).is_ok_and(|v| v.0 == item.value);
-    if !is_selected && let Ok(mut bg) = colors.get_mut(ev.entity) {
-        *bg = BackgroundColor(button::color_default());
+    if !is_selected && let Ok(mut surface) = surfaces.get_mut(ev.entity) {
+        *surface = ThemeSurface::Control;
     }
 }
 
@@ -521,19 +527,22 @@ fn item_out(
 /// writing to it directly (e.g. the mic falling back to a different device).
 fn sync_combobox_visuals(
     changed: Query<(Entity, &ComboboxValue), Changed<ComboboxValue>>,
-    mut items: Query<(&ComboboxItemButton, &mut BackgroundColor)>,
+    mut items: Query<(Entity, &ComboboxItemButton, &mut BackgroundColor)>,
+    mut commands: Commands,
     mut toggle_labels: Query<(&ComboboxToggleLabel, &mut Text)>,
 ) {
     for (root, value) in &changed {
-        for (item, mut bg) in &mut items {
+        for (entity, item, mut bg) in &mut items {
             if item.root != root {
                 continue;
             }
-            bg.0 = if item.value == value.0 {
-                button::CHOICE_SELECTED
+            let selected = item.value == value.0;
+            commands.entity(entity).insert(if selected {
+                ThemeSurface::Selected
             } else {
-                button::color_default()
-            };
+                ThemeSurface::Control
+            });
+            bg.0 = if selected { button::CHOICE_SELECTED } else { button::color_default() };
         }
         for (label, mut text) in &mut toggle_labels {
             if label.0 != root {

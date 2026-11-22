@@ -153,7 +153,6 @@ fn setup_options_menu(
         &loc.msg("options-title"),
         Some(&loc.msg("options-subtitle-audio")),
         &theme,
-        "Options",
     );
 
     spawn_back_button(

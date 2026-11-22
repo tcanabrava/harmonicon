@@ -609,12 +609,7 @@ load-bearing about *this* crate.
   "1 & a". Note `triplet_line` is the one `SongEditorColors` field whose
   weight matters *relative to nothing else on screen*: in Shuffle and
   Triplet it is the beat's only sub-beat line, so it belongs a shade under
-  `half_line`, not brighter. Both bundled `theme.json`s must define it —
-  `SongEditorColors` is `#[serde(default)]`, so a field a theme file omits
-  silently takes the Rust default while its siblings come from the file,
-  and `assets/themes/theme_schema.dtd.json` is `additionalProperties:
-  false`, so a new colour needs an entry there too or every theme fails
-  `asset_layout::theme_json_validates_against_schema`.
+  `half_line`, not brighter. Its color comes from `LoadedTheme::song_editor_colors`.
 - **The grid's beat ruler is laid out in ticks, and numbers bars**
   (`grid::ruler_label`, driven by `EditorState::ticks_per_bar`/
   `ticks_per_signature_beat`). A bar line's label is the 1-based *bar*

@@ -172,18 +172,8 @@ pub fn setup(
             }
             GlobalZIndex(1)
         })
-        .insert((ImageNode::new(manifest.background.clone()), GameplayRoot))
+        .insert((harmonicon_platform::theme::ThemeSurface::Canvas, GameplayRoot))
         .with_children(|root| {
-            // Dark overlay
-            root.spawn_empty().apply_scene(bsn! {
-                Node {
-                    position_type: {PositionType::Absolute},
-                    width: {Val::Percent(100.0)},
-                    height: {Val::Percent(100.0)},
-                }
-                BackgroundColor({Color::srgba(0.04, 0.04, 0.06, 0.70)})
-            });
-
             // ── Left panel: note highway + harmonica ─────────────────────────
             let left_top_padding = if compact {
                 8.0
@@ -220,7 +210,7 @@ pub fn setup(
                                 overflow: Overflow::clip(),
                                 ..default()
                             },
-                            BackgroundColor(Color::srgb(0.06, 0.06, 0.09)),
+                            harmonicon_platform::theme::ThemeSurface::Inset,
                             NoteHighway,
                         ))
                         .with_children(|hw| {

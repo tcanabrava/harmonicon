@@ -271,8 +271,7 @@ pub(crate) fn setup_lesson_tree(
     // `spawn_menu_root` scrolls vertically only, and this canvas outgrows
     // any window in both directions once every unit's cluster is laid out
     // beside the last.
-    let (root, header, _page_root) =
-        spawn_menu_root_plain(&mut commands, &title, None, &theme, "LessonTree");
+    let (root, header, _page_root) = spawn_menu_root_plain(&mut commands, &title, None, &theme);
 
     if lessons.0.is_empty() {
         commands.entity(root).with_children(|parent| {

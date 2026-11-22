@@ -1,24 +1,17 @@
 // SPDX-License-Identifier: MIT
 
-//! Theme selection with a preview image for the chosen theme.
+//! Live appearance selection with palette swatches.
 
 use bevy::input_focus::tab_navigation::TabIndex;
-use bevy::picking::Pickable;
-use bevy::picking::events::{PointerOut, PointerOver};
 use bevy::prelude::*;
-use bevy::ui_widgets::Activate;
-use bevy::ui_widgets::Button as WidgetButton;
-
-use harmonicon_platform::assets_management::{AvailableThemes, SelectedTheme, ThemesRescanned};
+use bevy::ui_widgets::{Activate, Button};
+use harmonicon_platform::assets_management::SelectedTheme;
 use harmonicon_platform::localization::{Localization, LocalizationExt};
-use harmonicon_platform::theme::{LoadedTheme, theme_source_prefix};
-use harmonicon_ui::dialogs::button;
+use harmonicon_platform::theme::{Appearance, LoadedTheme};
+use harmonicon_ui::dialogs::button::make_interactive;
 
 use crate::menu::routing::MenuPage;
 use crate::menu::scene::{cleanup_menu, spawn_back_button, spawn_menu_root};
-
-const THEME_SELECTED: Color = Color::srgb(0.25, 0.45, 0.30);
-const THEME_HOVER: Color = Color::srgb(0.20, 0.20, 0.32);
 
 pub struct ThemePickerPlugin;
 
@@ -26,216 +19,110 @@ impl Plugin for ThemePickerPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(OnEnter(MenuPage::Theme), setup)
             .add_systems(OnExit(MenuPage::Theme), cleanup_menu)
-            // Theme buttons carry their own select/hover behaviour as inline
-            // on(...) observers; these systems only react to the selection.
-            .add_systems(
-                Update,
-                (update_button_visuals, update_preview, rebuild_on_themes_rescanned)
-                    .run_if(in_state(MenuPage::Theme)),
-            );
+            .add_systems(Update, highlight_selection.run_if(in_state(MenuPage::Theme)));
     }
 }
 
-// ── Components ─────────────────────────────────────────────────────────────────
-
-/// Carries the theme name for each list button.
-#[derive(Component, Default, Clone)]
-struct ThemeButton(String);
-
-/// Marks the preview `ImageNode` so `update_preview` can swap its handle.
 #[derive(Component)]
-struct ThemePreviewImage;
+struct AppearanceCard(Appearance);
 
-// ── Setup ──────────────────────────────────────────────────────────────────────
-
-fn setup(
-    mut commands: Commands,
-    themes: Res<AvailableThemes>,
-    selected: Res<SelectedTheme>,
-    asset_server: Res<AssetServer>,
-    theme: Res<LoadedTheme>,
-    loc: Res<Localization>,
-) {
-    let (root, header, _page_root) =
-        spawn_menu_root(&mut commands, &loc.msg("theme-title"), None, &theme, "Theme");
-
+fn setup(mut commands: Commands, theme: Res<LoadedTheme>, loc: Res<Localization>) {
+    let (root, header, _) = spawn_menu_root(
+        &mut commands,
+        &loc.msg("theme-title"),
+        Some(&loc.msg("theme-subtitle")),
+        &theme,
+    );
     spawn_back_button(
         &mut commands,
         header,
         &loc.msg("theme-back-to-options"),
         |_: On<Activate>, mut page: ResMut<NextState<MenuPage>>| page.set(MenuPage::Options),
     );
-
-    // ── Content row (list | preview) ───────────────────────────────────────────
-    let content = commands
+    let cards = commands
         .spawn(Node {
-            flex_direction: FlexDirection::Row,
-            flex_grow: 1.0,
             width: Val::Percent(100.0),
-            column_gap: Val::Px(24.0),
-            ..default()
-        })
-        .id();
-    commands.entity(root).add_child(content);
-
-    // Left panel — scrollable theme list
-    let left = commands
-        .spawn(Node {
-            flex_direction: FlexDirection::Column,
-            width: Val::Px(240.0),
-            row_gap: Val::Px(8.0),
-            overflow: Overflow::clip_y(),
-            padding: UiRect::all(Val::Px(4.0)),
-            ..default()
-        })
-        .id();
-    commands.entity(content).add_child(left);
-
-    commands.entity(left).with_children(|l| {
-        for name in &themes.0 {
-            let is_selected = *name == selected.0;
-            l.spawn_empty().apply_scene(theme_button_scene(name.clone(), is_selected));
-        }
-    });
-
-    // Right panel — preview image
-    let right = commands
-        .spawn(Node {
-            flex_grow: 1.0,
-            align_items: AlignItems::Center,
+            flex_wrap: FlexWrap::Wrap,
             justify_content: JustifyContent::Center,
+            column_gap: Val::Px(18.0),
+            row_gap: Val::Px(14.0),
             ..default()
         })
         .id();
-    commands.entity(content).add_child(right);
-
-    let preview_handle: Handle<Image> = asset_server.load(format!(
-        "{}themes/{}/preview.png",
-        theme_source_prefix(&selected.0),
-        selected.0
-    ));
-    let preview = commands
-        .spawn((
-            Node { width: Val::Px(512.0), height: Val::Px(288.0), ..default() },
-            ImageNode { image: preview_handle, ..default() },
-            ThemePreviewImage,
-        ))
-        .id();
-    commands.entity(right).add_child(preview);
-}
-
-// ── Update systems ─────────────────────────────────────────────────────────────
-
-/// One theme-list button: its label, its dedicated "select this theme" click
-/// callback (capturing the name), and hover highlight — all inline `on(...)`.
-fn theme_button_scene(name: String, is_selected: bool) -> impl Scene {
-    let color = if is_selected { THEME_SELECTED } else { button::color_default() };
-    let label = name.clone();
-    let pick = name.clone();
-    bsn! {
-        WidgetButton
-        TabIndex(0)
-        Node {
-            width: {Val::Percent(100.0)},
-            padding: {UiRect::axes(Val::Px(16.0), Val::Px(10.0))},
-            justify_content: {JustifyContent::FlexStart},
-        }
-        BackgroundColor({color})
-        ThemeButton({name})
-        on(move |_: On<Activate>, mut selected: ResMut<SelectedTheme>| {
-            if selected.0 != pick {
-                selected.0.clone_from(&pick);
+    commands.entity(root).add_child(cards);
+    for appearance in Appearance::ALL {
+        let p = appearance.palette();
+        let mut card = commands.spawn((
+            Button,
+            TabIndex(0),
+            AppearanceCard(appearance),
+            Node {
+                width: Val::Px(256.0),
+                max_width: Val::Percent(100.0),
+                padding: UiRect::all(Val::Px(16.0)),
+                border: UiRect::all(Val::Px(2.0)),
+                border_radius: BorderRadius::all(Val::Px(16.0)),
+                flex_direction: FlexDirection::Column,
+                row_gap: Val::Px(12.0),
+                ..default()
+            },
+            BorderColor::all(p.border),
+        ));
+        make_interactive(&mut card, p.panel);
+        card.observe(move |_: On<Activate>, mut selected: ResMut<SelectedTheme>| {
+            if selected.0 != appearance {
+                selected.0 = appearance;
             }
-        })
-        on(theme_over)
-        on(theme_out)
-        Children [
-            Text({label})
-            TextFont { font_size: {FontSize::Px(19.0)} }
-            TextColor({Color::WHITE})
-            Pickable { should_block_lower: {false}, is_hoverable: {false} }
-        ]
+        });
+        card.with_children(|children| {
+            children.spawn((
+                Text::new(loc.msg(appearance.label_key())),
+                TextFont { font_size: FontSize::Px(24.0), ..default() },
+                TextColor(p.text),
+                Pickable::IGNORE,
+            ));
+            children
+                .spawn((
+                    Node {
+                        width: Val::Percent(100.0),
+                        height: Val::Px(78.0),
+                        align_items: AlignItems::Center,
+                        justify_content: JustifyContent::Center,
+                        column_gap: Val::Px(8.0),
+                        border_radius: BorderRadius::all(Val::Px(10.0)),
+                        ..default()
+                    },
+                    BackgroundColor(p.canvas),
+                    Pickable::IGNORE,
+                ))
+                .with_children(|preview| {
+                    for color in [p.control, p.border, p.accent] {
+                        preview.spawn((
+                            Node {
+                                width: Val::Px(42.0),
+                                height: Val::Px(34.0),
+                                border_radius: BorderRadius::all(Val::Px(6.0)),
+                                ..default()
+                            },
+                            BackgroundColor(color),
+                            Pickable::IGNORE,
+                        ));
+                    }
+                });
+        });
+        let id = card.id();
+        commands.entity(cards).add_child(id);
     }
 }
 
-/// Hover highlight, but never override the green of the currently-selected theme.
-fn theme_over(
-    ev: On<PointerOver>,
+fn highlight_selection(
     selected: Res<SelectedTheme>,
-    mut buttons: Query<(&ThemeButton, &mut BackgroundColor)>,
+    theme: Res<LoadedTheme>,
+    mut cards: Query<(&AppearanceCard, &mut BorderColor)>,
 ) {
-    if let Ok((btn, mut bg)) = buttons.get_mut(ev.entity)
-        && btn.0 != selected.0
-    {
-        let wanted = BackgroundColor(THEME_HOVER);
-        if *bg != wanted {
-            *bg = wanted;
-        }
-    }
-}
-
-fn theme_out(
-    ev: On<PointerOut>,
-    selected: Res<SelectedTheme>,
-    mut buttons: Query<(&ThemeButton, &mut BackgroundColor)>,
-) {
-    if let Ok((btn, mut bg)) = buttons.get_mut(ev.entity)
-        && btn.0 != selected.0
-    {
-        let wanted = BackgroundColor(button::color_default());
-        if *bg != wanted {
-            *bg = wanted;
-        }
-    }
-}
-
-/// Recolour the list whenever the selection changes (green for the chosen one).
-fn update_button_visuals(
-    selected: Res<SelectedTheme>,
-    mut buttons: Query<(&ThemeButton, &mut BackgroundColor)>,
-) {
-    if !selected.is_changed() {
-        return;
-    }
-    for (btn, mut bg) in &mut buttons {
-        let wanted = if btn.0 == selected.0 { THEME_SELECTED } else { button::color_default() };
-        if bg.0 != wanted {
-            bg.0 = wanted;
-        }
-    }
-}
-
-/// `assets_management::watch` rescans `AvailableThemes` live when
-/// `~/Harmonicon/themes` changes; if this page happens to be open when that
-/// happens, force a same-page rebuild the same way `artist_list::
-/// rebuild_on_songs_rescanned` does, and for the same message-driven reason
-/// (see that function's doc comment).
-fn rebuild_on_themes_rescanned(
-    mut rescanned: MessageReader<ThemesRescanned>,
-    mut page: ResMut<NextState<MenuPage>>,
-) {
-    if rescanned.read().next().is_some() {
-        page.set(MenuPage::Theme);
-    }
-}
-
-/// When the selected theme changes, reload the preview image.
-fn update_preview(
-    selected: Res<SelectedTheme>,
-    asset_server: Res<AssetServer>,
-    mut previews: Query<&mut ImageNode, With<ThemePreviewImage>>,
-) {
-    if !selected.is_changed() {
-        return;
-    }
-    let handle: Handle<Image> = asset_server.load(format!(
-        "{}themes/{}/preview.png",
-        theme_source_prefix(&selected.0),
-        selected.0
-    ));
-    for mut img in &mut previews {
-        if img.image != handle {
-            img.image = handle.clone();
-        }
+    for (card, mut border) in &mut cards {
+        let color =
+            if card.0 == selected.0 { theme.palette().accent } else { card.0.palette().border };
+        border.set_if_neq(BorderColor::all(color));
     }
 }

@@ -123,13 +123,8 @@ pub(crate) fn setup_jam_generate_menu(
     // gets clipped to a `ScrollArea` ancestor's own (content-sized, not
     // full-window) bounds — see `spawn_menu_root`'s own doc comment. The
     // Genre combobox (the row closest to the clip edge) hit exactly that.
-    let (root, header, page_root) = spawn_menu_root_plain(
-        &mut commands,
-        &loc.msg("jam-generate-title"),
-        None,
-        &theme,
-        "JamGenerate",
-    );
+    let (root, header, page_root) =
+        spawn_menu_root_plain(&mut commands, &loc.msg("jam-generate-title"), None, &theme);
 
     combobox::spawn_combobox(
         &mut commands,
@@ -309,7 +304,6 @@ pub(crate) struct PreparingLabel;
 /// Enters Jam Session once the backing render lands.
 pub(crate) fn finish_pending_jam(
     mut pending: Option<ResMut<PendingJam>>,
-    theme: Res<LoadedTheme>,
     mut manifests: ResMut<Assets<SongManifest>>,
     mut sources: ResMut<Assets<AudioSource>>,
     mut mode: ResMut<GameplayMode>,
@@ -330,7 +324,6 @@ pub(crate) fn finish_pending_jam(
     let (config, seed) = (config.clone(), *seed);
     commands.remove_resource::<PendingJam>();
 
-    let background = theme.default_background.clone().unwrap_or_default();
     let manifest = assemble_generated_manifest(
         rendered,
         &config.key,
@@ -338,7 +331,6 @@ pub(crate) fn finish_pending_jam(
         config.progression,
         config.position,
         config.genre,
-        background,
         Handle::default(),
         &mut sources,
     );

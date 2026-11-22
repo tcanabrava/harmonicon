@@ -33,13 +33,8 @@ pub(crate) fn setup(
     commands.insert_resource(lesson_tree::UnitSlides::default());
     commands.insert_resource(lesson_tree::LessonTreeViewport::default());
     commands.insert_resource(lesson_tree::PendingLessonFocus::default());
-    let (root, header, _) = scene::spawn_menu_root(
-        &mut commands,
-        &loc.msg("lesson-instrument-title"),
-        None,
-        &theme,
-        "LessonInstrument",
-    );
+    let (root, header, _) =
+        scene::spawn_menu_root(&mut commands, &loc.msg("lesson-instrument-title"), None, &theme);
     commands.entity(root).with_children(|parent| {
         parent.spawn((
             Text::new(loc.msg("lesson-instrument-help").to_string()),

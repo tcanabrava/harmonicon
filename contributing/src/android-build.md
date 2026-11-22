@@ -222,7 +222,7 @@ went this way.
 ### Asset discovery goes through the build-time manifest
 
 An APK's assets live inside the archive, reachable only through the JNI
-`AssetManager` — `std::fs::read_dir("assets/themes")` returns `Err`, and the
+`AssetManager` — `std::fs::read_dir("assets/notes/2d")` returns `Err`, and the
 runtime scans would find nothing at all. Songs and lessons are downloaded
 packs in the app's private data directory, which reads normally.
 
@@ -303,8 +303,8 @@ symbols, against a 517 MB desktop binary).
 147 MB APK: a 108 MB stripped cdylib (stored uncompressed so it maps
 straight out of the APK rather than unpacking a second copy into `/data`)
 plus ~38 MB of assets. Only `arm64-v8a` is built; adding `armeabi-v7a` means
-another full Rust build and roughly doubles the download. If this needs to
-come down, the first target is `assets/themes` (21 MB of the 38).
+another full Rust build and roughly doubles the download. This measurement
+predates the removal of the bundled theme images.
 
 ## What has *not* been done
 

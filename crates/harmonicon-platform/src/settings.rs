@@ -353,7 +353,7 @@ impl Default for Settings {
             metronome_volume: 0.7,
             input_latency_ms: 0,
             note_theme_2d: "circular".into(),
-            ui_theme: "default".into(),
+            ui_theme: "dark".into(),
             pitch_algorithm: PitchAlgorithm::default(),
             input_device: String::new(),
             show_note_numbers: false,
@@ -503,7 +503,7 @@ impl PersistedSettings<'_> {
             pitch_algorithm: self.audio.pitch_algorithm,
             input_device: self.audio.input_device.clone(),
             note_theme_2d: self.theme_2d.0.clone(),
-            ui_theme: self.ui_theme.0.clone(),
+            ui_theme: self.ui_theme.0.id().into(),
             show_note_numbers: self.note_numbers.0,
             adaptive_difficulty_enabled: self.adaptive_difficulty.0,
             fullscreen: self.fullscreen.0,
@@ -542,7 +542,7 @@ impl PersistedSettingsMut<'_> {
         self.audio.pitch_algorithm = settings.pitch_algorithm;
         self.audio.input_device = settings.input_device;
         self.theme_2d.0 = settings.note_theme_2d;
-        self.ui_theme.0 = settings.ui_theme;
+        self.ui_theme.0 = crate::theme::Appearance::from_saved(&settings.ui_theme);
         self.note_numbers.0 = settings.show_note_numbers;
         self.adaptive_difficulty.0 = settings.adaptive_difficulty_enabled;
         self.fullscreen.0 = settings.fullscreen;

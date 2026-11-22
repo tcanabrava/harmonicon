@@ -190,7 +190,6 @@ fn setup(mut commands: Commands, loc: Res<Localization>, theme: Res<LoadedTheme>
         &loc.msg("content-title"),
         Some(&loc.msg("content-subtitle")),
         &theme,
-        "ContentSources",
     );
     spawn_back_button(
         &mut commands,

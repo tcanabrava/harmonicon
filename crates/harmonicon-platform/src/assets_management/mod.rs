@@ -35,10 +35,6 @@ pub struct AssetsManagementPlugin;
 #[derive(Message)]
 pub struct SongsRescanned;
 
-/// The `themes/` sibling of [`SongsRescanned`].
-#[derive(Message)]
-pub struct ThemesRescanned;
-
 #[derive(Debug, Clone)]
 // Struct representing a song entry in the menu
 pub struct SongEntry {
@@ -85,19 +81,9 @@ impl SongPart {
 #[derive(Resource, Default)]
 pub struct AvailableSongs(pub HashMap<String, Vec<SongEntry>>);
 
-/// UI themes found under `assets/themes/<name>/theme.json`.
+/// The selected built-in application palette.
 #[derive(Resource, Default)]
-pub struct AvailableThemes(pub Vec<String>);
-
-/// The currently selected UI theme name (subfolder under `assets/themes/`).
-#[derive(Resource)]
-pub struct SelectedTheme(pub String);
-
-impl Default for SelectedTheme {
-    fn default() -> Self {
-        Self("default".into())
-    }
-}
+pub struct SelectedTheme(pub crate::theme::Appearance);
 
 /// 2D note themes found under `assets/notes/2d/<name>.png` (each paired with a
 /// `<name>.json` tail layout). The string is the bare `<name>`.
@@ -126,11 +112,9 @@ impl Plugin for AssetsManagementPlugin {
             .init_resource::<AvailableNoteThemes2d>()
             .init_resource::<SelectedNoteTheme2d>()
             .init_resource::<ShowNoteNumbers>()
-            .init_resource::<AvailableThemes>()
             .init_resource::<SelectedTheme>()
             .add_message::<watch::ExternalFolderChanged>()
             .add_message::<SongsRescanned>()
-            .add_message::<ThemesRescanned>()
             // Read by `rescan_on_external_change`; registered here too so an
             // app without `ContentPacksPlugin` (tests, tools) still runs.
             .add_message::<ContentPacksChanged>()
@@ -139,7 +123,6 @@ impl Plugin for AssetsManagementPlugin {
                 (
                     scan_all_songs.after(ContentPacksSet),
                     scan_note_themes,
-                    scan_ui_themes,
                     override_default_font,
                     watch::start_watching_external_folder,
                 ),
@@ -154,25 +137,20 @@ impl Plugin for AssetsManagementPlugin {
 }
 
 /// Consumes `watch::ExternalFolderChanged` for the two kinds this module
-/// owns (`songs`/`themes`), re-scanning + firing the matching `*Rescanned`
-/// message for whichever actually changed. `lessons::catalog` has its own
+/// owns (`songs`), re-scanning and firing `SongsRescanned` when needed. `lessons::catalog` has its own
 /// sibling consumer of the same message for `lessons`. A pack being
 /// installed, updated or removed (`ContentPacksChanged`) rescans songs too.
 fn rescan_on_external_change(
     mut changed: MessageReader<ExternalFolderChanged>,
     mut packs_changed: MessageReader<ContentPacksChanged>,
     mut available_songs: ResMut<AvailableSongs>,
-    available_themes: ResMut<AvailableThemes>,
     packs: Option<Res<ContentPacks>>,
     library: Option<Res<crate::song_library::SongLibrary>>,
     mut songs_rescanned: MessageWriter<SongsRescanned>,
-    mut themes_rescanned: MessageWriter<ThemesRescanned>,
 ) {
     let mut dirty_songs = packs_changed.read().count() > 0;
-    let mut dirty_themes = false;
     for ev in changed.read() {
         dirty_songs |= ev.top_level_dirs.contains("songs");
-        dirty_themes |= ev.top_level_dirs.contains("themes");
     }
 
     if dirty_songs {
@@ -181,10 +159,6 @@ fn rescan_on_external_change(
             library.filter(&mut available_songs);
         }
         songs_rescanned.write(SongsRescanned);
-    }
-    if dirty_themes {
-        scan_ui_themes(available_themes);
-        themes_rescanned.write(ThemesRescanned);
     }
 }
 
@@ -237,56 +211,6 @@ fn override_default_font(mut fonts: ResMut<Assets<Font>>) {
 }
 
 /// Collects the names of subfolders under `root` that contain a `theme.json`.
-#[cfg(not(any(target_arch = "wasm32", target_os = "android")))]
-fn scan_theme_names(root: &std::path::Path) -> Vec<String> {
-    let Ok(entries) = std::fs::read_dir(root) else {
-        return Vec::new();
-    };
-    entries
-        .flatten()
-        .filter(|e| e.file_type().map(|t| t.is_dir()).unwrap_or(false))
-        .filter(|e| e.path().join("theme.json").exists())
-        .map(|e| e.file_name().to_string_lossy().into_owned())
-        .collect()
-}
-
-// Discovers UI themes from the bundled `assets/themes/` directory, plus the
-// external `~/Harmonicon/themes/` drop folder if present (see `load_theme` in
-// `theme.rs`, which does the matching bundled-first resolution when loading).
-#[cfg(not(any(target_arch = "wasm32", target_os = "android")))]
-fn scan_ui_themes(mut available: ResMut<AvailableThemes>) {
-    let bundled = crate::paths::bundled_assets_dir().join("themes");
-    let mut names = scan_theme_names(&bundled);
-    if names.is_empty() {
-        warn!("No themes directory at {}/; defaulting to \"default\"", bundled.display());
-    }
-
-    if let Some(external_root) = dirs::home_dir().map(|h| h.join("Harmonicon/themes")) {
-        names.extend(scan_theme_names(&external_root));
-    }
-
-    names.sort_unstable();
-    names.dedup();
-    if names.is_empty() {
-        names.push("default".into());
-    }
-    info!("Found {} UI theme(s): {:?}", names.len(), names);
-    available.0 = names;
-}
-
-/// wasm sibling of the native `scan_ui_themes` above. No `~/Harmonicon`
-/// external-folder equivalent under wasm — there's no home directory concept
-/// in a browser, and `dirs::home_dir()` already returns `None` there, which
-/// the native version already treats as "no external themes" gracefully.
-#[cfg(any(target_arch = "wasm32", target_os = "android"))]
-fn scan_ui_themes(mut available: ResMut<AvailableThemes>) {
-    let mut names: Vec<String> = manifest::THEMES.iter().map(|s| s.to_string()).collect();
-    if names.is_empty() {
-        names.push("default".into());
-    }
-    info!("Found {} UI theme(s): {:?}", names.len(), names);
-    available.0 = names;
-}
 
 /// `songs_root` is the folder holding artist folders, and `source_prefix`
 /// is what each built `SongEntry::asset_path` starts with, so it loads from
@@ -646,21 +570,5 @@ mod tests {
         scan_song_packs(Some(&packs), &mut available);
         let paths: Vec<_> = available.0["Bach"].iter().map(|s| s.asset_path.as_str()).collect();
         assert_eq!(paths, ["packs://ready/Bach/Minuet/song/chart.harpchart"]);
-    }
-
-    #[test]
-    fn scan_ui_themes_does_not_duplicate_entries_when_run_again() {
-        let mut world = World::new();
-        world.init_resource::<AvailableThemes>();
-        let mut schedule = Schedule::default();
-        schedule.add_systems(scan_ui_themes);
-
-        schedule.run(&mut world);
-        let first = world.resource::<AvailableThemes>().0.clone();
-
-        schedule.run(&mut world);
-        let second = world.resource::<AvailableThemes>().0.clone();
-
-        assert_eq!(first, second);
     }
 }

@@ -9,7 +9,7 @@
 //! module is shared low-level vocabulary (`docs/physical_design_plan.md`:
 //! "dependencies point downward"), so it doesn't reach up into
 //! feature-specific knowledge like what a lesson is. `mod.rs`'s own
-//! `rescan_on_external_change` consumes this message for `songs`/`themes`
+//! `rescan_on_external_change` consumes this message for `songs`
 //! (the two kinds this module already owns); `lessons::catalog` consumes
 //! the same message for `lessons` from the other side, one small
 //! `assets_management`-downward dependency rather than the reverse.
@@ -51,7 +51,7 @@ pub(super) struct ExternalFolderEvents(Receiver<DebounceEventResult>);
 /// naming which immediate subfolders had a change fall under them. A
 /// consumer checks `top_level_dirs.contains("songs")` (etc.) for the one it
 /// owns and re-scans + fires its own specific `*Rescanned` message — see
-/// `mod.rs`'s `SongsRescanned`/`ThemesRescanned` and `lessons::catalog`'s
+/// `mod.rs`'s `SongsRescanned` and `lessons::catalog`'s
 /// `LessonsRescanned`. Message-driven rather than a bare resource-change
 /// poll for the same reason those are: a menu page's own rebuild system only
 /// runs while that page is open, so its change-detection tick goes stale

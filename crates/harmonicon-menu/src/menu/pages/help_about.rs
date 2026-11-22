@@ -79,7 +79,7 @@ pub(crate) fn setup_help_about_menu(
     loc: Res<Localization>,
 ) {
     let (root, header, _page_root) =
-        spawn_menu_root(&mut commands, &loc.msg("help-about-title"), None, &theme, "HelpAbout");
+        spawn_menu_root(&mut commands, &loc.msg("help-about-title"), None, &theme);
     spawn_button(
         &mut commands,
         root,

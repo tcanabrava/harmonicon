@@ -191,8 +191,7 @@ pub(crate) fn setup_lesson_reader(
     let entry = selected.0.as_deref().and_then(|id| find_lesson(&lessons, id));
 
     let title = entry.map(|e| String::from(loc.msg(&e.manifest.title_key))).unwrap_or_default();
-    let (root, header, _page_root) =
-        spawn_menu_root(&mut commands, &title, None, &theme, "Lessons");
+    let (root, header, _page_root) = spawn_menu_root(&mut commands, &title, None, &theme);
 
     let Some(entry) = entry else {
         spawn_back_to_tree(&mut commands, header, &loc);

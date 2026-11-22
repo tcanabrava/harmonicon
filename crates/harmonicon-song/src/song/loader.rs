@@ -1,11 +1,10 @@
 // SPDX-License-Identifier: MIT
 
 use bevy::{
-    asset::{AssetLoader, AssetPath, LoadContext, RenderAssetUsages, io::Reader},
+    asset::{AssetLoader, AssetPath, LoadContext, io::Reader},
     audio::AudioSource,
     image::Image,
     prelude::*,
-    render::render_resource::{Extent3d, TextureDimension, TextureFormat},
 };
 use thiserror::Error;
 
@@ -151,13 +150,11 @@ impl SongChartLoader {
     }
 }
 
-/// Everything a song needs *besides* its notes: background, backing audio,
-/// waveform, note art.
+/// Everything a song needs besides its notes: backing audio, waveform and note art.
 ///
 /// Split out of [`SongChartLoader::load_inner`] when MIDI songs arrived —
 /// only the way a chart is *produced* differs between formats, and
-/// duplicating this half would have meant a `.mid` song quietly missing a
-/// generated background or its waveform.
+/// both formats share backing audio and waveform handling.
 pub(super) async fn assemble_manifest(
     chart: HarpChart,
     source_tracks: Vec<TrackChart>,
@@ -191,22 +188,8 @@ pub(super) async fn assemble_manifest(
     // asset; if that path doesn't exist, the dependency fails and
     // `AssetServer::is_loaded_with_dependencies` never returns true for
     // the manifest — `menu::check_loading` would then wait on
-    // `SongLoading` forever. Falling back instead (a generated
-    // background, no music, `Handle::default()` for the unused
-    // `elements`) is what lets a song ship with only a chart file, like
-    // `Example Song 3`.
-    let background_path = sibling(song_folder.join("background.png"));
-    let background = match load_context.read_asset_bytes(background_path.clone()).await {
-        Ok(_) => load_context.load::<Image>(background_path),
-        Err(_) => {
-            let seed = format!("{}\u{0}{}", chart.song.artist, chart.song.title);
-            load_context.add_labeled_asset(
-                "generated_background".to_string(),
-                generate_background_image(&seed),
-            )
-        }
-    };
-
+    // `SongLoading` forever. Optional backing and art fall back to an
+    // empty handle so a song can ship only a chart file.
     let elements_path = sibling(song_folder.join("elements.png"));
     let elements = match load_context.read_asset_bytes(elements_path.clone()).await {
         Ok(_) => load_context.load::<Image>(elements_path),
@@ -268,7 +251,6 @@ pub(super) async fn assemble_manifest(
     Ok(SongManifest {
         path: song_folder,
         chart,
-        background,
         music,
         backing_stems,
         music_duration_secs,
@@ -282,8 +264,7 @@ pub(super) async fn assemble_manifest(
 
 /// Renders each of a raw MIDI file's non-empty tracks to its own
 /// `AudioSource`, registered as a labeled sub-asset of the manifest being
-/// loaded (so it shares the manifest's own lifetime/dependency tracking,
-/// the same way the generated placeholder background below does) — see
+/// loaded, sharing the manifest's lifetime and dependency tracking. See
 /// `SongManifest::backing_stems`'s doc comment for why a song ships these as
 /// separate stems instead of one pre-mixed file, with the duration of the
 /// longest — the length of the backing as a whole, since playback runs
@@ -321,69 +302,9 @@ fn load_midi_tracks(
     (Some(tracks), longest as f64 / SAMPLE_RATE as f64)
 }
 
-/// Side (px) of a generated placeholder background — small and stretched to
-/// fill the screen (like every other background), so the gradient reads as
-/// smooth rather than needing to be full resolution.
-const GENERATED_BACKGROUND_SIZE: u32 = 64;
-
-/// A vertical two-color gradient for a song that doesn't ship its own
-/// `background.png`, generated in memory (never touches disk, so it can
-/// never fail to load — see the dependency-hang note where this is called).
-/// `seed` (the song's own artist/title) picks the hue deterministically, so
-/// two songs without art still look distinct from each other rather than
-/// identical gray boxes, and the same song looks the same every run.
-fn generate_background_image(seed: &str) -> Image {
-    use std::hash::{Hash, Hasher};
-    let mut hasher = std::collections::hash_map::DefaultHasher::new();
-    seed.hash(&mut hasher);
-    let hue = (hasher.finish() % 360) as f32;
-
-    let top = Color::hsl(hue, 0.35, 0.16).to_srgba();
-    let bottom = Color::hsl((hue + 40.0) % 360.0, 0.35, 0.06).to_srgba();
-
-    let mut data =
-        Vec::with_capacity((GENERATED_BACKGROUND_SIZE * GENERATED_BACKGROUND_SIZE * 4) as usize);
-    for y in 0..GENERATED_BACKGROUND_SIZE {
-        let t = y as f32 / (GENERATED_BACKGROUND_SIZE - 1) as f32;
-        let pixel = [
-            (top.red + (bottom.red - top.red) * t).clamp(0.0, 1.0) * 255.0,
-            (top.green + (bottom.green - top.green) * t).clamp(0.0, 1.0) * 255.0,
-            (top.blue + (bottom.blue - top.blue) * t).clamp(0.0, 1.0) * 255.0,
-            255.0,
-        ]
-        .map(|c| c as u8);
-        for _ in 0..GENERATED_BACKGROUND_SIZE {
-            data.extend_from_slice(&pixel);
-        }
-    }
-
-    Image::new(
-        Extent3d {
-            width: GENERATED_BACKGROUND_SIZE,
-            height: GENERATED_BACKGROUND_SIZE,
-            depth_or_array_layers: 1,
-        },
-        TextureDimension::D2,
-        data,
-        TextureFormat::Rgba8UnormSrgb,
-        RenderAssetUsages::default(),
-    )
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn generate_background_image_is_the_expected_size_and_fully_opaque() {
-        let image = generate_background_image("Some Artist\u{0}Some Song");
-        let data = image.data.expect("generated image should have pixel data");
-        assert_eq!(
-            data.len(),
-            (GENERATED_BACKGROUND_SIZE * GENERATED_BACKGROUND_SIZE * 4) as usize
-        );
-        assert!(data.as_chunks::<4>().0.iter().all(|px| px[3] == 255));
-    }
 
     #[test]
     fn a_chart_with_repeats_and_endings_validates() {
@@ -566,22 +487,5 @@ mod tests {
         let mut flat = guitar_chart();
         flat["track"][0]["events"][1]["modifiers"][0]["semitones"] = serde_json::json!(0);
         assert!(validate_and_parse_chart(&mut flat).is_err());
-    }
-
-    #[test]
-    fn generate_background_image_is_deterministic_per_seed() {
-        let a = generate_background_image("Same Seed");
-        let b = generate_background_image("Same Seed");
-        assert_eq!(a.data, b.data);
-    }
-
-    #[test]
-    fn generate_background_image_varies_between_different_seeds() {
-        let a = generate_background_image("Artist One\u{0}Song One");
-        let b = generate_background_image("Artist Two\u{0}Song Two");
-        // Not a strict guarantee for every possible pair (hashes can
-        // collide), but true for these two — catches a seed that's
-        // accidentally ignored entirely.
-        assert_ne!(a.data, b.data);
     }
 }

@@ -247,7 +247,7 @@ pub(super) fn setup(
                 row_gap: Val::Px(8.0),
                 ..default()
             },
-            BackgroundColor(Color::srgb(0.04, 0.04, 0.07)),
+            harmonicon_platform::theme::ThemeSurface::Canvas,
             GlobalZIndex(300),
             TabGroup::default(),
             ResultsRoot,

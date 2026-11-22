@@ -23,7 +23,7 @@ pub(crate) fn setup_welcome_menu(
     welcome: Res<WelcomeFlow>,
 ) {
     let (root, _header, _page_root) =
-        spawn_menu_root(&mut commands, &loc.msg("welcome-title"), None, &theme, "Welcome");
+        spawn_menu_root(&mut commands, &loc.msg("welcome-title"), None, &theme);
 
     // The scrim keeps body text readable over theme backgrounds.
     let scrim = commands
@@ -34,7 +34,7 @@ pub(crate) fn setup_welcome_menu(
                 border_radius: BorderRadius::all(Val::Px(8.0)),
                 ..default()
             },
-            BackgroundColor(Color::srgba(0.04, 0.04, 0.07, 0.82)),
+            harmonicon_platform::theme::ThemeSurface::Panel,
         ))
         .id();
     let body = commands

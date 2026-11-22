@@ -93,7 +93,6 @@ fn setup(mut commands: Commands, loc: Res<Localization>) {
             justify_content: {JustifyContent::Center},
             row_gap: {Val::Px(20.0)},
         }
-        BackgroundColor({Color::srgb(0.05, 0.05, 0.08)})
         Children [
             Text({String::from(loc.msg("sync-title"))})
             TextFont { font_size: {FontSize::Px(38.0)} }

@@ -35,7 +35,7 @@ pub(crate) fn setup(
                 flex_direction: FlexDirection::Column,
                 ..default()
             },
-            BackgroundColor(Color::srgb(0.05, 0.05, 0.08)),
+            harmonicon_platform::theme::ThemeSurface::Canvas,
             GameplayRoot,
         ))
         .id();

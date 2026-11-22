@@ -27,6 +27,7 @@ use bevy::ui::Checked;
 use bevy::ui_widgets::{RadioButton, RadioGroup, ValueChange, radio_self_update};
 
 use super::button;
+use harmonicon_platform::theme::ThemeSurface;
 
 /// Triggered on a tab bar's root entity (the `Entity` returned by
 /// [`spawn_tab_bar`]) when the user switches to a different tab. Not
@@ -50,6 +51,10 @@ pub struct TabBarSelected(pub usize);
 struct TabButton {
     bar: Entity,
     index: usize,
+}
+
+fn tab_surface(active: bool) -> ThemeSurface {
+    if active { ThemeSurface::Selected } else { ThemeSurface::Control }
 }
 
 fn tab_color(active: bool) -> Color {
@@ -88,7 +93,7 @@ pub fn spawn_tab_bar<M: 'static>(
         let tab = commands
             .spawn_empty()
             .apply_scene(tab_scene(label.clone(), index == selected))
-            .insert(TabButton { bar, index })
+            .insert((TabButton { bar, index }, tab_surface(index == selected)))
             .id();
         if index == selected {
             commands.entity(tab).insert(Checked);
@@ -126,14 +131,14 @@ fn tab_over(
     ev: On<PointerOver>,
     tabs: Query<&TabButton>,
     bars: Query<&TabBarSelected>,
-    mut colors: Query<&mut BackgroundColor>,
+    mut surfaces: Query<&mut ThemeSurface>,
 ) {
     let Ok(tab) = tabs.get(ev.entity) else {
         return;
     };
     let active = bars.get(tab.bar).is_ok_and(|s| s.0 == tab.index);
-    if !active && let Ok(mut bg) = colors.get_mut(ev.entity) {
-        *bg = BackgroundColor(button::CHOICE_HOVER);
+    if !active && let Ok(mut surface) = surfaces.get_mut(ev.entity) {
+        *surface = ThemeSurface::Hover;
     }
 }
 
@@ -141,14 +146,14 @@ fn tab_out(
     ev: On<PointerOut>,
     tabs: Query<&TabButton>,
     bars: Query<&TabBarSelected>,
-    mut colors: Query<&mut BackgroundColor>,
+    mut surfaces: Query<&mut ThemeSurface>,
 ) {
     let Ok(tab) = tabs.get(ev.entity) else {
         return;
     };
     let active = bars.get(tab.bar).is_ok_and(|s| s.0 == tab.index);
-    if !active && let Ok(mut bg) = colors.get_mut(ev.entity) {
-        *bg = BackgroundColor(button::color_default());
+    if !active && let Ok(mut surface) = surfaces.get_mut(ev.entity) {
+        *surface = ThemeSurface::Control;
     }
 }
 
@@ -180,7 +185,9 @@ fn on_radio_group_value_change(
     if let Ok(kids) = children.get(ev.source) {
         for &child in kids {
             if let (Ok(tab), Ok(mut bg)) = (tabs.get(child), colors.get_mut(child)) {
-                bg.0 = tab_color(tab.index == clicked_tab.index);
+                let active = tab.index == clicked_tab.index;
+                bg.0 = tab_color(active);
+                commands.entity(child).insert(tab_surface(active));
             }
         }
     }

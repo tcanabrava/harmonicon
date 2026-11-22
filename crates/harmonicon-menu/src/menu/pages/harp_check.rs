@@ -426,8 +426,7 @@ pub(crate) fn setup_harp_check(
         }
         .to_owned()
     };
-    let (root, header, page_root) =
-        spawn_menu_root(&mut commands, &loc.msg(&title), None, &theme, "HarpCheck");
+    let (root, header, page_root) = spawn_menu_root(&mut commands, &loc.msg(&title), None, &theme);
     commands.entity(page_root).insert(InstrumentControlsKind(
         chart.and_then(HarpChart::instrument).map(|instrument| instrument.kind()),
     ));

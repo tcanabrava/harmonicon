@@ -26,16 +26,14 @@ load-bearing about *this* crate.
     (`watch::changed_top_level_dirs`) — `watch.rs` itself stays agnostic of
     what any of those subfolders *mean* (see "dependencies point downward"
     in `docs/physical_design_plan.md`). `assets_management::mod.rs`'s own
-    `rescan_on_external_change` consumes that message for the two kinds
-    this module owns (`songs`/`themes`), re-running `scan_all_songs`/
-    `scan_ui_themes`; `lessons::catalog` has its own sibling consumer for
+    `rescan_on_external_change` consumes that message for `songs`,
+    re-running the song scan; `lessons::catalog` has its own sibling consumer for
     `lessons` (see the Lessons bullet below) — one small
     `lessons`-depends-on-`assets_management` edge rather than the reverse.
     Every scan function fully replaces its resource's contents rather than
     appending, so each is safe to call again at runtime (`scan_all_songs`
-    clears `AvailableSongs` first — it didn't always; `scan_ui_themes`/
-    `scan_lessons` already assigned wholesale). A successful live rescan
-    also fires its own specific `SongsRescanned`/`ThemesRescanned`/
+    clears `AvailableSongs` first; `scan_lessons` replaces its catalog).
+    A successful live rescan also fires its own `SongsRescanned`/
     `LessonsRescanned` — a message, not a bare `is_changed()` poll, because
     the menu pages that consume them only run their consuming system while
     open, so their own change-detection tick would otherwise read

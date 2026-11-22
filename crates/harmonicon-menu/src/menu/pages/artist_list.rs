@@ -195,7 +195,7 @@ pub(crate) fn setup_artist_list(
 ) {
     let state = &*state;
     let (content, header, root) =
-        spawn_menu_root_plain(&mut commands, &loc.msg("select-song"), None, &theme, "SongPicker");
+        spawn_menu_root_plain(&mut commands, &loc.msg("select-song"), None, &theme);
     commands.entity(content).insert(Node {
         width: Val::Percent(90.0),
         flex_grow: 1.0,
@@ -717,9 +717,7 @@ fn collect_songs(
         .filter(|song| {
             matches_search(query, &[&song.name, &song.artist, &song.genre, &song.instrument])
         })
-        .filter(|song| {
-            state.instrument_filter.as_ref().is_none_or(|kind| kind == &song.instrument)
-        })
+        .filter(|song| state.instrument_filter.as_ref().is_none_or(|kind| kind == &song.instrument))
         .filter(|song| {
             let accuracy = preferences(profile, &song.asset_path)
                 .last_accuracy

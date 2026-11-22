@@ -20,7 +20,7 @@ use harmonicon_core::instrument::{
 };
 use harmonicon_core::midi::{freq_to_midi, midi_to_freq_hz, midi_to_note};
 use harmonicon_platform::localization::{Localization, LocalizationExt};
-use harmonicon_platform::theme::LoadedTheme;
+use harmonicon_platform::theme::{LoadedTheme, ThemeSurface};
 use harmonicon_ui::dialogs::combobox::{ComboboxSelect, spawn_combobox};
 use harmonicon_ui::dialogs::tab_bar::{TabSelect, spawn_tab_bar};
 
@@ -150,7 +150,6 @@ enum Readout {
     Detail,
     Signal,
 }
-const INK: Color = Color::srgb(0.91, 0.96, 0.97);
 const MUTED: Color = Color::srgb(0.61, 0.72, 0.77);
 const MINT: Color = Color::srgb(0.42, 0.87, 0.72);
 #[derive(Component)]
@@ -205,23 +204,23 @@ fn setup(
         &loc.msg("tuner-title"),
         Some(&loc.msg("tuner-subtitle")),
         &theme,
-        "Tuner",
     );
+    let palette = theme.palette();
     let card = commands
         .spawn((
             Node {
                 width: Val::Px(860.0),
                 max_width: Val::Percent(100.0),
-                padding: UiRect::all(Val::Px(28.0)),
+                padding: UiRect::all(Val::Px(20.0)),
                 flex_direction: FlexDirection::Column,
                 align_items: AlignItems::Center,
-                row_gap: Val::Px(12.0),
+                row_gap: Val::Px(8.0),
                 border: UiRect::all(Val::Px(1.0)),
                 border_radius: BorderRadius::all(Val::Px(22.0)),
                 ..default()
             },
-            BackgroundColor(Color::srgb(0.047, 0.078, 0.104)),
-            BorderColor::all(Color::srgb(0.20, 0.32, 0.36)),
+            ThemeSurface::Panel,
+            BorderColor::all(palette.border),
         ))
         .id();
     commands.entity(root).add_child(card);
@@ -259,7 +258,7 @@ fn setup(
             justify_content: JustifyContent::SpaceEvenly,
             align_items: AlignItems::Center,
             column_gap: Val::Px(18.0),
-            row_gap: Val::Px(12.0),
+            row_gap: Val::Px(8.0),
             ..default()
         })
         .id();
@@ -270,16 +269,16 @@ fn setup(
             max_width: Val::Percent(100.0),
             flex_direction: FlexDirection::Column,
             align_items: AlignItems::Center,
-            row_gap: Val::Px(12.0),
+            row_gap: Val::Px(8.0),
             ..default()
         })
         .id();
     commands.entity(workspace).add_child(display);
-    spawn_readout(&mut commands, display, Readout::Target, 15.0, 24.0, MUTED);
-    spawn_readout(&mut commands, display, Readout::Note, 72.0, 88.0, INK);
+    spawn_readout(&mut commands, display, Readout::Target, 15.0, 24.0, palette.muted);
+    spawn_readout(&mut commands, display, Readout::Note, 66.0, 80.0, palette.text);
     spawn_meter(&mut commands, display, &loc);
-    spawn_readout(&mut commands, display, Readout::Verdict, 29.0, 38.0, MINT);
-    spawn_readout(&mut commands, display, Readout::Detail, 16.0, 43.0, MUTED);
+    spawn_readout(&mut commands, display, Readout::Verdict, 29.0, 38.0, palette.accent);
+    spawn_readout(&mut commands, display, Readout::Detail, 16.0, 36.0, palette.muted);
 
     let instrument = commands
         .spawn(Node {
@@ -294,14 +293,14 @@ fn setup(
         .spawn((
             Text::new(loc.msg("tuner-peg-caption")),
             TextFont { font_size: FontSize::Px(14.0), ..default() },
-            TextColor(MUTED),
+            TextColor(palette.muted),
         ))
         .id();
     let strings = commands
         .spawn((Node { width: Val::Px(256.0), height: Val::Px(300.0), ..default() }, StringPicker))
         .id();
     commands.entity(instrument).add_children(&[caption, strings]);
-    spawn_readout(&mut commands, card, Readout::Signal, 13.0, 24.0, MUTED);
+    spawn_readout(&mut commands, card, Readout::Signal, 13.0, 24.0, palette.muted);
     let track = commands
         .spawn((
             Node {
@@ -311,7 +310,7 @@ fn setup(
                 border_radius: BorderRadius::all(Val::Px(3.0)),
                 ..default()
             },
-            BackgroundColor(Color::srgb(0.13, 0.21, 0.25)),
+            ThemeSurface::Inset,
         ))
         .id();
     commands.entity(card).add_child(track);
@@ -323,7 +322,7 @@ fn setup(
                 border_radius: BorderRadius::all(Val::Px(3.0)),
                 ..default()
             },
-            BackgroundColor(MINT),
+            BackgroundColor(palette.accent),
             InputFill,
         ))
         .id();
@@ -815,11 +814,13 @@ fn update(
     loc: Res<Localization>,
     mic: Option<Res<MicStatus>>,
     tuner: Res<Tuner>,
+    theme: Res<LoadedTheme>,
     mut readout: Query<(&Readout, &mut Text, &mut TextColor)>,
     mut rows: Query<(&StringLabel, &Children, &mut BackgroundColor), Without<StringWire>>,
     mut wires: Query<(&StringWire, &mut BackgroundColor), Without<StringLabel>>,
     mut labels: Query<(&mut Text, &mut TextColor), Without<Readout>>,
 ) {
+    let palette = theme.palette();
     let connected = mic.as_ref().is_some_and(|m| m.is_connected());
     let rms = (frame.samples.iter().map(|s| s * s).sum::<f32>()
         / frame.samples.len().max(1) as f32)
@@ -918,7 +919,8 @@ fn update(
             text.0 = value.to_string();
         }
         if matches!(slot, Readout::Verdict) {
-            let tint = cents.filter(|c| c.abs() <= MAX_ADJUST_CENTS).map_or(MINT, pitch_color);
+            let tint =
+                cents.filter(|c| c.abs() <= MAX_ADJUST_CENTS).map_or(palette.accent, pitch_color);
             if color.0 != tint {
                 color.0 = tint;
             }
@@ -933,8 +935,7 @@ fn update(
     for (row, children, mut background) in &mut rows {
         let n = row.0;
         let Some(&note) = tuner.notes.get(n) else { continue };
-        let surface =
-            if n == i { Color::srgb(0.12, 0.29, 0.28) } else { Color::srgb(0.09, 0.15, 0.19) };
+        let surface = if n == i { palette.selected } else { palette.control };
         if background.0 != surface {
             background.0 = surface;
         }
@@ -945,7 +946,7 @@ fn update(
                 if text.0 != value {
                     text.0 = value;
                 }
-                let tint = if tuner.tuned[n] || n == i { MINT } else { Color::WHITE };
+                let tint = if tuner.tuned[n] || n == i { palette.accent } else { palette.text };
                 if color.0 != tint {
                     color.0 = tint;
                 }
