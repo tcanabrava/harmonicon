@@ -13,7 +13,7 @@ use bevy::input_focus::tab_navigation::TabGroup;
 use bevy::prelude::*;
 use bevy::ui_widgets::Activate;
 
-use harmonicon_platform::theme::{MODAL_BACKDROP_BG, MODAL_PANEL_BG, MODAL_PANEL_BORDER};
+use harmonicon_platform::theme::{LoadedTheme, MODAL_BACKDROP_BG, ThemeSurface};
 
 use super::button;
 pub use super::file_dialog::DialogId;
@@ -46,6 +46,7 @@ fn handle_open(
     roots: Query<Entity, With<ConfirmDialogRoot>>,
     mut commands: Commands,
     loc: Res<Localization>,
+    theme: Res<LoadedTheme>,
 ) {
     let Some(req) = requests.read().last() else {
         return;
@@ -56,6 +57,7 @@ fn handle_open(
     open.0 = Some(req.purpose);
 
     let purpose = req.purpose;
+    let palette = theme.palette();
     commands
         .spawn_scene(bsn! {
             Node {
@@ -79,12 +81,12 @@ fn handle_open(
                     max_width: {Val::Px(480.0)},
                     border: {UiRect::all(Val::Px(1.0))},
                 }
-                BackgroundColor({MODAL_PANEL_BG})
-                ~{BorderColor::all(MODAL_PANEL_BORDER)}
+                ~{ThemeSurface::Panel}
+                ~{BorderColor::all(palette.border)}
                 Children [
                     Text({req.message.clone()})
                     TextFont { font_size: {FontSize::Px(16.0)} }
-                    TextColor({Color::WHITE})
+                    TextColor({palette.text})
                     TextLayout { justify: {Justify::Center} }
                     --
                     Node {
@@ -186,6 +188,7 @@ mod tests {
             .init_resource::<InputFocus>()
             .init_resource::<ButtonInput<KeyCode>>()
             .init_resource::<Localization>()
+            .init_resource::<LoadedTheme>()
             .add_plugins(ConfirmDialogPlugin);
         app.world_mut().write_message(OpenConfirmDialog {
             purpose: DialogId("test"),

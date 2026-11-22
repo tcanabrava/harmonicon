@@ -17,7 +17,7 @@ use std::path::PathBuf;
 
 use bevy::input::ButtonState;
 use bevy::input::keyboard::KeyboardInput;
-use bevy::input_focus::tab_navigation::{TabGroup, TabIndex};
+use bevy::input_focus::tab_navigation::TabGroup;
 use bevy::input_focus::{AutoFocus, InputFocus};
 use bevy::prelude::*;
 use bevy::ui_widgets::Activate;
@@ -27,6 +27,7 @@ use bevy::ui_widgets::ScrollArea;
 use super::confirm_dialog::{ConfirmChosen, OpenConfirmDialog};
 use crate::dialogs::button;
 use harmonicon_platform::localization::{Localization, LocalizationExt};
+use harmonicon_platform::theme::{LoadedTheme, MODAL_BACKDROP_BG, ThemeSurface};
 
 /// Identifies who opened a dialog, so a caller only reacts to its own results.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -103,9 +104,6 @@ enum FileDialogState {
     Open,
 }
 
-const PANEL_BG: Color = Color::srgba(0.08, 0.08, 0.11, 0.98);
-const ENTRY_BG: Color = Color::srgba(0.14, 0.14, 0.20, 0.95);
-
 /// Directories then matching files in `dir`, sorted, hidden entries skipped.
 fn list_dir(dir: &std::path::Path, extensions: &[String]) -> (Vec<PathBuf>, Vec<PathBuf>) {
     let mut dirs = Vec::new();
@@ -146,6 +144,7 @@ fn handle_open(
     mut next_state: ResMut<NextState<FileDialogState>>,
     mut refresh_req: MessageWriter<RefreshFileList>,
     loc: Res<Localization>,
+    theme: Res<LoadedTheme>,
     mut commands: Commands,
 ) {
     let Some(req) = requests.read().last() else {
@@ -173,7 +172,9 @@ fn handle_open(
     let title = dialog.title.clone();
     let is_save = matches!(dialog.mode, DialogMode::Save { .. });
     let save_row_display = if is_save { Display::Flex } else { Display::None };
+    let save_action_visibility = if is_save { Visibility::Inherited } else { Visibility::Hidden };
     let initial_filename = dialog.save_filename.clone();
+    let palette = theme.palette();
 
     commands
         .spawn_scene(bsn! {
@@ -186,106 +187,90 @@ fn handle_open(
                 flex_direction: {FlexDirection::Column},
                 align_items: {AlignItems::Center},
                 justify_content: {JustifyContent::Center},
-                row_gap: {Val::Px(6.0)},
             }
-            BackgroundColor({Color::srgba(0.0, 0.0, 0.0, 0.78)})
+            BackgroundColor({MODAL_BACKDROP_BG})
             GlobalZIndex(300)
             FileDialogRoot
             Children [
-                Text({title})
-                TextFont { font_size: {FontSize::Px(18.0)} }
-                TextColor({Color::WHITE})
-                --
-                Text({String::new()})
-                TextFont { font_size: {FontSize::Px(15.0)} }
-                TextColor({Color::srgb(0.6, 0.6, 0.7)})
-                DialogPathText
-                --
                 Node {
-                    flex_direction: {FlexDirection::Column},
-                    row_gap: {Val::Px(2.0)},
                     width: {Val::Px(640.0)},
-                    max_height: {Val::Percent(64.0)},
-                    overflow: {Overflow::scroll_y()},
-                    padding: {UiRect::all(Val::Px(6.0))},
+                    max_width: {Val::Percent(94.0)},
+                    max_height: {Val::Percent(90.0)},
+                    flex_direction: {FlexDirection::Column},
+                    row_gap: {Val::Px(12.0)},
+                    padding: {UiRect::all(Val::Px(20.0))},
+                    border: {UiRect::all(Val::Px(1.0))},
                 }
-                BackgroundColor({PANEL_BG})
-                FileDialogList
-                ScrollArea
-                // Focus has to start inside the dialog, or Tab walks the page
-                // behind it (a modal TabGroup only keeps focus already in
-                // it). The list, not a button: a focused button activates on
-                // Space and Enter, which here are typed into the filename.
-                AutoFocus
-                --
-                Node {
-                    display: {save_row_display},
-                    flex_direction: {FlexDirection::Row},
-                    align_items: {AlignItems::Center},
-                    column_gap: {Val::Px(8.0)},
-                }
+                ~{ThemeSurface::Panel}
+                ~{BorderColor::all(palette.border)}
                 Children [
-                    Text({String::from(loc.msg("dialog-file-name"))})
-                    TextFont { font_size: {FontSize::Px(15.0)} }
-                    TextColor({Color::srgb(0.75, 0.75, 0.85)})
+                    Text({title})
+                    TextFont { font_size: {FontSize::Px(24.0)} }
+                    TextColor({palette.text})
+                    --
+                    Text({String::new()})
+                    TextFont { font_size: {FontSize::Px(14.0)} }
+                    TextColor({palette.muted})
+                    DialogPathText
                     --
                     Node {
-                        width: {Val::Px(340.0)},
-                        height: {Val::Px(28.0)},
+                        flex_direction: {FlexDirection::Column},
+                        row_gap: {Val::Px(4.0)},
+                        overflow: {Overflow::scroll_y()},
+                        min_height: {Val::Px(0.0)},
+                        padding: {UiRect::all(Val::Px(6.0))},
+                        border: {UiRect::all(Val::Px(1.0))},
+                    }
+                    ~{ThemeSurface::Inset}
+                    ~{BorderColor::all(palette.border)}
+                    FileDialogList
+                    ScrollArea
+                    // Focus the list so Space and Enter still reach the filename handler.
+                    AutoFocus
+                    --
+                    Node {
+                        display: {save_row_display},
                         align_items: {AlignItems::Center},
-                        padding: {UiRect::horizontal(Val::Px(8.0))},
+                        column_gap: {Val::Px(8.0)},
+                        flex_shrink: {0.0_f32},
                     }
-                    BackgroundColor({Color::srgba(0.10, 0.10, 0.16, 1.0)})
                     Children [
-                        Text({initial_filename})
+                        Text({String::from(loc.msg("dialog-file-name"))})
                         TextFont { font_size: {FontSize::Px(15.0)} }
-                        TextColor({Color::WHITE})
-                        SaveFilenameText
+                        TextColor({palette.text})
+                        --
+                        Node {
+                            flex_grow: {1.0_f32},
+                            min_width: {Val::Px(0.0)},
+                            min_height: {Val::Px(32.0)},
+                            align_items: {AlignItems::Center},
+                            padding: {UiRect::axes(Val::Px(8.0), Val::Px(4.0))},
+                            border: {UiRect::all(Val::Px(1.0))},
+                        }
+                        ~{ThemeSurface::Inset}
+                        ~{BorderColor::all(palette.border)}
+                        Children [
+                            Text({initial_filename})
+                            TextFont { font_size: {FontSize::Px(15.0)} }
+                            TextColor({palette.text})
+                            SaveFilenameText
+                        ]
                     ]
                     --
-                    WidgetButton
-                    TabIndex(0)
                     Node {
-                        padding: {UiRect::axes(Val::Px(14.0), Val::Px(5.0))},
+                        justify_content: {JustifyContent::FlexEnd},
+                        column_gap: {Val::Px(8.0)},
+                        flex_shrink: {0.0_f32},
                     }
-                    BackgroundColor({Color::srgb(0.18, 0.28, 0.45)})
-                    on(|_: On<Activate>,
-                        mut dialog: ResMut<FileDialog>,
-                        mut chosen: MessageWriter<FileChosen>,
-                        mut confirm: MessageWriter<OpenConfirmDialog>,
-                        loc: Res<Localization>,
-                        roots: Query<Entity, With<FileDialogRoot>>,
-                        next: ResMut<NextState<FileDialogState>>,
-                        mut commands: Commands| {
-                        confirm_save(&mut dialog, &mut chosen, &mut confirm, &loc, &roots, next, &mut commands);
-                    })
                     Children [
-                        Text({String::from(loc.msg("dialog-save"))})
-                        TextFont { font_size: {FontSize::Px(15.0)} }
-                        TextColor({Color::WHITE})
+                        @button::small(&loc.msg("dialog-cancel-esc"), cancel_button)
+                        --
+                        Node { display: {save_row_display} }
+                        ~{save_action_visibility}
+                        Children [
+                            @button::small(&loc.msg("dialog-save"), save_button)
+                        ]
                     ]
-                ]
-                --
-                WidgetButton
-                TabIndex(0)
-                Node {
-                    padding: {UiRect::axes(Val::Px(14.0), Val::Px(5.0))},
-                    margin: {UiRect::top(Val::Px(4.0))},
-                }
-                BackgroundColor({ENTRY_BG})
-                on(|_: On<Activate>,
-                    mut dialog: ResMut<FileDialog>,
-                    roots: Query<Entity, With<FileDialogRoot>>,
-                    next: ResMut<NextState<FileDialogState>>,
-                    mut commands: Commands| {
-                    close(&mut dialog, &roots, next, &mut commands);
-                })
-                Children [
-
-                        Text({String::from(loc.msg("dialog-cancel-esc"))})
-                        TextFont { font_size: {FontSize::Px(15.0)} }
-                        TextColor({Color::srgb(0.85, 0.7, 0.7)})
-
                 ]
             ]
         })
@@ -294,6 +279,29 @@ fn handle_open(
         .insert(TabGroup::modal());
     next_state.set(FileDialogState::Open);
     refresh_req.write(RefreshFileList);
+}
+
+fn cancel_button(
+    _: On<Activate>,
+    mut dialog: ResMut<FileDialog>,
+    roots: Query<Entity, With<FileDialogRoot>>,
+    next: ResMut<NextState<FileDialogState>>,
+    mut commands: Commands,
+) {
+    close(&mut dialog, &roots, next, &mut commands);
+}
+
+fn save_button(
+    _: On<Activate>,
+    mut dialog: ResMut<FileDialog>,
+    mut chosen: MessageWriter<FileChosen>,
+    mut confirm: MessageWriter<OpenConfirmDialog>,
+    loc: Res<Localization>,
+    roots: Query<Entity, With<FileDialogRoot>>,
+    next: ResMut<NextState<FileDialogState>>,
+    mut commands: Commands,
+) {
+    confirm_save(&mut dialog, &mut chosen, &mut confirm, &loc, &roots, next, &mut commands);
 }
 
 /// Rebuild the entry list and path label, only when a [`RefreshFileList`] is
