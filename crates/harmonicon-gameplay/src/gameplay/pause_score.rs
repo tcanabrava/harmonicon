@@ -3,6 +3,7 @@
 use super::pause_menu::{PauseMenuRoot, SelectedPhraseIndex};
 use super::{LoopConfig, Paused, adaptive_difficulty::AdaptiveDifficulty};
 use bevy::prelude::*;
+use harmonicon_platform::theme::{Appearance, LoadedTheme, ThemeSurface};
 use bevy::ui::{RelativeCursorPosition, ScrollPosition};
 use harmonicon_app::app::{GameplayMode, SelectedSong};
 use harmonicon_core::chart::seconds_to_tick;
@@ -60,6 +61,7 @@ fn cursor_beat(normalized: Option<Vec2>, width: f32, spacing: f32) -> Option<f64
 
 #[derive(bevy::ecs::system::SystemParam)]
 pub(super) struct ScoreData<'w> {
+    theme: Res<'w, LoadedTheme>,
     selected: Res<'w, SelectedSong>,
     manifests: Res<'w, Assets<SongManifest>>,
     bravura: Option<Res<'w, BravuraFont>>,
@@ -90,6 +92,7 @@ pub(super) fn update_pause_score(
     mut summaries: Query<&mut Text, With<SelectionSummary>>,
 ) {
     let ScoreData {
+        theme,
         selected,
         manifests,
         bravura,
@@ -106,6 +109,8 @@ pub(super) fn update_pause_score(
         return;
     }
     let Some(manifest) = manifests.get(&selected.0) else { return };
+    let palette = theme.palette();
+    let light = theme.0 == Appearance::Light;
     let chart = &manifest.chart;
     let end = adaptive
         .sections
@@ -138,23 +143,23 @@ pub(super) fn update_pause_score(
                 p.spawn((
                     Text::new(loc.msg("pause-score-instructions").to_string()),
                     TextFont { font_size: FontSize::Px(16.0), ..default() },
-                    TextColor(Color::WHITE),
+                    TextColor(palette.text),
                 ));
                 p.spawn((
                     SelectionSummary,
                     Text::new(loc.msg("pause-score-no-selection").to_string()),
                     TextFont { font_size: FontSize::Px(18.0), ..default() },
-                    TextColor(Color::srgb(0.65, 0.82, 1.0)),
+                    TextColor(palette.accent),
                 ));
                 viewport = harmonicon_ui::dialogs::scroll_area::spawn_scroll_area_xy(
                     p,
-                    Color::srgb(0.55, 0.60, 0.7),
-                    Color::srgb(0.12, 0.14, 0.18),
+                    palette.muted,
+                    palette.inset,
                 );
             });
             commands
                 .entity(viewport)
-                .insert((Viewport, BackgroundColor(Color::srgb(0.06, 0.07, 0.09))))
+                .insert((Viewport, ThemeSurface::Inset))
                 .with_children(|p| {
                     p.spawn((
                         Content,
@@ -177,7 +182,7 @@ pub(super) fn update_pause_score(
                                     flex_shrink: 0.0,
                                     ..default()
                                 },
-                                BackgroundColor(Color::srgb(0.11, 0.13, 0.18)),
+                                ThemeSurface::Panel,
                             ))
                             .with_children(|band| {
                                 for (index, section) in adaptive.sections.iter().enumerate() {
@@ -207,8 +212,8 @@ pub(super) fn update_pause_score(
                                             overflow: Overflow::clip(),
                                             ..default()
                                         },
-                                        BorderColor::all(Color::srgb(0.45, 0.5, 0.6)),
-                                        BackgroundColor(Color::srgb(0.16, 0.21, 0.28)),
+                                        BorderColor::all(palette.border),
+                                        ThemeSurface::Control,
                                     ))
                                     .observe(select_zone)
                                     .with_children(|p| {
@@ -216,13 +221,13 @@ pub(super) fn update_pause_score(
                                             Text::new(section.name.clone()),
                                             TextLayout::no_wrap(),
                                             TextFont { font_size: FontSize::Px(13.0), ..default() },
-                                            TextColor(Color::WHITE),
+                                            TextColor(palette.text),
                                             Pickable::IGNORE,
                                         ));
                                     });
                                 }
                             });
-                        let score = music_score::full_score::spawn_full_score(content, &bravura, grand, end);
+                        let score = music_score::full_score::spawn_full_score(content, &bravura, grand, end, light);
                         if let Some(instrument) = chart.instrument() {
                             music_score::apply_instrument_clef(content, score, instrument.kind());
                         }
@@ -237,8 +242,8 @@ pub(super) fn update_pause_score(
                                     border: UiRect::horizontal(Val::Px(2.0)),
                                     ..default()
                                 },
-                                BackgroundColor(Color::srgba(0.3, 0.65, 1.0, 0.06)),
-                                BorderColor::all(Color::srgb(0.4, 0.75, 1.0)),
+                                BackgroundColor(palette.selected.with_alpha(0.22)),
+                                BorderColor::all(palette.accent),
                                 Pickable::IGNORE,
                             ))
                             .with_children(|p| {
@@ -246,7 +251,7 @@ pub(super) fn update_pause_score(
                                     p.spawn((
                                         Text::new(text),
                                         TextFont { font_size: FontSize::Px(13.0), ..default() },
-                                        TextColor(Color::srgb(0.4, 0.75, 1.0)),
+                                        TextColor(palette.accent),
                                         Node {
                                             position_type: PositionType::Absolute,
                                             left: if right { Val::Auto } else { Val::Px(2.0) },

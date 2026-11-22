@@ -17,6 +17,7 @@ pub(super) struct FullScoreLayer {
     grand: bool,
     root: Entity,
     dirty: bool,
+    appearance: ScoreAppearance,
     end: f64,
 }
 
@@ -27,8 +28,10 @@ pub fn spawn_full_score(
     bravura: &BravuraFont,
     grand: bool,
     end: f64,
+    light: bool,
 ) -> Entity {
-    let root = spawn_score(parent, bravura, grand, ScoreAppearance::Hud);
+    let appearance = if light { ScoreAppearance::Light } else { ScoreAppearance::Hud };
+    let root = spawn_score(parent, bravura, grand, appearance);
     parent.commands().queue(move |world: &mut World| {
         world.entity_mut(root).remove::<MusicScorePanel>();
         let children: Vec<_> = world.get::<Children>(root).into_iter().flatten().copied().collect();
@@ -42,6 +45,7 @@ pub fn spawn_full_score(
                     grand,
                     root,
                     dirty: true,
+                    appearance,
                     end,
                 });
             }
@@ -100,7 +104,7 @@ pub(super) fn rebuild_full_score(
             &mut clefs,
             &mut signatures,
             full.grand,
-            forced, octave_annotation, &signature.0, ScoreAppearance::Hud,
+            forced, octave_annotation, &signature.0, full.appearance,
         );
         commands.entity(layer).with_children(|parent| {
             for (index, beat) in std::iter::once(0.0).chain(bars.beats(0.0, end)).enumerate() {
@@ -109,7 +113,7 @@ pub(super) fn rebuild_full_score(
                     MusicScoreNoteGlyph,
                     Text::new(number.to_string()),
                     TextFont { font_size: FontSize::Px(12.0), ..default() },
-                    TextColor(Color::srgb(0.65, 0.72, 0.82)),
+                    TextColor(full.appearance.ink()),
                     Node {
                         position_type: PositionType::Absolute,
                         left: Val::Px(beat as f32 * spacing.0),
@@ -132,7 +136,7 @@ mod full_score_tests {
         app.world_mut().commands().spawn(Node::default()).with_children(|p| {
             let font = BravuraFont(Handle::default());
             spawn_music_score(p, &font);
-            spawn_full_score(p, &font, true, 16.0);
+            spawn_full_score(p, &font, true, 16.0, false);
         });
         app.world_mut().flush();
         let world = app.world_mut();
@@ -149,7 +153,7 @@ mod full_score_tests {
         app.world_mut().commands().spawn(Node::default()).with_children(|p| {
             let font = BravuraFont(Handle::default());
             live = spawn_music_score(p, &font);
-            full = spawn_full_score(p, &font, false, 4.0);
+            full = spawn_full_score(p, &font, false, 4.0, true);
         });
         app.world_mut().flush();
         app.world_mut()
@@ -166,6 +170,10 @@ mod full_score_tests {
         app.update();
 
         let world = app.world_mut();
+        assert_eq!(
+            world.get::<BackgroundColor>(full).unwrap().0,
+            harmonicon_platform::theme::Appearance::Light.palette().panel,
+        );
         let clef_of = |world: &mut World, root: Entity| {
             world
                 .query_filtered::<(&Text, &ChildOf), With<MusicScoreClef>>()

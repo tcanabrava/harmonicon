@@ -15,7 +15,7 @@ use super::{GameplayRoot, LoopConfig, MusicPlayer, Paused, SongInfo, spawn_song_
 use harmonicon_app::app::{AppState, GameplayMode, ReturnToSongList, SelectedSong};
 use harmonicon_app::profile::PlayerProfile;
 use harmonicon_platform::localization::{Localization, LocalizationExt};
-use harmonicon_platform::theme::{MODAL_BACKDROP_BG, MODAL_PANEL_BG, MODAL_PANEL_BORDER};
+use harmonicon_platform::theme::{LoadedTheme, MODAL_BACKDROP_BG, ThemeSurface};
 use harmonicon_song::lessons::LessonContext;
 use harmonicon_song::song::SongManifest;
 use harmonicon_ui::dialogs::button;
@@ -150,11 +150,11 @@ fn practice_speed_slider_scene(value: f32) -> impl Scene {
         Slider { track_click: {TrackClick::Snap} }
         SliderValue({value})
         Node { width: {Val::Px(140.0)}, height: {Val::Px(12.0)} }
-        BackgroundColor({Color::srgb(0.14, 0.14, 0.22)})
+        ~{ThemeSurface::Inset}
         on(set_practice_speed)
         Children [
             Node { width: {Val::Percent(frac * 100.0)}, height: {Val::Percent(100.0)} }
-            BackgroundColor({Color::srgb(0.35, 0.75, 1.0)})
+            ~{ThemeSurface::HitLine}
             PracticeSpeedFill
             Pickable { should_block_lower: {false}, is_hoverable: {false} }
         ]
@@ -451,12 +451,12 @@ fn phrase_learned_slider_scene(value: f32) -> impl Scene {
         Slider { track_click: {TrackClick::Snap} }
         SliderValue({value})
         Node { width: {Val::Px(140.0)}, height: {Val::Px(12.0)} }
-        BackgroundColor({Color::srgb(0.14, 0.14, 0.22)})
+        ~{ThemeSurface::Inset}
         PhraseLearnedSlider
         on(on_phrase_learned_slider_change)
         Children [
             Node { width: {Val::Percent(value * 100.0)}, height: {Val::Percent(100.0)} }
-            BackgroundColor({Color::srgb(0.35, 0.75, 1.0)})
+            ~{ThemeSurface::HitLine}
             PhraseLearnedFill
             Pickable { should_block_lower: {false}, is_hoverable: {false} }
         ]
@@ -549,7 +549,9 @@ pub(super) fn setup_pause_menu(
     adaptive: Res<AdaptiveDifficulty>,
     song_info: Res<SongInfo>,
     loc: Res<Localization>,
+    theme: Res<LoadedTheme>,
 ) {
+    let palette = theme.palette();
     let is_jam = *mode == GameplayMode::JamSession;
     // A scale-adherence lesson (see `PassCriteria::ScaleAdherence`) is the
     // one lesson type that never reaches the results screen on its own —
@@ -576,7 +578,7 @@ pub(super) fn setup_pause_menu(
                 align_items: {AlignItems::Center},
                 padding: {if is_jam { UiRect::all(Val::Px(16.0)).with_top(Val::Px(8.0 + BAR_HEIGHT)) } else { UiRect::all(Val::Px(16.0)) }},
             }
-            BackgroundColor({if is_jam { MODAL_BACKDROP_BG } else { Color::srgb(0.045, 0.05, 0.07) }})
+            BackgroundColor({if is_jam { MODAL_BACKDROP_BG } else { palette.canvas }})
             GlobalZIndex(300)
         })
         .insert((GameplayRoot, PauseMenuRoot, Visibility::Hidden))
@@ -622,8 +624,8 @@ pub(super) fn setup_pause_menu(
     let actions = commands
         .spawn((
             card_node(AlignItems::Center),
-            BackgroundColor(MODAL_PANEL_BG),
-            BorderColor::all(MODAL_PANEL_BORDER),
+            ThemeSurface::Panel,
+            BorderColor::all(palette.border),
         ))
         .id();
     commands.entity(root).add_child(actions);
@@ -634,7 +636,7 @@ pub(super) fn setup_pause_menu(
         col.spawn_empty().apply_scene(bsn! {
             Text({String::from(loc.msg("pause-paused"))})
             TextFont { font_size: {FontSize::Px(34.0)} }
-            TextColor({Color::WHITE})
+            TextColor({palette.text})
         });
         col.spawn_empty().apply_scene(button::default(&loc.msg("pause-resume"), on_resume));
         col.spawn_empty().apply_scene(button::default(&loc.msg("pause-restart"), on_restart));
@@ -652,8 +654,8 @@ pub(super) fn setup_pause_menu(
     let aids = commands
         .spawn((
             card_node(AlignItems::Start),
-            BackgroundColor(MODAL_PANEL_BG),
-            BorderColor::all(MODAL_PANEL_BORDER),
+            ThemeSurface::Panel,
+            BorderColor::all(palette.border),
         ))
         .id();
 
@@ -672,7 +674,7 @@ pub(super) fn setup_pause_menu(
                     --
                     Text({wait_mode_label_text(&loc, false)})
                     TextFont { font_size: {FontSize::Px(15.0)} }
-                    TextColor({Color::srgb(0.70, 0.70, 0.80)})
+                    TextColor({palette.text})
                     WaitForNoteLabel
                 ]
             });
@@ -691,7 +693,7 @@ pub(super) fn setup_pause_menu(
                     --
                     Text({String::new()})
                     TextFont { font_size: {FontSize::Px(15.0)} }
-                    TextColor({Color::srgb(0.70, 0.70, 0.80)})
+                    TextColor({palette.text})
                     super::flute_visuals::FluteViewLabel
                 ]
             });
@@ -706,8 +708,8 @@ pub(super) fn setup_pause_menu(
     let practice = commands
         .spawn((
             card_node(AlignItems::Start),
-            BackgroundColor(MODAL_PANEL_BG),
-            BorderColor::all(MODAL_PANEL_BORDER),
+            ThemeSurface::Panel,
+            BorderColor::all(palette.border),
         ))
         .id();
     commands.entity(root).add_child(practice);
@@ -726,7 +728,7 @@ pub(super) fn setup_pause_menu(
                     --
                     Text({adaptive_difficulty_label_text(&loc, adaptive.enabled)})
                     TextFont { font_size: {FontSize::Px(15.0)} }
-                    TextColor({Color::srgb(0.70, 0.70, 0.80)})
+                    TextColor({palette.text})
                     AdaptiveDifficultyLabel
                 ]
             });
@@ -737,7 +739,7 @@ pub(super) fn setup_pause_menu(
             children.spawn_empty().apply_scene(bsn! {
                 Text({phrase_text})
                 TextFont { font_size: {FontSize::Px(15.0)} }
-                TextColor({Color::srgb(0.70, 0.70, 0.80)})
+                TextColor({palette.text})
                 PhraseSelectorLabel
             });
         });
@@ -746,7 +748,7 @@ pub(super) fn setup_pause_menu(
             p.spawn((
                 Text::new(loc.msg("pause-achievement-not-assessed").to_string()),
                 TextFont { font_size: FontSize::Px(14.0), ..default() },
-                TextColor(Color::srgb(0.65, 0.7, 0.78)),
+                TextColor(palette.muted),
             ));
             p.spawn((
                 bevy::ui_widgets::Button,
@@ -754,14 +756,14 @@ pub(super) fn setup_pause_menu(
                 RepeatButtonLabel,
                 Text::new(loc.msg("pause-repeat-off").to_string()),
                 TextFont { font_size: FontSize::Px(16.0), ..default() },
-                TextColor(Color::WHITE),
+                TextColor(palette.text),
                 Node {
                     padding: UiRect::axes(Val::Px(12.0), Val::Px(8.0)),
                     border: UiRect::all(Val::Px(1.0)),
                     ..default()
                 },
-                BackgroundColor(Color::srgb(0.12, 0.22, 0.32)),
-                BorderColor::all(Color::srgb(0.4, 0.75, 1.0)),
+                ThemeSurface::Selected,
+                BorderColor::all(palette.accent),
             ))
             .observe(on_repeat_section);
         });
@@ -769,12 +771,12 @@ pub(super) fn setup_pause_menu(
             children.spawn_empty().apply_scene(bsn! {
                 Text({String::from(loc.msg("pause-drag-section-hint"))})
                 TextFont { font_size: {FontSize::Px(13.0)} }
-                TextColor({Color::srgb(0.55, 0.55, 0.62)})
+                TextColor({palette.muted})
             });
             children.spawn_empty().apply_scene(bsn! {
                 Text({String::from(loc.msg("pause-notes-update-hint"))})
                 TextFont { font_size: {FontSize::Px(13.0)} }
-                TextColor({Color::srgb(0.55, 0.55, 0.62)})
+                TextColor({palette.muted})
             });
         });
     }
@@ -789,14 +791,14 @@ pub(super) fn setup_pause_menu(
             Children [
                 Text({loop_label_text(&loc, &LoopConfig::default())})
                 TextFont { font_size: {FontSize::Px(15.0)} }
-                TextColor({Color::srgb(0.70, 0.70, 0.80)})
+                TextColor({palette.text})
                 LoopRangeLabel
             ]
         });
         children.spawn_empty().apply_scene(bsn! {
             Text({String::from(loc.msg("pause-drag-loop-hint"))})
             TextFont { font_size: {FontSize::Px(15.0)} }
-            TextColor({Color::srgb(0.55, 0.55, 0.62)})
+            TextColor({palette.muted})
         });
     });
 
