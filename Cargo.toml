@@ -97,7 +97,7 @@ bevy = { workspace = true }
 serde_json = { workspace = true }
 jsonschema = { workspace = true }
 dirs = { workspace = true }
-regex = "1.13.1"
+regex = "1.13.2"
 
 [features]
 # Local iteration: Bevy's debug names + asset file watcher + BRP. Never ship it.
