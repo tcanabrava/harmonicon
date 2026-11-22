@@ -25,13 +25,16 @@ pub(super) fn spawn_staff_window(
     update_clef: bool,
     octave_annotation: i8,
     signature: &harmonicon_core::notation::KeySignature,
+    appearance: ScoreAppearance,
 ) {
     // One clef for the whole song, from its own range — see `choose_clef`.
     let clef = notation::resolve_clef(notes, forced);
     let own = |parent: &ChildOf| parent.parent() == root;
     for (mut text, mut node, _) in clefs.iter_mut().filter(|(_, _, p)| update_clef && own(p)) {
         let glyph = match (clef, octave_annotation) {
-            (Clef::Bass, -1) => "\u{E064}", (Clef::Treble, -1) => "\u{E052}", _ => clef.glyph(),
+            (Clef::Bass, -1) => "\u{E064}",
+            (Clef::Treble, -1) => "\u{E052}",
+            _ => clef.glyph(),
         };
         if text.0 != glyph {
             text.0 = glyph.to_string();
@@ -72,7 +75,7 @@ pub(super) fn spawn_staff_window(
                     height: Val::Px(8.0 * STEP_PX),
                     ..default()
                 },
-                BackgroundColor(Color::srgba(0.75, 0.75, 0.80, 0.45)),
+                BackgroundColor(appearance.rule(0.45)),
                 MusicScoreNoteGlyph,
             ));
         }
@@ -86,7 +89,7 @@ pub(super) fn spawn_staff_window(
             }
             let x = ((rest.start_beat - origin) * scale as f64) as f32;
             parent.spawn((
-                glyph(bravura, rest.glyph(), x, y_for_step(rest.staff_step()), Color::WHITE),
+                glyph(bravura, rest.glyph(), x, y_for_step(rest.staff_step()), appearance.ink()),
                 MusicScoreNoteGlyph,
             ));
             if rest.dots > 0 {
@@ -96,7 +99,7 @@ pub(super) fn spawn_staff_window(
                         glyph::AUGMENTATION_DOT,
                         x + 1.5 * STAFF_LINE_SPACING,
                         y_for_step(5),
-                        Color::WHITE,
+                        appearance.ink(),
                     ),
                     MusicScoreNoteGlyph,
                 ));
@@ -120,6 +123,7 @@ pub(super) fn spawn_staff_window(
                     stems[i],
                     marks[i],
                     scale,
+                    appearance,
                 );
             }
         }

@@ -18,7 +18,7 @@ use super::{BEAT_W, HOLE_COL_W, NOTE_PAD, ROW_H, grid_height};
 use harmonicon_audio::AudioSettings;
 use harmonicon_platform::localization::{Localization, LocalizationExt};
 use harmonicon_platform::settings::ActionButtonStyle;
-use harmonicon_platform::theme::{LoadedTheme, SongEditorColors};
+use harmonicon_platform::theme::{Appearance, LoadedTheme, SongEditorColors};
 
 // ── Components ────────────────────────────────────────────────────────────────
 
@@ -956,17 +956,19 @@ pub(super) fn sync_editor_score(
     mut commands: Commands,
     state: Res<EditorState>,
     bravura: Option<Res<harmonicon_ui::music_score::BravuraFont>>,
+    theme: Option<Res<LoadedTheme>>,
     slots: Query<(Entity, Option<&Children>), With<EditorScoreSlot>>,
-    mut last: Local<Option<(Entity, harmonicon_core::instrument::InstrumentKind)>>,
+    mut last: Local<Option<(Entity, harmonicon_core::instrument::InstrumentKind, bool)>>,
 ) {
     let Some(bravura) = bravura else { return };
     let Ok((slot, children)) = slots.single() else { return };
     let kind = state.effective_instrument().kind();
     let piano = super::piano_note::is_piano(&state);
-    if *last == Some((slot, kind)) {
+    let light = theme.is_some_and(|theme| theme.0 == Appearance::Light);
+    if *last == Some((slot, kind, light)) {
         return;
     }
-    *last = Some((slot, kind));
+    *last = Some((slot, kind, light));
     if let Some(children) = children {
         for &child in children {
             commands.entity(child).despawn();
@@ -987,10 +989,9 @@ pub(super) fn sync_editor_score(
             ..default()
         })
         .with_children(|parent| {
-            if piano {
-                harmonicon_ui::music_score::spawn_piano_score(parent, &bravura);
-            } else {
-                let score = harmonicon_ui::music_score::spawn_music_score(parent, &bravura);
+            let score =
+                harmonicon_ui::music_score::spawn_editor_score(parent, &bravura, piano, light);
+            if !piano {
                 harmonicon_ui::music_score::apply_instrument_clef(parent, score, kind);
             }
         });
@@ -1001,6 +1002,49 @@ mod editor_score_tests {
     use super::super::instrument_ui::InstrumentKind;
     use super::*;
     use harmonicon_ui::music_score::{BravuraFont, Clef, PANEL_HEIGHT, PianoGrandStaff};
+
+    #[test]
+    fn editor_score_follows_appearance_changes() {
+        let mut app = App::new();
+        app.insert_resource(super::super::document_picker::fresh(
+            InstrumentKind::Piano.selection(),
+        ))
+        .insert_resource(BravuraFont(Handle::default()))
+        .init_resource::<LoadedTheme>()
+        .add_systems(Update, sync_editor_score);
+        let slot = app.world_mut().spawn((EditorScoreSlot, Node::default())).id();
+
+        for appearance in [Appearance::Light, Appearance::Dark, Appearance::Light] {
+            app.world_mut().resource_mut::<LoadedTheme>().0 = appearance;
+            app.update();
+
+            let world = app.world();
+            let children = world.get::<Children>(slot).unwrap();
+            assert_eq!(children.len(), 1);
+            let score = children[0];
+            let (paper, ink) = if appearance == Appearance::Light {
+                (appearance.palette().panel, appearance.palette().text)
+            } else {
+                (harmonicon_platform::theme::HUD_PANEL_BG, Color::WHITE)
+            };
+            assert_eq!(world.get::<BackgroundColor>(score).unwrap().0, paper);
+            let clefs: Vec<_> = world
+                .get::<Children>(score)
+                .unwrap()
+                .into_iter()
+                .copied()
+                .filter(|entity| {
+                    world.get::<Text>(*entity).is_some_and(|text| {
+                        text.0 == Clef::Treble.glyph() || text.0 == Clef::Bass.glyph()
+                    })
+                })
+                .collect();
+            assert_eq!(clefs.len(), 2);
+            for clef in clefs {
+                assert_eq!(world.get::<TextColor>(clef).unwrap().0, ink);
+            }
+        }
+    }
 
     #[test]
     fn editor_score_changes_to_a_grand_staff_when_a_piano_document_is_chosen() {

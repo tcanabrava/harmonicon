@@ -28,7 +28,7 @@ pub fn spawn_full_score(
     grand: bool,
     end: f64,
 ) -> Entity {
-    let root = spawn_score(parent, bravura, grand);
+    let root = spawn_score(parent, bravura, grand, ScoreAppearance::Hud);
     parent.commands().queue(move |world: &mut World| {
         world.entity_mut(root).remove::<MusicScorePanel>();
         let children: Vec<_> = world.get::<Children>(root).into_iter().flatten().copied().collect();
@@ -100,7 +100,7 @@ pub(super) fn rebuild_full_score(
             &mut clefs,
             &mut signatures,
             full.grand,
-            forced, octave_annotation, &signature.0,
+            forced, octave_annotation, &signature.0, ScoreAppearance::Hud,
         );
         commands.entity(layer).with_children(|parent| {
             for (index, beat) in std::iter::once(0.0).chain(bars.beats(0.0, end)).enumerate() {
@@ -156,12 +156,7 @@ mod full_score_tests {
             .entity_mut(full)
             .insert((InstrumentScoreClef(Clef::Bass), InheritedVisibility::VISIBLE));
         app.insert_resource(BravuraFont(Handle::default()))
-            .insert_resource(TieMaterialHandle {
-                below: Handle::default(),
-                above: Handle::default(),
-                below_highlighted: Handle::default(),
-                above_highlighted: Handle::default(),
-            })
+            .init_resource::<TieMaterialHandle>()
             .init_resource::<MusicScoreNotes>()
             .init_resource::<MusicScoreMeter>()
             .init_resource::<MusicScoreBarMap>()

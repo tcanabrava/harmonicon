@@ -710,8 +710,54 @@ fn load_bravura_font(mut fonts: ResMut<Assets<Font>>, mut commands: Commands) {
 #[derive(Component)]
 pub struct PianoGrandStaff;
 
+#[derive(Component, Clone, Copy)]
+enum ScoreAppearance {
+    Hud,
+    EditorLight,
+}
+
+impl ScoreAppearance {
+    fn paper(self) -> Color {
+        match self {
+            Self::Hud => harmonicon_platform::theme::HUD_PANEL_BG,
+            Self::EditorLight => harmonicon_platform::theme::Appearance::Light.palette().panel,
+        }
+    }
+
+    fn ink(self) -> Color {
+        match self {
+            Self::Hud => Color::WHITE,
+            Self::EditorLight => harmonicon_platform::theme::Appearance::Light.palette().text,
+        }
+    }
+
+    fn highlight(self) -> Color {
+        match self {
+            Self::Hud => HIGHLIGHT_COLOR,
+            Self::EditorLight => harmonicon_platform::theme::Appearance::Light.palette().accent,
+        }
+    }
+
+    fn rule(self, alpha: f32) -> Color {
+        match self {
+            Self::Hud => Color::srgba(0.75, 0.75, 0.80, alpha),
+            Self::EditorLight => harmonicon_platform::theme::Appearance::Light.palette().muted.with_alpha(alpha),
+        }
+    }
+}
+
+pub fn spawn_editor_score(
+    parent: &mut ChildSpawnerCommands,
+    bravura: &BravuraFont,
+    grand: bool,
+    light: bool,
+) -> Entity {
+    let appearance = if light { ScoreAppearance::EditorLight } else { ScoreAppearance::Hud };
+    spawn_score(parent, bravura, grand, appearance)
+}
+
 pub fn spawn_music_score(parent: &mut ChildSpawnerCommands, bravura: &BravuraFont) -> Entity {
-    spawn_score(parent, bravura, false)
+    spawn_score(parent, bravura, false, ScoreAppearance::Hud)
 }
 /// Space for section labels inside the live score, above the notation.
 pub const SECTION_HEADER_HEIGHT: f32 = 24.0;
@@ -721,7 +767,7 @@ pub fn spawn_sectioned_score(
     bravura: &BravuraFont,
     grand: bool,
 ) -> Entity {
-    let root = spawn_score(parent, bravura, grand);
+    let root = spawn_score(parent, bravura, grand, ScoreAppearance::Hud);
     parent.commands().queue(move |world: &mut World| {
         let height = PANEL_HEIGHT * if grand { 2.0 } else { 1.0 } + SECTION_HEADER_HEIGHT;
         world.get_mut::<Node>(root).unwrap().height = Val::Px(height);
@@ -741,9 +787,9 @@ pub fn spawn_sectioned_score(
 }
 
 pub fn spawn_piano_score(parent: &mut ChildSpawnerCommands, bravura: &BravuraFont) -> Entity {
-    spawn_score(parent, bravura, true)
+    spawn_score(parent, bravura, true, ScoreAppearance::Hud)
 }
-fn spawn_score(parent: &mut ChildSpawnerCommands, bravura: &BravuraFont, grand: bool) -> Entity {
+fn spawn_score(parent: &mut ChildSpawnerCommands, bravura: &BravuraFont, grand: bool, appearance: ScoreAppearance) -> Entity {
     let mut root = parent.spawn((
         Node {
             width: Val::Percent(100.0),
@@ -758,16 +804,20 @@ fn spawn_score(parent: &mut ChildSpawnerCommands, bravura: &BravuraFont, grand: 
             ..default()
         },
         // Shared with the song-progress bar, so the two read as one panel.
-        BackgroundColor(harmonicon_platform::theme::HUD_PANEL_BG),
-        BorderColor::all(harmonicon_platform::theme::HUD_DIVIDER_COLOR),
+        BackgroundColor(appearance.paper()),
+        BorderColor::all(match appearance {
+            ScoreAppearance::Hud => harmonicon_platform::theme::HUD_DIVIDER_COLOR,
+            ScoreAppearance::EditorLight => harmonicon_platform::theme::Appearance::Light.palette().border,
+        }),
         MusicScorePanel,
+        appearance,
     ));
     if grand {
         root.insert(PianoGrandStaff);
     }
     let root_id = root.id();
     root.with_children(|panel| {
-        panel.spawn((Node { position_type: PositionType::Absolute, width: Val::Px(PLAYHEAD_X - 8.0), height: Val::Percent(100.0), ..default() }, BackgroundColor(harmonicon_platform::theme::HUD_PANEL_BG), ZIndex(1), bevy::picking::Pickable::IGNORE));
+        panel.spawn((Node { position_type: PositionType::Absolute, width: Val::Px(PLAYHEAD_X - 8.0), height: Val::Percent(100.0), ..default() }, BackgroundColor(appearance.paper()), ZIndex(1), bevy::picking::Pickable::IGNORE));
         key_signature::spawn(panel, root_id, false);
         if grand { key_signature::spawn(panel, root_id, true); }
         if grand {
@@ -780,10 +830,10 @@ fn spawn_score(parent: &mut ChildSpawnerCommands, bravura: &BravuraFont, grand: 
                         height: Val::Px(1.0),
                         ..default()
                     },
-                    BackgroundColor(Color::srgba(0.75, 0.75, 0.80, 0.6)),
+                    BackgroundColor(appearance.rule(0.6)),
                 ));
             }
-            panel.spawn((glyph(bravura, Clef::Bass.glyph(), CLEF_X, PANEL_HEIGHT + y_for_step(Clef::Bass.anchor_step()), Color::WHITE), ZIndex(2)));
+            panel.spawn((glyph(bravura, Clef::Bass.glyph(), CLEF_X, PANEL_HEIGHT + y_for_step(Clef::Bass.anchor_step()), appearance.ink()), ZIndex(2)));
             for (numerator, step, digit) in
                 [(true, TIME_SIG_NUMERATOR_STEP, 4), (false, TIME_SIG_DENOMINATOR_STEP, 4)]
             {
@@ -793,7 +843,7 @@ fn spawn_score(parent: &mut ChildSpawnerCommands, bravura: &BravuraFont, grand: 
                         time_sig_glyphs(digit),
                         TIME_SIG_X,
                         PANEL_HEIGHT + y_for_step(step),
-                        Color::WHITE,
+                        appearance.ink(),
                     ),
                     MusicScoreTimeSig { numerator }, ZIndex(2),
                 ));
@@ -811,7 +861,7 @@ fn spawn_score(parent: &mut ChildSpawnerCommands, bravura: &BravuraFont, grand: 
                     height: Val::Px(1.0),
                     ..default()
                 },
-                BackgroundColor(Color::srgba(0.75, 0.75, 0.80, 0.6)),
+                BackgroundColor(appearance.rule(0.6)),
             ));
         }
         // Clef — its glyph's own SMuFL origin sits on the line it names
@@ -819,7 +869,7 @@ fn spawn_score(parent: &mut ChildSpawnerCommands, bravura: &BravuraFont, grand: 
         // `rebuild_score_notes` once there are notes to judge the range by.
         let clef = Clef::default();
         panel.spawn((
-            glyph(bravura, clef.glyph(), CLEF_X, y_for_step(clef.anchor_step()), Color::WHITE),
+            glyph(bravura, clef.glyph(), CLEF_X, y_for_step(clef.anchor_step()), appearance.ink()),
             MusicScoreClef,
             ZIndex(2),
         ));
@@ -832,7 +882,7 @@ fn spawn_score(parent: &mut ChildSpawnerCommands, bravura: &BravuraFont, grand: 
             (false, TIME_SIG_DENOMINATOR_STEP, meter.denominator),
         ] {
             panel.spawn((
-                glyph(bravura, time_sig_glyphs(digit), TIME_SIG_X, y_for_step(step), Color::WHITE),
+                glyph(bravura, time_sig_glyphs(digit), TIME_SIG_X, y_for_step(step), appearance.ink()),
                 MusicScoreTimeSig { numerator }, ZIndex(2),
             ));
         }
@@ -909,7 +959,7 @@ fn rebuild_score_notes(
     selection: Res<MusicScoreSelection>,
     playhead: Res<MusicScorePlayhead>,
     panels: Query<
-        (Entity, &ComputedNode, Option<&PianoGrandStaff>, Option<Ref<InstrumentScoreClef>>, Option<&InstrumentOctaveAnnotation>),
+        (Entity, &ComputedNode, Option<&PianoGrandStaff>, Option<Ref<InstrumentScoreClef>>, Option<&InstrumentOctaveAnnotation>, &ScoreAppearance),
         With<MusicScorePanel>,
     >,
     mut layers: Query<(Entity, &mut Node, &ChildOf), (With<MusicScoreNotesLayer>, Without<MusicScoreClef>)>,
@@ -935,11 +985,10 @@ fn rebuild_score_notes(
     // px, so this needs `inverse_scale_factor()` to match — same
     // conversion `gameplay_2d::size_note_ribbons` already applies for the
     // same reason.
-    let Some((panel, panel_width)) =
-        panels.iter().next().map(|(e, n, _, _, _)| (e, n.size().x * n.inverse_scale_factor()))
-    else {
+    let Some((panel, node, grand, forced, octave, &appearance)) = panels.iter().next() else {
         return;
     };
+    let panel_width = node.size().x * node.inverse_scale_factor();
     let Some((layer, _, _)) = layers.iter().find(|(_, _, parent)| parent.parent() == panel) else {
         return;
     };
@@ -961,7 +1010,7 @@ fn rebuild_score_notes(
         || bar_map.is_changed()
         || spacing.is_changed()
         || signature.is_changed()
-        || panels.iter().any(|(_, _, _, clef, _)| clef.is_some_and(|clef| clef.is_changed()))
+        || forced.as_ref().is_some_and(|clef| clef.is_changed())
     {
         let span = beats_behind + beats_ahead;
         let lo = now - beats_behind - span;
@@ -982,10 +1031,11 @@ fn rebuild_score_notes(
             &existing,
             &mut clefs,
             &mut time_sigs,
-            panels.iter().next().is_some_and(|(_, _, grand, _, _)| grand.is_some()),
-            panels.iter().next().and_then(|(_, _, _, clef, _)| clef.map(|clef| clef.0)),
-            panels.iter().next().and_then(|(_, _, _, _, octave)| octave.map(|octave| octave.0)).unwrap_or(0),
+            grand.is_some(),
+            forced.map(|clef| clef.0),
+            octave.map_or(0, |octave| octave.0),
             &signature.0,
+            appearance,
         );
         commands.entity(layer).with_children(|parent| {
             for section in &sections.0 {
@@ -1023,7 +1073,7 @@ fn rebuild_score_notes(
         });
         if let Some((start, end)) = selection.0 {
             let height = PANEL_HEIGHT
-                * if panels.iter().next().is_some_and(|(_, _, grand, _, _)| grand.is_some()) {
+                * if panels.iter().next().is_some_and(|(_, _, grand, _, _, _)| grand.is_some()) {
                     2.0
                 } else {
                     1.0
@@ -1102,6 +1152,7 @@ fn spawn_window(
     forced: Option<Clef>,
     octave_annotation: i8,
     signature: &harmonicon_core::notation::KeySignature,
+    appearance: ScoreAppearance,
 ) {
     for (glyph, parent) in existing {
         if parent.parent() == layer {
@@ -1127,7 +1178,7 @@ fn spawn_window(
             clefs,
             time_sigs,
             Some(Clef::Treble),
-            true, 0, signature,
+            true, 0, signature, appearance,
         );
         let bass = commands
             .spawn((
@@ -1158,7 +1209,7 @@ fn spawn_window(
             clefs,
             time_sigs,
             Some(Clef::Bass),
-            false, 0, signature,
+            false, 0, signature, appearance,
         );
     } else {
         spawn_staff_window(
@@ -1177,7 +1228,7 @@ fn spawn_window(
             clefs,
             time_sigs,
             forced,
-            true, octave_annotation, signature,
+            true, octave_annotation, signature, appearance,
         );
     }
 }

@@ -6,12 +6,8 @@
 //! the same "custom shader for a shape a plain `Node` can't express"
 //! pattern `gameplay::note_ribbon_2d::NoteRibbon2dMaterial` already
 //! established for the falling-note comet tail, applied here to a small,
-//! static shape instead of an animated one. Two shared material instances
-//! cover every tie in the panel — one bowing down under the notes, one up
-//! over them: unlike the note tail (animated per-note, so each note needs
-//! its own material instance to carry its own uniform values), a tie's
-//! shape never varies, so [`TieMaterialHandle`] is created once at startup
-//! and every tie glyph just clones the `Handle` for its side.
+//! static shape. Each score appearance shares one material per direction
+//! and highlight state.
 
 use bevy::prelude::*;
 use bevy::render::render_resource::AsBindGroup;
@@ -38,11 +34,24 @@ impl UiMaterial for TieMaterial {
 }
 
 /// The shared tie materials every tie glyph in the panel points at — one
-/// per side, in white and in the highlight gold (a tie belongs to its note,
-/// so it follows the note's highlight). See the module doc comment for why
-/// shared instances are enough.
-#[derive(Resource, Clone)]
-pub struct TieMaterialHandle {
+/// per direction and highlight state for each score appearance.
+#[derive(Resource, Default)]
+pub(super) struct TieMaterialHandle {
+    hud: TieMaterials,
+    editor_light: TieMaterials,
+}
+
+impl TieMaterialHandle {
+    pub(super) fn for_score(&self, appearance: super::ScoreAppearance) -> &TieMaterials {
+        match appearance {
+            super::ScoreAppearance::Hud => &self.hud,
+            super::ScoreAppearance::EditorLight => &self.editor_light,
+        }
+    }
+}
+
+#[derive(Default)]
+pub(super) struct TieMaterials {
     /// Bows down, for a tie under the noteheads (stems up).
     pub below: Handle<TieMaterial>,
     /// Bows up, for a tie over them (stems down).
@@ -65,10 +74,14 @@ fn load_tie_material(mut materials: ResMut<Assets<TieMaterial>>, mut commands: C
         materials
             .add(TieMaterial { color: color.into(), params: Vec4::new(0.85, 0.16, above, 0.0) })
     };
+    let mut for_score = |appearance: super::ScoreAppearance| TieMaterials {
+        below: tie(appearance.ink(), 0.0),
+        above: tie(appearance.ink(), 1.0),
+        below_highlighted: tie(appearance.highlight(), 0.0),
+        above_highlighted: tie(appearance.highlight(), 1.0),
+    };
     commands.insert_resource(TieMaterialHandle {
-        below: tie(Color::WHITE, 0.0),
-        above: tie(Color::WHITE, 1.0),
-        below_highlighted: tie(super::HIGHLIGHT_COLOR, 0.0),
-        above_highlighted: tie(super::HIGHLIGHT_COLOR, 1.0),
+        hud: for_score(super::ScoreAppearance::Hud),
+        editor_light: for_score(super::ScoreAppearance::EditorLight),
     });
 }

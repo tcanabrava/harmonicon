@@ -16,6 +16,7 @@ pub(super) fn spawn_note_glyphs(
     stem: StemRole,
     accidental: Accidental,
     scale: f32,
+    appearance: ScoreAppearance,
 ) {
     let beam = stem.beam;
     let x = ((note.start_beat - now) * scale as f64) as f32;
@@ -26,9 +27,9 @@ pub(super) fn spawn_note_glyphs(
     // Which way the stem goes — or would go, for a stemless whole note. A
     // tie is drawn on the other side, clear of it.
     let stem_up = stem.stem_up;
-    // A highlighted note's own marks take the highlight; a beam stays white,
+    // A highlighted note's own marks take the highlight; a beam keeps the regular ink,
     // since it belongs to its whole group rather than to this note.
-    let ink = if note.highlighted { HIGHLIGHT_COLOR } else { Color::WHITE };
+    let ink = if note.highlighted { appearance.highlight() } else { appearance.ink() };
 
     // Which accidental (if any) is decided over the whole song by
     // `notation::accidentals`, since it depends on what the bar has already
@@ -70,6 +71,7 @@ pub(super) fn spawn_note_glyphs(
         let width = (x - gap - left).max(TIE_MIN_WIDTH_PX);
         let height = TIE_ARC_HEIGHT_SP * STAFF_LINE_SPACING;
         let offset = TIE_GAP_SP * STAFF_LINE_SPACING;
+        let tie_material = tie_material.for_score(appearance);
         let (top, material) = match (stem_up, note.highlighted) {
             (true, false) => (notehead_y + offset, &tie_material.below),
             (true, true) => (notehead_y + offset, &tie_material.below_highlighted),
@@ -157,7 +159,7 @@ pub(super) fn spawn_note_glyphs(
                         height: Val::Px(BEAM_THICKNESS_PX),
                         ..default()
                     },
-                    BackgroundColor(Color::WHITE),
+                    BackgroundColor(appearance.ink()),
                     MusicScoreNoteGlyph,
                 ));
             }
@@ -204,7 +206,7 @@ pub(super) fn spawn_note_glyphs(
                 height: Val::Px(LEDGER_THICKNESS_SP * STAFF_LINE_SPACING),
                 ..default()
             },
-            BackgroundColor(Color::srgba(0.75, 0.75, 0.80, 0.6)),
+            BackgroundColor(appearance.rule(0.6)),
             MusicScoreNoteGlyph,
         ));
     }

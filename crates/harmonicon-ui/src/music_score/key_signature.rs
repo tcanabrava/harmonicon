@@ -17,7 +17,7 @@ pub(super) fn rebuild(
     font: Option<Res<BravuraFont>>,
     signature: Res<MusicScoreKeySignature>,
     notes: Res<MusicScoreNotes>,
-    roots: Query<(Option<Ref<InstrumentScoreClef>>, Has<PianoGrandStaff>)>,
+    roots: Query<(Option<Ref<InstrumentScoreClef>>, Has<PianoGrandStaff>, &ScoreAppearance)>,
     mut slots: Query<(Entity, &mut KeySignatureSlot)>,
 ) {
     let Some(font) = font else { return };
@@ -25,7 +25,7 @@ pub(super) fn rebuild(
     // song, so only a slot whose inputs can have moved resolves it.
     let inputs_changed = signature.is_changed() || notes.is_changed();
     for (entity, mut slot) in &mut slots {
-        let (forced, grand) = roots.get(slot.root).unwrap_or((None, false));
+        let Ok((forced, grand, appearance)) = roots.get(slot.root) else { continue };
         let clef_changed = forced.as_ref().is_some_and(|forced| forced.is_changed());
         if slot.last.is_some() && !inputs_changed && !clef_changed {
             continue;
@@ -38,7 +38,7 @@ pub(super) fn rebuild(
         let steps = signature_steps(clef, flat);
         commands.entity(entity).with_children(|parent| {
             for (index, &step) in steps.iter().take(usize::from(signature.0.fifths().unsigned_abs())).enumerate() {
-                parent.spawn(glyph(&font, if flat { notation::glyph::ACCIDENTAL_FLAT } else { notation::glyph::ACCIDENTAL_SHARP }, index as f32 * 9.0, y_for_step(step), Color::WHITE));
+                parent.spawn(glyph(&font, if flat { notation::glyph::ACCIDENTAL_FLAT } else { notation::glyph::ACCIDENTAL_SHARP }, index as f32 * 9.0, y_for_step(step), appearance.ink()));
             }
         });
     }
