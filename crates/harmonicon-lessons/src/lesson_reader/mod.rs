@@ -16,7 +16,7 @@ use harmonicon_audio::AudioSettings;
 use harmonicon_core::chart::Scale;
 use harmonicon_core::harmonica::{Position, Progression, progression_bars, semitone};
 use harmonicon_platform::localization::{Localization, LocalizationExt};
-use harmonicon_platform::theme::LoadedTheme;
+use harmonicon_platform::theme::{LoadedTheme, ThemeSurface};
 use harmonicon_song::lessons::{
     AvailableLessons, LessonContext, LessonEntry, LessonWidget, PassCriteria,
 };
@@ -198,9 +198,8 @@ pub(crate) fn setup_lesson_reader(
         return;
     };
 
-    // Instructional body — width-capped so long text wraps like a page
-    // rather than spanning the whole window, on a dark translucent card so
-    // it stays readable over a busy background image.
+    let palette = theme.palette();
+    // Keep long instructions at a comfortable reading width.
     let body = commands
         .spawn_empty()
         .apply_scene(bsn! {
@@ -209,13 +208,13 @@ pub(crate) fn setup_lesson_reader(
                 margin: {UiRect::axes(Val::Px(24.0), Val::Px(8.0))},
                 padding: {UiRect::axes(Val::Px(18.0), Val::Px(14.0))},
             }
-            BackgroundColor({Color::srgba(0.0, 0.0, 0.0, 0.95)})
         })
+        .insert(ThemeSurface::Panel)
         .with_children(|card| {
             card.spawn_empty().apply_scene(bsn! {
                 Text({String::from(loc.msg(&entry.manifest.body_key))})
                 TextFont { font_size: {FontSize::Px(18.0)} }
-                TextColor({Color::srgb(0.82, 0.84, 0.90)})
+                TextColor({palette.text})
             });
         })
         .id();

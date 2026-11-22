@@ -2,6 +2,7 @@
 
 //! The two built-in palettes and shared UI colors.
 use bevy::prelude::*;
+use bevy::text::{EditableText, TextCursorStyle};
 
 use crate::assets_management::SelectedTheme;
 
@@ -419,14 +420,17 @@ fn paint_surfaces(
 /// state change or theme switch can restore the authored color.
 fn ensure_text_contrast(
     theme: Res<LoadedTheme>,
-    mut texts: Query<(Entity, &mut TextColor), Or<(With<Text>, With<TextSpan>)>>,
+    mut texts: Query<
+        (Entity, &mut TextColor, Option<&mut TextCursorStyle>),
+        Or<(With<Text>, With<TextSpan>, With<EditableText>)>,
+    >,
     surfaces: Query<(Option<&BackgroundColor>, Option<&ChildOf>, Has<ImageNode>), With<Node>>,
     parents: Query<&ChildOf>,
     mut adjusted: Local<bevy::ecs::entity::EntityHashMap<(Color, Color)>>,
 ) {
     let palette = theme.palette();
     adjusted.retain(|entity, _| texts.contains(*entity));
-    for (entity, mut text) in &mut texts {
+    for (entity, mut text, cursor) in &mut texts {
         let source = adjusted
             .get(&entity)
             .filter(|(_, applied)| *applied == text.0)
@@ -466,6 +470,11 @@ fn ensure_text_contrast(
         }
         if text.0 != resolved {
             text.0 = resolved;
+        }
+        if let Some(mut cursor) = cursor
+            && cursor.color != resolved
+        {
+            cursor.color = resolved;
         }
     }
 }

@@ -24,10 +24,10 @@ use harmonicon_platform::localization::{Localization, LocalizationExt};
 use harmonicon_platform::song_library::SongLibrary;
 #[cfg(test)]
 use harmonicon_platform::song_library::song_identity;
-use harmonicon_platform::theme::LoadedTheme;
+use harmonicon_platform::theme::{LoadedTheme, Palette, ThemeSurface};
 use harmonicon_song::song::SongManifest;
 use harmonicon_ui::dialogs::button;
-use harmonicon_ui::dialogs::button::{BaseButtonColor, CHOICE_SELECTED};
+use harmonicon_ui::dialogs::button::BaseButtonColor;
 use harmonicon_ui::dialogs::confirm_dialog::{ConfirmChosen, DialogId, OpenConfirmDialog};
 use harmonicon_ui::dialogs::text_input::spawn_text_input;
 
@@ -193,6 +193,7 @@ pub(crate) fn setup_artist_list(
     mine: Res<harmonicon_platform::settings::MyInstruments>,
     state: Res<SongPickerState>,
 ) {
+    let palette = theme.palette();
     let state = &*state;
     let (content, header, root) =
         spawn_menu_root_plain(&mut commands, &loc.msg("select-song"), None, &theme);
@@ -243,7 +244,7 @@ pub(crate) fn setup_artist_list(
             Node { width: Val::Percent(100.0), flex_shrink: 0.0, ..default() },
         ))
         .id();
-    let search_row = spawn_search_row(&mut commands, &loc, &state.query);
+    let search_row = spawn_search_row(&mut commands, &loc, &state.query, palette);
     let empty = commands
         .spawn_scene(bsn! {
             @summary(PickerSummary::Empty, 18.0)
@@ -289,8 +290,7 @@ pub(crate) fn setup_artist_list(
         .id();
     let mut rows = Entity::PLACEHOLDER;
     commands.entity(list_frame).with_children(|parent| {
-        rows =
-            spawn_scroll_area(parent, Color::srgb(0.40, 0.58, 0.73), Color::srgb(0.08, 0.10, 0.15));
+        rows = spawn_scroll_area(parent, palette.border, palette.inset);
     });
     commands.entity(rows).insert((
         SongPickerRows,
@@ -304,9 +304,9 @@ pub(crate) fn setup_artist_list(
             overflow: Overflow::scroll_y(),
             ..default()
         },
-        BackgroundColor(Color::srgba(0.045, 0.055, 0.085, 0.94)),
+        ThemeSurface::Inset,
     ));
-    let preview = commands.spawn_scene(preview_panel(&loc)).id();
+    let preview = commands.spawn_scene(preview_panel(&loc)).insert(ThemeSurface::Panel).id();
     let hints = commands
         .spawn_scene(bsn! {
             Text({String::from(loc.msg("song-picker-keys"))})
@@ -351,7 +351,12 @@ pub(crate) fn setup_artist_list(
 }
 
 /// The search label, text field, Clear button and result count.
-fn spawn_search_row(commands: &mut Commands, loc: &Localization, query: &str) -> Entity {
+fn spawn_search_row(
+    commands: &mut Commands,
+    loc: &Localization,
+    query: &str,
+    palette: Palette,
+) -> Entity {
     let row = commands
         .spawn_scene(bsn! {
             Node {
@@ -373,13 +378,15 @@ fn spawn_search_row(commands: &mut Commands, loc: &Localization, query: &str) ->
         row,
         query,
         420.0,
-        Color::srgb(0.12, 0.12, 0.17),
-        Color::srgb(0.30, 0.30, 0.40),
+        palette.panel,
+        palette.border,
         |ev: On<harmonicon_ui::dialogs::text_input::TextInputCommitted>,
          mut state: ResMut<SongPickerState>| state.query = ev.value.to_lowercase(),
     );
     commands.entity(search).insert((
         SongPickerSearch,
+        TextColor(palette.text),
+        bevy::text::TextCursorStyle { color: palette.text, ..default() },
         Node {
             flex_grow: 1.0,
             min_width: Val::Px(80.0),
@@ -417,8 +424,6 @@ fn spawn_search_row(commands: &mut Commands, loc: &Localization, query: &str) ->
     row
 }
 
-const SORT_BG: Color = Color::srgb(0.14, 0.14, 0.22);
-
 /// A column header: clicking sorts by it, clicking again reverses.
 fn sort_choice(sort: SongSort, width: f32, label: String) -> impl Scene {
     bsn! {
@@ -433,7 +438,7 @@ fn sort_choice(sort: SongSort, width: f32, label: String) -> impl Scene {
             align_items: {AlignItems::Center},
             column_gap: {Val::Px(6.0)},
         }
-        @button::tinted(SORT_BG)
+        @button::tinted(button::color_default())
         on(move |_: On<Activate>, mut state: ResMut<SongPickerState>| {
             if state.sort == sort {
                 state.descending = !state.descending;
@@ -470,7 +475,6 @@ fn preview_panel(loc: &Localization) -> impl Scene {
             column_gap: {Val::Px(20.0)},
             align_items: {AlignItems::Center},
         }
-        BackgroundColor({Color::srgb(0.075, 0.10, 0.15)})
         Children [
             Node {
                 flex_direction: {FlexDirection::Column},
@@ -544,6 +548,7 @@ pub(crate) fn update_picker_summary(
     songs: Res<AvailableSongs>,
     profile: Res<PlayerProfile>,
     loc: Res<Localization>,
+    theme: Option<Res<LoadedTheme>>,
     mut summaries: Query<(&mut Text, &mut Node, Ref<PickerSummary>)>,
     mut plays: Query<
         (
@@ -619,18 +624,13 @@ pub(crate) fn update_picker_summary(
         };
         text.set_if_neq(Text::new(label));
     }
+    let palette =
+        theme.as_deref().map_or_else(|| LoadedTheme::default().palette(), LoadedTheme::palette);
     for (entity, disabled, delete, color) in &mut plays {
         if let Some(mut color) = color {
-            let target = if selected.is_some() && delete {
-                Color::srgb(0.24, 0.13, 0.16)
-            } else if selected.is_some() {
-                CHOICE_SELECTED
-            } else {
-                Color::srgb(0.10, 0.11, 0.14)
-            };
-            if color.0 != target {
-                color.0 = target;
-            }
+            let target =
+                if selected.is_some() && !delete { palette.selected } else { palette.control };
+            color.set_if_neq(BaseButtonColor(target));
         }
         if selected.is_none() && !disabled {
             commands.entity(entity).insert(bevy::ui::InteractionDisabled);
@@ -852,8 +852,9 @@ fn song_row(
     times_played: u32,
     instrument: String,
 ) -> impl Scene {
-    let base = if selected { Color::srgb(0.16, 0.30, 0.43) } else { Color::srgb(0.11, 0.11, 0.16) };
-    let border = if selected { Color::srgb(0.65, 0.85, 1.0) } else { Color::NONE };
+    let palette = LoadedTheme::default().palette();
+    let base = if selected { palette.selected } else { palette.panel };
+    let border = if selected { palette.accent } else { Color::NONE };
     let path = song.asset_path.clone();
     let row = SongRow { path: path.clone(), index };
     bsn! {
@@ -1179,30 +1180,30 @@ pub(crate) fn navigate_song_picker(
 pub(crate) fn update_picker_feedback(
     state: Res<SongPickerState>,
     focus: Res<InputFocus>,
+    theme: Res<LoadedTheme>,
     mut sorts: Query<(Entity, &SortChoice, &mut BaseButtonColor)>,
     mut arrows: Query<(&mut Text, &mut Visibility)>,
     mut rows: Query<(&SongRow, &mut BaseButtonColor, &mut BorderColor), Without<SortChoice>>,
 ) {
+    let palette = theme.palette();
     for (entity, choice, mut color) in &mut sorts {
         let active = state.sort == choice.sort;
         if let Ok((mut text, mut visibility)) = arrows.get_mut(choice.arrow) {
             text.set_if_neq(Text::new(if state.descending { "↓" } else { "↑" }));
             visibility.set_if_neq(if active { Visibility::Inherited } else { Visibility::Hidden });
         }
-        color.0 = if active {
-            CHOICE_SELECTED
+        color.set_if_neq(BaseButtonColor(if active {
+            palette.selected
         } else if focus.get() == Some(entity) {
-            Color::srgb(0.25, 0.30, 0.45)
+            palette.hover
         } else {
-            Color::srgb(0.14, 0.14, 0.22)
-        };
+            palette.control
+        }));
     }
     for (row, mut color, mut border) in &mut rows {
         let selected = state.selected.as_deref() == Some(row.path.as_str());
-        color.0 =
-            if selected { Color::srgb(0.16, 0.30, 0.43) } else { Color::srgb(0.11, 0.11, 0.16) };
-        *border =
-            BorderColor::all(if selected { Color::srgb(0.65, 0.85, 1.0) } else { Color::NONE });
+        color.set_if_neq(BaseButtonColor(if selected { palette.selected } else { palette.panel }));
+        border.set_if_neq(BorderColor::all(if selected { palette.accent } else { Color::NONE }));
     }
 }
 

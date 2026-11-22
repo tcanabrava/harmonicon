@@ -57,7 +57,7 @@ use bevy::ui_widgets::{Activate, Button as WidgetButton};
 
 use harmonicon_app::profile::PlayerProfile;
 use harmonicon_platform::localization::{Localization, LocalizationExt};
-use harmonicon_platform::theme::LoadedTheme;
+use harmonicon_platform::theme::{LoadedTheme, Palette, ThemeSurface};
 use harmonicon_song::lessons::LessonsRescanned;
 use harmonicon_ui::dialogs::tooltip::Tooltip;
 
@@ -117,7 +117,6 @@ const LABEL_TEXT_PX: f32 = LABEL_PX - LABEL_PAD_X * 2.0;
 /// Sits behind a lesson title. Edges run underneath the labels, and text
 /// drawn straight over a line is hard to read; this is dark and mostly
 /// opaque so the words win, without becoming a solid card.
-const LABEL_BACKDROP: Color = Color::srgba(0.07, 0.08, 0.12, 0.82);
 
 /// Edge thickness.
 const EDGE_PX: f32 = 3.5;
@@ -428,20 +427,21 @@ pub(crate) fn setup_lesson_tree(
     commands.entity(canvas).add_child(edge_layer);
     spawn_edges(&mut commands, edge_layer, &tree, &mut materials);
 
+    let palette = theme.palette();
     for unit in &tree.units {
-        spawn_unit(&mut commands, canvas, unit, !collapsed.0.contains(&unit.id), &loc);
+        spawn_unit(&mut commands, canvas, unit, !collapsed.0.contains(&unit.id), &loc, palette);
     }
     for node in &tree.nodes {
         let review_due = due.contains(node.id.as_str());
-        spawn_node(&mut commands, canvas, node, review_due, &placeholder, &loc);
+        spawn_node(&mut commands, canvas, node, review_due, &placeholder, &loc, palette);
     }
 
     if let Some(next) = next_available_lesson(&tree.nodes) {
         let lesson_id = next.id.clone();
         let unit_id = next.unit_id.clone();
         let locator = commands
-            .spawn_scene(button::icon(
-                "⌖",
+            .spawn_scene(button::default(
+                &loc.msg("lesson-tree-find-next"),
                 move |_: On<Activate>,
                       mut collapsed: ResMut<CollapsedUnits>,
                       mut compacting: ResMut<PendingCompaction>,
@@ -501,6 +501,7 @@ fn spawn_unit(
     unit: &PlacedUnit,
     expanded: bool,
     loc: &Localization,
+    palette: Palette,
 ) {
     let centre = node_centre(unit.column, unit.row);
     // Locked still wins: an all-elective unit sits behind the units before
@@ -510,6 +511,7 @@ fn spawn_unit(
         (false, true) => OPTIONAL_COLOR,
         (false, false) => UNIT_OPEN,
     };
+    let ink = if unit.locked { palette.muted } else { palette.text };
     let unit_id = unit.id.clone();
     let mut accessibility = AccessibilityKitNode::new(Role::Button);
     accessibility.set_label(String::from(loc.msg(&unit.title_key)));
@@ -532,7 +534,7 @@ fn spawn_unit(
                 ..default()
             },
             BorderColor::all(ring),
-            BackgroundColor(Color::srgba(0.10, 0.11, 0.16, 0.85)),
+            ThemeSurface::Panel,
             WidgetButton,
             TabIndex(0),
             AccessibilityNode(accessibility),
@@ -573,7 +575,7 @@ fn spawn_unit(
                 ],
             ))})
             TextFont { font_size: {FontSize::Px(15.0)} }
-            TextColor({ring})
+            TextColor({ink})
         })
         .id();
     commands.entity(node).add_child(progress);
@@ -583,7 +585,7 @@ fn spawn_unit(
         .apply_scene(bsn! {
             Text("▼")
             TextFont { font_size: {FontSize::Px(13.0)} }
-            TextColor({ring})
+            TextColor({ink})
             UnitChevron({unit.id.clone()})
         })
         .id();
@@ -603,7 +605,7 @@ fn spawn_unit(
             Text::new(String::from(loc.msg(&unit.title_key))),
             TextFont { font_size: FontSize::Px(UNIT_FONT_PX), ..default() },
             TextLayout::justify(Justify::Center),
-            TextColor(ring),
+            TextColor(ink),
             LayoutOwner(unit.id.clone()),
         ))
         .id();
@@ -645,6 +647,7 @@ fn spawn_node(
     review_due: bool,
     placeholder: &Handle<Image>,
     loc: &Localization,
+    palette: Palette,
 ) {
     let centre = node_centre(node.column, node.row);
     let locked = node.state == NodeState::Locked;
@@ -754,17 +757,13 @@ fn spawn_node(
             // Edges pass behind the titles, and glyphs drawn straight over a
             // line are hard to read. The backdrop is what separates the text
             // from whatever runs under it.
-            BackgroundColor({LABEL_BACKDROP})
             Text({String::from(loc.msg(&node.title_key))})
             TextFont { font_size: {FontSize::Px(LABEL_FONT_PX)} }
             ~{TextLayout::justify(Justify::Center)}
-            TextColor({if locked {
-                Color::srgba(0.62, 0.65, 0.74, 0.55)
-            } else {
-                Color::srgb(0.86, 0.89, 0.95)
-            }})
+            TextColor({if locked { palette.muted } else { palette.text }})
         })
         .id();
+    commands.entity(title).insert(ThemeSurface::Panel);
     commands.entity(label).add_child(title);
 
     if node.optional {

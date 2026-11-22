@@ -30,7 +30,7 @@ pub const CHOICE_HOVER: Color = Color::srgb(0.20, 0.20, 0.32);
 /// hover/press tint would each blindly overwrite `BackgroundColor` and
 /// erase the other. See [`make_interactive`] for attaching the whole thing
 /// to a button built outside a `bsn!` scene.
-#[derive(Component, Clone, Copy, Default)]
+#[derive(Component, Clone, Copy, Default, PartialEq)]
 pub struct BaseButtonColor(pub Color);
 
 /// Live hover/press state for [`apply_button_visuals`] to read — updated by
