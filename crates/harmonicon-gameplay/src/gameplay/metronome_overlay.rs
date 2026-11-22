@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 
+use harmonicon_platform::theme::{Appearance, LoadedTheme, ThemeSurface};
 use bevy::{
     audio::{AudioSource, Volume},
     input_focus::tab_navigation::TabIndex,
@@ -114,9 +115,6 @@ pub struct MetronomeFeelLabel;
 pub struct MetronomeTempoLabel;
 
 // The two little HUD pill buttons share these idle/hover colours.
-const PILL_IDLE: Color = Color::srgba(0.12, 0.12, 0.16, 0.9);
-const PILL_HOVER: Color = Color::srgba(0.20, 0.20, 0.32, 0.9);
-const PILL_BORDER: Color = Color::srgb(0.35, 0.35, 0.50);
 
 /// Click subdivision. `Straight` clicks plain quarters; `Shuffle` splits each
 /// beat into triplets and clicks the beat + the swung "and" (the long-short
@@ -162,17 +160,15 @@ pub fn spawn_metronome(
             });
 
             // Click on/off toggle. Authored with bsn!; click + hover ride along
-            // inline as on(...). The border colour is inserted after (bsn! can't
-            // express BorderColor::all), and the label uses the default font.
+            // inline as on(...).
             row.spawn_empty()
                 .apply_scene(bsn! {
                     WidgetButton
                     TabIndex(0)
                     Node {
                         padding: {UiRect::axes(Val::Px(6.0), Val::Px(2.0))},
-                        border: {UiRect::all(Val::Px(1.5))},
                     }
-                    BackgroundColor({PILL_IDLE})
+                    ~{ThemeSurface::Control}
                     MetronomeMuteButton
                     on(toggle_mute)
                     on(pill_over)
@@ -184,8 +180,7 @@ pub fn spawn_metronome(
                         MetronomeMuteLabel
                         Pickable { should_block_lower: {false}, is_hoverable: {false} }
                     ]
-                })
-                .insert(BorderColor::all(PILL_BORDER));
+                });
 
             // Straight ↔ shuffle feel toggle.
             row.spawn_empty()
@@ -194,9 +189,8 @@ pub fn spawn_metronome(
                     TabIndex(0)
                     Node {
                         padding: {UiRect::axes(Val::Px(6.0), Val::Px(2.0))},
-                        border: {UiRect::all(Val::Px(1.5))},
                     }
-                    BackgroundColor({PILL_IDLE})
+                    ~{ThemeSurface::Control}
                     MetronomeFeelButton
                     on(toggle_feel)
                     on(pill_over)
@@ -208,8 +202,7 @@ pub fn spawn_metronome(
                         MetronomeFeelLabel
                         Pickable { should_block_lower: {false}, is_hoverable: {false} }
                     ]
-                })
-                .insert(BorderColor::all(PILL_BORDER));
+                });
         });
 
     parent
@@ -221,10 +214,8 @@ pub fn spawn_metronome(
                     Node {
                         width: {size},
                         height: {size},
-                        border: {UiRect::all(Val::Px(1.5))},
                     }
-                    BackgroundColor({Color::srgba(0.12, 0.12, 0.16, 0.9)})
-                    ~{BorderColor::all(Color::srgb(0.35, 0.35, 0.50))}
+                    BackgroundColor({Color::NONE})
                     MetronomeBeat(i)
                 });
             }
@@ -262,6 +253,7 @@ pub fn update_metronome(
     tempo: Res<MetronomeTempo>,
     feel: Res<MetronomeFeel>,
     mut beats: Query<(&MetronomeBeat, &mut BackgroundColor)>,
+    theme: Option<Res<LoadedTheme>>,
 ) {
     if clock.get() < 0.0 {
         return;
@@ -283,6 +275,12 @@ pub fn update_metronome(
             base + brightness * if is_downbeat { 0.1 } else { 0.9 },
             0.9,
         );
+        let color = if let Some(theme) = theme.as_ref().filter(|theme| theme.0 == Appearance::Light) {
+            let palette = theme.palette();
+            palette.control.to_srgba().mix(&palette.accent.to_srgba(), brightness.clamp(0.0, 1.0)).into()
+        } else {
+            color
+        };
         // Only the current beat's dot animates; the rest hold still.
         if bg.0 != color {
             bg.0 = color;
@@ -396,15 +394,15 @@ fn toggle_feel(_: On<Activate>, mut feel: ResMut<MetronomeFeel>) {
 }
 
 /// Shared hover highlight for the small HUD pill buttons.
-fn pill_over(ev: On<PointerOver>, mut colors: Query<&mut BackgroundColor>) {
+fn pill_over(ev: On<PointerOver>, mut colors: Query<&mut ThemeSurface>) {
     if let Ok(mut bg) = colors.get_mut(ev.entity) {
-        *bg = BackgroundColor(PILL_HOVER);
+        *bg = ThemeSurface::Hover;
     }
 }
 
-fn pill_out(ev: On<PointerOut>, mut colors: Query<&mut BackgroundColor>) {
+fn pill_out(ev: On<PointerOut>, mut colors: Query<&mut ThemeSurface>) {
     if let Ok(mut bg) = colors.get_mut(ev.entity) {
-        *bg = BackgroundColor(PILL_IDLE);
+        *bg = ThemeSurface::Control;
     }
 }
 

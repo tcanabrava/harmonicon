@@ -38,7 +38,7 @@ use super::{
     SongInfo, SongNotes, ValidHarpNotes, spawn_score_readout,
 };
 use harmonicon_platform::localization::{Localization, LocalizationExt};
-use harmonicon_platform::theme::{LoadedTheme, NoteColors, effective_note_colors};
+use harmonicon_platform::theme::{Appearance, LoadedTheme, NoteColors, effective_note_colors};
 
 /// Height of the hit line, as a percentage of the play area — the region a
 /// note's leading edge must reach to be judged.
@@ -57,6 +57,7 @@ pub(super) struct NoteRenderAssets {
 
 #[derive(bevy::ecs::system::SystemParam)]
 pub(super) struct LessonDisplayContext<'w> {
+    theme: Res<'w, LoadedTheme>,
     compact: Res<'w, harmonicon_platform::responsive::CompactLayout>,
     bravura: Option<Res<'w, BravuraFont>>,
     lesson: Option<Res<'w, harmonicon_song::lessons::LessonContext>>,
@@ -89,6 +90,7 @@ pub fn setup(
     music_started.0 = false;
     (*valid_notes, *played_harp) = ValidHarpNotes::for_played_harp(&effective, &manifest.chart);
 
+    let appearance = display.theme.0;
     let chart = &manifest.chart;
     // The harmonica, when the chart is played on one: the hole strip and the
     // "grab a C harp" hint only mean something on a harp.
@@ -141,6 +143,7 @@ pub fn setup(
     let modifiers = used_modifiers(chart);
     let lyrics = harmonicon_core::lyrics::lyric_lines(chart);
     let panels = contextual_panels(compact, aural, !modifiers.is_empty(), !lyrics.is_empty());
+    let lyric_height = if panels.lyrics { super::karaoke::STRIP_HEIGHT } else { 0.0 };
 
     // Animated tail previews for the techniques legend (built up front so the UI
     // closures only borrow a ready slice, not the material store).
@@ -192,7 +195,7 @@ pub fn setup(
                 height: Val::Percent(100.0),
                 flex_direction: FlexDirection::Column,
                 padding: UiRect {
-                    top: Val::Px(left_top_padding),
+                    top: Val::Px(left_top_padding + lyric_height),
                     ..UiRect::all(Val::Px(if piano_roll.is_some() { 0.0 } else { 8.0 }))
                 },
                 row_gap: Val::Px(4.0),
@@ -248,13 +251,13 @@ pub fn setup(
                     // The fingering strip under the highway, shown or hidden
                     // by `flute_visuals::sync_flute_view`.
                     if !aural {
-                        super::flute_visuals::spawn_flute_stage(left, &flute, &loc);
+                        super::flute_visuals::spawn_flute_stage(left, &flute, &loc, appearance);
                     }
                 } else if let Some(harmonicon_core::instrument::Instrument::Fretted(guitar)) =
                     instrument.clone()
                 {
                     if !aural {
-                        super::guitar_visuals::spawn_neck_overview(left, &guitar, &loc);
+                        super::guitar_visuals::spawn_neck_overview(left, &guitar, &loc, appearance);
                     }
                     spawn_track(left);
                 } else if let Some((low, high)) = piano_roll {
@@ -336,7 +339,7 @@ pub fn setup(
                 })
                 .with_children(|col| {
                     if let Some(harp) = played {
-                        spawn_harmonica_strip(col, harp, &loc);
+                        spawn_harmonica_strip(col, harp, &loc, appearance);
                     }
                 });
             });
@@ -364,7 +367,10 @@ pub fn setup(
                 flex_shrink: if is_guitar { 0.0 } else { 1.0 },
                 height: Val::Percent(100.0),
                 flex_direction: FlexDirection::Column,
-                padding: UiRect { top: Val::Px(right_top_padding), ..UiRect::all(Val::Px(12.0)) },
+                padding: UiRect {
+                    top: Val::Px(right_top_padding + lyric_height),
+                    ..UiRect::all(Val::Px(12.0))
+                },
                 row_gap: Val::Px(12.0),
                 ..default()
             })
@@ -375,7 +381,7 @@ pub fn setup(
                     && guitar.kind
                         == harmonicon_core::instrument::fretted_strings::FrettedKind::Guitar
                 {
-                    super::guitar_visuals::spawn_chord_diagram(right, guitar);
+                    super::guitar_visuals::spawn_chord_diagram(right, guitar, appearance);
                 }
                 if panels.side_panel {
                     spawn_hud_panel(
@@ -429,6 +435,7 @@ pub fn setup(
             bravura,
             piano_roll.is_some(),
             instrument.as_ref().map(|instrument| instrument.kind()),
+            appearance,
         );
     }
     if panels.lyrics {
@@ -442,6 +449,7 @@ pub fn setup(
                 } else {
                     0.0
                 },
+            appearance,
         );
     }
     let harp_hint = played
@@ -456,6 +464,7 @@ pub(super) fn spawn_gameplay_music_score(
     bravura: &BravuraFont,
     piano: bool,
     kind: Option<harmonicon_core::instrument::InstrumentKind>,
+    appearance: Appearance,
 ) {
     commands
         .spawn((
@@ -474,7 +483,12 @@ pub(super) fn spawn_gameplay_music_score(
             GameplayRoot,
         ))
         .with_children(|panel| {
-            let score = music_score::spawn_sectioned_score(panel, bravura, piano);
+            let score = music_score::spawn_sectioned_score(
+                panel,
+                bravura,
+                piano,
+                appearance == Appearance::Light,
+            );
             if let Some(kind) = kind {
                 music_score::apply_instrument_clef(panel, score, kind);
             }
@@ -1174,6 +1188,7 @@ pub fn update_holes(
     mut glow: HoleGlow,
     clock: Res<super::GameplayClock>,
     notes: Res<SongNotes>,
+    theme: Res<LoadedTheme>,
     mut cells: Query<(&HoleCell, &mut BackgroundColor, &mut HoleState, &mut BorderColor)>,
     loc: Res<Localization>,
     mut cues: Query<&mut Text, With<super::highway_2d::HarmonicaCue>>,
@@ -1207,19 +1222,18 @@ pub fn update_holes(
             text.0.clone_from(&cue);
         }
     }
+    let palette = theme.palette();
+    let light = theme.0 == Appearance::Light;
     for (cell, mut bg, mut state, mut border) in &mut cells {
         let target = show_targets && guidance.iter().any(|(hole, _)| *hole == cell.0);
-        let edge =
-            if target { Color::srgb(0.98, 0.85, 0.47) } else { Color::srgb(0.28, 0.30, 0.40) };
+        let edge = if target { palette.accent } else { palette.border };
         *border = BorderColor::all(edge);
         glow.step(cell.0, &mut state);
-        let b = state.brightness;
-
-        let color = if state.is_blow {
-            Color::srgb(0.10 + 0.18 * b, 0.12 + 0.33 * b, 0.16 + 0.72 * b)
-        } else {
-            Color::srgb(0.10 + 0.78 * b, 0.12 + 0.22 * b, (0.16 - 0.04 * b).max(0.0))
-        };
+        let brightness = state.brightness.clamp(0.0, 1.0);
+        let base = if target { palette.selected } else { palette.control };
+        let heard = super::highway_2d::breath_color(theme.0, state.is_blow);
+        let glow_weight = brightness * if light { 0.5 } else { 0.8 };
+        let color = base.to_srgba().mix(&heard.to_srgba(), glow_weight).into();
         if bg.0 != color {
             bg.0 = color;
         }

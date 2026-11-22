@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 
 //! Guitar-only guidance. Positions guide the hands; scoring remains pitch-only.
+use harmonicon_platform::theme::{Appearance, LoadedTheme, ThemeSurface};
 use super::{GameplayClock, LOOKAHEAD, ScheduledNote, SongNotes};
 use bevy::prelude::*;
 use harmonicon_core::instrument::{
@@ -405,8 +406,8 @@ mod tests {
         guitar.strings.pop();
         let loc = harmonicon_platform::localization::Localization::default();
         app.world_mut().commands().spawn(Node::default()).with_children(|p| {
-            spawn_neck_overview(p, &guitar, &loc);
-            spawn_chord_diagram(p, &guitar);
+            spawn_neck_overview(p, &guitar, &loc, Appearance::Dark);
+            spawn_chord_diagram(p, &guitar, Appearance::Dark);
         });
         app.world_mut().flush();
         let mut notes = app.world_mut().resource_mut::<SongNotes>();
@@ -500,12 +501,12 @@ pub(super) struct ChordDiagram(u8, bool, f32);
 #[derive(Component)]
 pub(super) struct DiagramRoot(bool);
 
-pub(super) fn spawn_chord_diagram(parent: &mut ChildSpawnerCommands, guitar: &Guitar) {
-    spawn_diagram(parent, guitar, false, 1.0);
-    spawn_diagram(parent, guitar, true, 0.65);
+pub(super) fn spawn_chord_diagram(parent: &mut ChildSpawnerCommands, guitar: &Guitar, appearance: Appearance) {
+    spawn_diagram(parent, guitar, false, 1.0, appearance);
+    spawn_diagram(parent, guitar, true, 0.65, appearance);
 }
 
-fn spawn_diagram(parent: &mut ChildSpawnerCommands, guitar: &Guitar, next: bool, scale: f32) {
+fn spawn_diagram(parent: &mut ChildSpawnerCommands, guitar: &Guitar, next: bool, scale: f32, appearance: Appearance) {
     parent
         .spawn((
             DiagramRoot(next),
@@ -519,7 +520,7 @@ fn spawn_diagram(parent: &mut ChildSpawnerCommands, guitar: &Guitar, next: bool,
                 },
                 ..default()
             },
-            BackgroundColor(Color::srgb(0.08, 0.10, 0.14)),
+            ThemeSurface::Panel,
         ))
         .with_children(|chart| {
             chart.spawn((
@@ -577,7 +578,7 @@ fn spawn_diagram(parent: &mut ChildSpawnerCommands, guitar: &Guitar, next: bool,
                     ChordDiagram(string, next, scale),
                     Text::new(""),
                     TextFont { font_size: FontSize::Px(20.0 * scale), ..default() },
-                    TextColor(Color::srgb(0.98, 0.85, 0.47)),
+                    TextColor(neck_now(appearance)),
                     Node {
                         position_type: PositionType::Absolute,
                         left: Val::Px((x - 8.0) * scale),
@@ -641,12 +642,17 @@ const NECK_NEXT: Color = Color::srgb(0.48, 0.77, 1.0);
 
 /// A schematic full neck: physical frets left to right, string 1 on top.
 /// One moving window guides the hand; dots alone say which strings to play.
+fn neck_now(appearance: Appearance) -> Color {
+    if appearance == Appearance::Light { appearance.palette().accent } else { NECK_NOW }
+}
+
 pub(super) fn spawn_neck_overview(
     parent: &mut ChildSpawnerCommands,
     guitar: &Guitar,
     loc: &harmonicon_platform::localization::Localization,
+    appearance: Appearance,
 ) {
-    spawn_neck(parent, guitar, loc, 92.0, false);
+    spawn_neck(parent, guitar, loc, 92.0, false, appearance);
 }
 
 pub(super) fn spawn_trainer_neck(
@@ -654,7 +660,7 @@ pub(super) fn spawn_trainer_neck(
     guitar: &Guitar,
     loc: &harmonicon_platform::localization::Localization,
 ) -> Entity {
-    spawn_neck(parent, guitar, loc, 180.0, true)
+    spawn_neck(parent, guitar, loc, 180.0, true, Appearance::Dark)
 }
 
 fn spawn_neck(
@@ -663,7 +669,11 @@ fn spawn_neck(
     loc: &harmonicon_platform::localization::Localization,
     height: f32,
     label_every_fret: bool,
+    appearance: Appearance,
 ) -> Entity {
+    let now_ink = neck_now(appearance);
+    let next_ink = if appearance == Appearance::Light { Color::srgb_u8(34, 91, 148) } else { NECK_NEXT };
+    let palette = appearance.palette();
     let mut board_id = Entity::PLACEHOLDER;
     parent
         .spawn(Node {
@@ -702,7 +712,7 @@ fn spawn_neck(
                         flex_shrink: 0.0,
                         ..default()
                     },
-                    BackgroundColor(Color::srgb(0.10, 0.09, 0.08)),
+                    BackgroundColor(if appearance == Appearance::Light { palette.panel } else { Color::srgb(0.10, 0.09, 0.08) }),
                 ))
                 .with_children(|board| {
                     let columns = f32::from(guitar.frets) + 1.0;
@@ -720,7 +730,7 @@ fn spawn_neck(
                                 height: Val::Percent(100.0),
                                 ..default()
                             },
-                            BackgroundColor(Color::srgb(0.45, 0.44, 0.40)),
+                            BackgroundColor(palette.border),
                         ));
                         if label_every_fret
                             || fret == 0
@@ -729,7 +739,7 @@ fn spawn_neck(
                             board.spawn((
                                 Text::new(fret.to_string()),
                                 TextFont { font_size: FontSize::Px(11.0), ..default() },
-                                TextColor(Color::srgb(0.67, 0.7, 0.75)),
+                                TextColor(palette.muted),
                                 Node {
                                     position_type: PositionType::Absolute,
                                     left: Val::Percent((f32::from(fret) + 0.25) * 100.0 / columns),
@@ -765,8 +775,8 @@ fn spawn_neck(
                                 border: UiRect::all(Val::Px(2.0)),
                                 ..default()
                             },
-                            BorderColor::all(NECK_NOW),
-                            BackgroundColor(NECK_NOW.with_alpha(0.14)),
+                            BorderColor::all(now_ink),
+                            BackgroundColor(now_ink.with_alpha(0.14)),
                         ))
                         .with_children(|region| {
                             region.spawn((
@@ -774,7 +784,7 @@ fn spawn_neck(
                                 Text::new(""),
                                 TextLayout::no_wrap(),
                                 TextFont { font_size: FontSize::Px(13.0), ..default() },
-                                TextColor(NECK_NOW),
+                                TextColor(now_ink),
                                 Node {
                                     position_type: PositionType::Absolute,
                                     top: Val::Px(-22.0),
@@ -799,8 +809,8 @@ fn spawn_neck(
                                         ..default()
                                     },
                                     UiTransform::from_translation(Val2::all(Val::Percent(-50.0))),
-                                    BorderColor::all(if next { NECK_NEXT } else { NECK_NOW }),
-                                    BackgroundColor(if next { Color::NONE } else { NECK_NOW }),
+                                    BorderColor::all(if next { next_ink } else { now_ink }),
+                                    BackgroundColor(if next { Color::NONE } else { now_ink }),
                                 ))
                                 .with_children(|circle| {
                                     circle.spawn((
@@ -809,9 +819,9 @@ fn spawn_neck(
                                         TextFont { font_size: FontSize::Px(13.0), ..default() },
                                         TextLayout::no_wrap(),
                                         TextColor(if next {
-                                            NECK_NEXT
+                                            next_ink
                                         } else {
-                                            Color::srgb(0.08, 0.08, 0.10)
+                                            if appearance == Appearance::Light { Color::WHITE } else { Color::srgb(0.08, 0.08, 0.10) }
                                         }),
                                     ));
                                 });
@@ -839,7 +849,9 @@ pub(super) fn update_neck_overview(
     >,
     mut fingers: Query<&mut Text, With<FingerLabel>>,
     time: Res<Time>,
+    theme: Option<Res<LoadedTheme>>,
 ) {
+    let now_ink = neck_now(theme.as_ref().map_or(Appearance::Dark, |theme| theme.0));
     let Ok(NeckOverview(guitar)) = boards.single() else { return };
     let current = attack_group(&notes.notes, clock.get(), None);
     let next = attack_group(&notes.notes, clock.get(), current.first().map(|n| n.time));
@@ -856,8 +868,8 @@ pub(super) fn update_neck_overview(
     for (_, mut node, mut fill, mut border, mut motion) in &mut regions {
         let group = &now_positions;
         let span = now_span;
-        fill.0 = if span.is_none() { Color::NONE } else { NECK_NOW.with_alpha(0.14) };
-        *border = BorderColor::all(if span.is_none() { Color::NONE } else { NECK_NOW });
+        fill.0 = if span.is_none() { Color::NONE } else { now_ink.with_alpha(0.14) };
+        *border = BorderColor::all(if span.is_none() { Color::NONE } else { now_ink });
         if let Some((first, last)) = span {
             node.display = Display::Flex;
             node.left = Val::Percent(f32::from(first + guitar.capo) * 100.0 / columns);

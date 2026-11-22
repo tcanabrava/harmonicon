@@ -713,35 +713,35 @@ pub struct PianoGrandStaff;
 #[derive(Component, Clone, Copy)]
 enum ScoreAppearance {
     Hud,
-    EditorLight,
+    Light,
 }
 
 impl ScoreAppearance {
     fn paper(self) -> Color {
         match self {
             Self::Hud => harmonicon_platform::theme::HUD_PANEL_BG,
-            Self::EditorLight => harmonicon_platform::theme::Appearance::Light.palette().panel,
+            Self::Light => harmonicon_platform::theme::Appearance::Light.palette().panel,
         }
     }
 
     fn ink(self) -> Color {
         match self {
             Self::Hud => Color::WHITE,
-            Self::EditorLight => harmonicon_platform::theme::Appearance::Light.palette().text,
+            Self::Light => harmonicon_platform::theme::Appearance::Light.palette().text,
         }
     }
 
     fn highlight(self) -> Color {
         match self {
             Self::Hud => HIGHLIGHT_COLOR,
-            Self::EditorLight => harmonicon_platform::theme::Appearance::Light.palette().accent,
+            Self::Light => harmonicon_platform::theme::Appearance::Light.palette().accent,
         }
     }
 
     fn rule(self, alpha: f32) -> Color {
         match self {
             Self::Hud => Color::srgba(0.75, 0.75, 0.80, alpha),
-            Self::EditorLight => harmonicon_platform::theme::Appearance::Light.palette().muted.with_alpha(alpha),
+            Self::Light => harmonicon_platform::theme::Appearance::Light.palette().muted.with_alpha(alpha),
         }
     }
 }
@@ -752,7 +752,7 @@ pub fn spawn_editor_score(
     grand: bool,
     light: bool,
 ) -> Entity {
-    let appearance = if light { ScoreAppearance::EditorLight } else { ScoreAppearance::Hud };
+    let appearance = if light { ScoreAppearance::Light } else { ScoreAppearance::Hud };
     spawn_score(parent, bravura, grand, appearance)
 }
 
@@ -766,8 +766,10 @@ pub fn spawn_sectioned_score(
     parent: &mut ChildSpawnerCommands,
     bravura: &BravuraFont,
     grand: bool,
+    light: bool,
 ) -> Entity {
-    let root = spawn_score(parent, bravura, grand, ScoreAppearance::Hud);
+    let appearance = if light { ScoreAppearance::Light } else { ScoreAppearance::Hud };
+    let root = spawn_score(parent, bravura, grand, appearance);
     parent.commands().queue(move |world: &mut World| {
         let height = PANEL_HEIGHT * if grand { 2.0 } else { 1.0 } + SECTION_HEADER_HEIGHT;
         world.get_mut::<Node>(root).unwrap().height = Val::Px(height);
@@ -807,7 +809,7 @@ fn spawn_score(parent: &mut ChildSpawnerCommands, bravura: &BravuraFont, grand: 
         BackgroundColor(appearance.paper()),
         BorderColor::all(match appearance {
             ScoreAppearance::Hud => harmonicon_platform::theme::HUD_DIVIDER_COLOR,
-            ScoreAppearance::EditorLight => harmonicon_platform::theme::Appearance::Light.palette().border,
+            ScoreAppearance::Light => harmonicon_platform::theme::Appearance::Light.palette().border,
         }),
         MusicScorePanel,
         appearance,
@@ -817,7 +819,7 @@ fn spawn_score(parent: &mut ChildSpawnerCommands, bravura: &BravuraFont, grand: 
     }
     let root_id = root.id();
     root.with_children(|panel| {
-        panel.spawn((Node { position_type: PositionType::Absolute, width: Val::Px(PLAYHEAD_X - 8.0), height: Val::Percent(100.0), ..default() }, BackgroundColor(appearance.paper()), ZIndex(1), bevy::picking::Pickable::IGNORE));
+        panel.spawn((Node { position_type: PositionType::Absolute, width: Val::Px(PLAYHEAD_X - 8.0), height: Val::Px(PANEL_HEIGHT * if grand { 2.0 } else { 1.0 }), ..default() }, BackgroundColor(appearance.paper()), ZIndex(1), bevy::picking::Pickable::IGNORE));
         key_signature::spawn(panel, root_id, false);
         if grand { key_signature::spawn(panel, root_id, true); }
         if grand {
@@ -1057,7 +1059,7 @@ fn rebuild_score_notes(
                             ..default()
                         },
                         BorderColor::all(Color::srgb(0.4, 0.75, 1.0)),
-                        BackgroundColor(Color::srgb(0.08, 0.11, 0.16)),
+                        harmonicon_platform::theme::ThemeSurface::Inset,
                         bevy::picking::Pickable::IGNORE,
                     ))
                     .with_children(|p| {
@@ -1065,7 +1067,7 @@ fn rebuild_score_notes(
                             Text::new(section.label.clone()),
                             TextLayout::no_wrap(),
                             TextFont { font_size: FontSize::Px(12.0), ..default() },
-                            TextColor(Color::srgb(0.75, 0.82, 0.9)),
+                            TextColor(appearance.ink()),
                             bevy::picking::Pickable::IGNORE,
                         ));
                     });
@@ -1400,7 +1402,7 @@ mod piano_staff_tests {
     fn section_headers_live_inside_the_score_panel() {
         let mut app = App::new();
         app.world_mut().commands().spawn(Node::default()).with_children(|p| {
-            spawn_sectioned_score(p, &BravuraFont(Handle::default()), false);
+            spawn_sectioned_score(p, &BravuraFont(Handle::default()), false, false);
         });
         app.world_mut().flush();
         let world = app.world_mut();

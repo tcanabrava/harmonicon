@@ -29,6 +29,7 @@ use bevy::prelude::*;
 use harmonicon_app::app::SelectedSong;
 use harmonicon_core::chart::{seconds_to_tick, tick_to_seconds};
 use harmonicon_core::instrument::ScrollAxis;
+use harmonicon_platform::theme::{Appearance, LoadedTheme};
 use harmonicon_song::song::SongManifest;
 
 use super::bars::{beat_ticks_in_range, chart_meter, pickup_lead_ticks, ticks_per_beat};
@@ -96,11 +97,19 @@ pub(super) fn update_beat_guides(
     selected: Res<SelectedSong>,
     manifests: Res<Assets<SongManifest>>,
     lanes: Res<HighwayLanes>,
+    theme: Option<Res<LoadedTheme>>,
     mut guides: Query<(&mut Node, &mut Visibility, &mut BackgroundColor), With<BeatGuide>>,
 ) {
     let axis = lanes.0.as_ref().map_or(ScrollAxis::Vertical, |layout| layout.axis);
     let mut guides = guides.iter_mut();
     let elapsed = clock.get();
+    let (beat_color, downbeat_color) =
+        if let Some(theme) = theme.filter(|theme| theme.0 == Appearance::Light) {
+            let ink = theme.palette().muted;
+            (ink.with_alpha(0.10), ink.with_alpha(0.25))
+        } else {
+            (BEAT_COLOR, DOWNBEAT_COLOR)
+        };
 
     if let Some(manifest) = manifests.get(&selected.0) {
         let timing = &manifest.chart.timing;
@@ -135,7 +144,7 @@ pub(super) fn update_beat_guides(
             if across(&node, axis) != (Val::Percent(0.0), Val::Percent(100.0)) {
                 set_across(&mut node, axis, 0.0, Val::Percent(100.0));
             }
-            let tint = if is_downbeat { DOWNBEAT_COLOR } else { BEAT_COLOR };
+            let tint = if is_downbeat { downbeat_color } else { beat_color };
             if color.0 != tint {
                 color.0 = tint;
             }

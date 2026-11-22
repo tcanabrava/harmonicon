@@ -38,14 +38,14 @@ impl UiMaterial for TieMaterial {
 #[derive(Resource, Default)]
 pub(super) struct TieMaterialHandle {
     hud: TieMaterials,
-    editor_light: TieMaterials,
+    light: TieMaterials,
 }
 
 impl TieMaterialHandle {
     pub(super) fn for_score(&self, appearance: super::ScoreAppearance) -> &TieMaterials {
         match appearance {
             super::ScoreAppearance::Hud => &self.hud,
-            super::ScoreAppearance::EditorLight => &self.editor_light,
+            super::ScoreAppearance::Light => &self.light,
         }
     }
 }
@@ -82,6 +82,6 @@ fn load_tie_material(mut materials: ResMut<Assets<TieMaterial>>, mut commands: C
     };
     commands.insert_resource(TieMaterialHandle {
         hud: for_score(super::ScoreAppearance::Hud),
-        editor_light: for_score(super::ScoreAppearance::EditorLight),
+        light: for_score(super::ScoreAppearance::Light),
     });
 }

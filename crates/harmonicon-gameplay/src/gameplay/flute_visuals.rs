@@ -13,6 +13,7 @@
 //! mid-song.
 use super::{GameplayClock, ScheduledNote, SongNotes};
 use bevy::prelude::*;
+use harmonicon_platform::theme::{Appearance, LoadedTheme, ThemeSurface};
 use bevy::ui_widgets::Activate;
 use harmonicon_core::instrument::flute::{FingeringAssignment, Flute, Side, key_rows};
 use harmonicon_core::instrument::{InstrumentModel, LaneLayout, PlayPosition};
@@ -330,7 +331,7 @@ pub(super) fn spawn_flute_chart(
                             border_radius: BorderRadius::MAX,
                             ..default()
                         },
-                        BorderColor::all(Color::srgba(1.0, 1.0, 1.0, 0.75)),
+                        BorderColor::all(Color::srgb_u8(140, 160, 172)),
                         BackgroundColor(Color::NONE),
                     ));
                 });
@@ -377,7 +378,9 @@ pub(super) fn spawn_flute_stage(
     parent: &mut ChildSpawnerCommands,
     flute: &Flute,
     loc: &Localization,
+    appearance: Appearance,
 ) {
+    let palette = appearance.palette();
     parent
         .spawn((
             FluteStage(*flute),
@@ -391,7 +394,7 @@ pub(super) fn spawn_flute_stage(
                 padding: UiRect::axes(Val::Px(24.0), Val::Px(8.0)),
                 ..default()
             },
-            BackgroundColor(Color::srgb(0.06, 0.08, 0.11)),
+            ThemeSurface::Panel,
         ))
         .with_children(|strip| {
             // The preview sits above the current chart, on the same axis:
@@ -420,7 +423,7 @@ pub(super) fn spawn_flute_stage(
                                 name.spawn((
                                     Text::new(String::from(loc.msg("gameplay-flute-next"))),
                                     TextFont { font_size: FontSize::Px(14.0), ..default() },
-                                    TextColor(Color::srgb(0.65, 0.73, 0.83)),
+                                    TextColor(palette.muted),
                                 ));
                             }
                             name.spawn((
@@ -435,9 +438,9 @@ pub(super) fn spawn_flute_stage(
                                     ..default()
                                 },
                                 TextColor(if slot == ChartSlot::Now {
-                                    Color::WHITE
+                                    palette.text
                                 } else {
-                                    KEY_NEXT
+                                    palette.muted
                                 }),
                             ));
                         });
@@ -480,7 +483,7 @@ pub(super) fn spawn_flute_stage(
                         overflow: Overflow::clip(),
                         ..default()
                     },
-                    BackgroundColor(Color::srgb(0.18, 0.23, 0.30)),
+                    ThemeSurface::Inset,
                 ))
                 .with_children(|bar| {
                     bar.spawn((
@@ -547,6 +550,7 @@ pub(super) fn update_flute_stage(
     mut names: Query<(&StageNoteName, &mut Text)>,
     mut bars: Query<(&mut Node, &mut BackgroundColor), (With<StageCountdown>, Without<FluteKey>)>,
     mut highlight: ResMut<StaffHighlight>,
+    theme: Option<Res<LoadedTheme>>,
 ) {
     let Ok((entity, FluteStage(flute))) = stage.single() else { return };
     let shown = mine.flute_view == FluteView::Fingering;
@@ -622,18 +626,26 @@ pub(super) fn update_flute_stage(
     let pressed = |note: Option<&ScheduledNote>, key: u16| {
         note.and_then(fingering).and_then(|at| flute.keys(at)).is_some_and(|k| k.pressed(key))
     };
+    let (now_ink, held_ink, next_ink, countdown_ink) =
+        if let Some(theme) = theme.filter(|theme| theme.0 == Appearance::Light) {
+            let palette = theme.palette();
+            let blue = Color::srgb_u8(34, 91, 148);
+            (blue, palette.accent, palette.control, blue)
+        } else {
+            (KEY_NOW, KEY_HELD, KEY_NEXT, COUNTDOWN_COMING)
+        };
     for (key, mut colour) in &mut keys {
         let want = match key.slot {
             ChartSlot::Now if pressed(current, key.key) => {
                 if held {
-                    KEY_HELD
+                    held_ink
                 } else {
-                    KEY_NOW
+                    now_ink
                 }
             }
-            ChartSlot::Next if pressed(next, key.key) => KEY_NEXT,
+            ChartSlot::Next if pressed(next, key.key) => next_ink,
             ChartSlot::Outgoing if pressed(motion.outgoing.as_ref(), key.key) => {
-                if motion.outgoing.as_ref().is_some_and(|n| n.hit) { KEY_HELD } else { KEY_NOW }
+                if motion.outgoing.as_ref().is_some_and(|n| n.hit) { held_ink } else { now_ink }
             }
             _ => Color::NONE,
         };
@@ -656,7 +668,7 @@ pub(super) fn update_flute_stage(
         if node.width != width {
             node.width = width;
         }
-        let want = if sounding { KEY_HELD } else { COUNTDOWN_COMING };
+        let want = if sounding { held_ink } else { countdown_ink };
         if colour.0 != want {
             colour.0 = want;
         }
@@ -790,7 +802,7 @@ mod tests {
         app.world_mut()
             .commands()
             .spawn(Node::default())
-            .with_children(|p| spawn_flute_stage(p, &flute, &loc));
+            .with_children(|p| spawn_flute_stage(p, &flute, &loc, Appearance::Dark));
         app.world_mut().flush();
         app.world_mut().resource_mut::<GameplayClock>().set_free(1.4);
         app.update();

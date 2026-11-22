@@ -9,6 +9,7 @@
 //! All the lyric logic — lines, word joins, where the singer is — is
 //! `harmonicon_core::lyrics`; this module only draws its answer.
 
+use harmonicon_platform::theme::{Appearance, ThemeSurface};
 use bevy::prelude::*;
 
 use harmonicon_app::app::{AppState, GameplayMode};
@@ -21,6 +22,7 @@ const UNSUNG_COLOR: Color = Color::WHITE;
 const NEXT_COLOR: Color = Color::srgba(1.0, 1.0, 1.0, 0.55);
 const CURRENT_FONT: f32 = 26.0;
 const NEXT_FONT: f32 = 18.0;
+pub(super) const STRIP_HEIGHT: f32 = 66.0;
 
 pub(super) struct KaraokePlugin;
 
@@ -69,10 +71,16 @@ pub(super) fn strip_top(staff: bool) -> f32 {
 /// a sibling top-level entity at the staff's `GlobalZIndex(100)` for the
 /// same reason as `gameplay_2d::spawn_gameplay_music_score`. Nothing is
 /// spawned for a chart without lyrics.
-pub(super) fn spawn_karaoke(commands: &mut Commands, lines: Vec<LyricLine>, top: f32) {
+pub(super) fn spawn_karaoke(commands: &mut Commands, lines: Vec<LyricLine>, top: f32, appearance: Appearance) {
     if lines.is_empty() {
         return;
     }
+    let palette = appearance.palette();
+    let (sung, unsung, next) = if appearance == Appearance::Light {
+        (palette.accent, palette.text, palette.muted)
+    } else {
+        (SUNG_COLOR, UNSUNG_COLOR, NEXT_COLOR)
+    };
     commands
         .spawn_scene(bsn! {
             Node {
@@ -91,20 +99,20 @@ pub(super) fn spawn_karaoke(commands: &mut Commands, lines: Vec<LyricLine>, top:
                     flex_direction: {FlexDirection::Column},
                     align_items: {AlignItems::Center},
                 }
-                BackgroundColor({Color::srgba(0.0, 0.0, 0.0, 0.45)})
+                ~{ThemeSurface::Panel}
                 Children [
                     Text("")
                     TextFont { font_size: {FontSize::Px(CURRENT_FONT)} }
                     Children [
                         TextSpan("") TextFont { font_size: {FontSize::Px(CURRENT_FONT)} }
-                        TextColor({SUNG_COLOR}) KaraokeSung
+                        TextColor({sung}) KaraokeSung
                         --
                         TextSpan("") TextFont { font_size: {FontSize::Px(CURRENT_FONT)} }
-                        TextColor({UNSUNG_COLOR}) KaraokeUnsung
+                        TextColor({unsung}) KaraokeUnsung
                     ]
                     --
                     Text("") TextFont { font_size: {FontSize::Px(NEXT_FONT)} }
-                    TextColor({NEXT_COLOR}) KaraokeNext
+                    TextColor({next}) KaraokeNext
                 ]
             ]
         })
@@ -182,7 +190,7 @@ mod tests {
             vec![line(&[("how", 1.0), ("sweet", 2.0)]), line(&[("the", 3.0), ("sound", 4.0)])];
         world
             .run_system_once(move |mut commands: Commands| {
-                spawn_karaoke(&mut commands, lines.clone(), 0.0);
+                spawn_karaoke(&mut commands, lines.clone(), 0.0, Appearance::Dark);
             })
             .unwrap();
 
@@ -202,7 +210,7 @@ mod tests {
     fn a_chart_without_lyrics_spawns_nothing() {
         let mut world = World::new();
         world
-            .run_system_once(|mut commands: Commands| spawn_karaoke(&mut commands, Vec::new(), 0.0))
+            .run_system_once(|mut commands: Commands| spawn_karaoke(&mut commands, Vec::new(), 0.0, Appearance::Dark))
             .unwrap();
         assert_eq!(world.query::<&KaraokeStrip>().iter(&world).count(), 0);
     }

@@ -9,6 +9,7 @@ use harmonicon_core::instrument::bowed_strings::{
     BowArticulation, BowDirection, BowGesture, BowedStrings, FingerboardPosition,
 };
 use harmonicon_platform::localization::{Localization, LocalizationExt};
+use harmonicon_platform::theme::ThemeSurface;
 
 #[derive(Component)]
 pub(crate) struct FingerboardView {
@@ -64,7 +65,7 @@ pub(crate) fn spawn(parent: &mut ChildSpawnerCommands, setup: &BowedStrings, loc
                     flex_shrink: 0.0,
                     ..default()
                 },
-                BackgroundColor(Color::srgb(0.075, 0.065, 0.05)),
+                ThemeSurface::Panel,
             ))
             .with_children(|board| {
                 board.spawn((
@@ -75,7 +76,7 @@ pub(crate) fn spawn(parent: &mut ChildSpawnerCommands, setup: &BowedStrings, loc
                         height: Val::Percent(100.0),
                         ..default()
                     },
-                    BackgroundColor(Color::srgb(0.8, 0.77, 0.64)),
+                    ThemeSurface::Divider,
                 ));
                 for (index, &pitch) in setup.strings.iter().enumerate() {
                     let string = index as u8 + 1;
@@ -99,7 +100,7 @@ pub(crate) fn spawn(parent: &mut ChildSpawnerCommands, setup: &BowedStrings, loc
                             height: Val::Px(1.0 + index as f32 * 0.45),
                             ..default()
                         },
-                        BackgroundColor(Color::srgb(0.62, 0.64, 0.68)),
+                        ThemeSurface::Divider,
                     ));
                     for heard in [false, true] {
                         let size = if heard { 16.0 } else { 32.0 };
@@ -114,10 +115,16 @@ pub(crate) fn spawn(parent: &mut ChildSpawnerCommands, setup: &BowedStrings, loc
                                     width: Val::Px(size),
                                     height: Val::Px(size),
                                     border_radius: BorderRadius::MAX,
+                                    border: UiRect::all(Val::Px(1.0)),
                                     align_items: AlignItems::Center,
                                     justify_content: JustifyContent::Center,
                                     ..default()
                                 },
+                                BorderColor::all(if heard {
+                                    Color::srgb_u8(34, 91, 148)
+                                } else {
+                                    Color::srgb_u8(143, 99, 12)
+                                }),
                                 BackgroundColor(if heard {
                                     Color::srgb(0.25, 0.68, 1.0)
                                 } else {

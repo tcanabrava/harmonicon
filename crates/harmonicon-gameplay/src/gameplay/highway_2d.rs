@@ -11,6 +11,7 @@
 //! lane on any harp, 10-hole diatonic or 12-hole chromatic.
 
 use bevy::prelude::*;
+use harmonicon_platform::theme::{Appearance, ThemeSurface};
 
 use harmonicon_core::chart::Action;
 use harmonicon_core::harmonica::Harmonica;
@@ -161,6 +162,15 @@ pub(super) fn spawn_highway(hw: &mut ChildSpawnerCommands, layout: &LaneLayout, 
     }
 }
 
+pub(super) fn breath_color(appearance: Appearance, blow: bool) -> Color {
+    match (appearance, blow) {
+        (Appearance::Light, true) => Color::srgb_u8(34, 91, 148),
+        (Appearance::Light, false) => Color::srgb_u8(144, 65, 23),
+        (Appearance::Dark, true) => Color::srgb(0.50, 0.75, 1.00),
+        (Appearance::Dark, false) => Color::srgb(1.00, 0.62, 0.35),
+    }
+}
+
 /// The hole strip under the highway, labelled with the notes of the harp
 /// the player is *holding* — a substituted harp has different notes in the
 /// same holes, and the strip is what the player reads them off.
@@ -168,10 +178,14 @@ pub(super) fn spawn_harmonica_strip(
     col: &mut ChildSpawnerCommands,
     harp: &Harmonica,
     loc: &Localization,
+    appearance: Appearance,
 ) {
+    let palette = appearance.palette();
+    let blow = breath_color(appearance, true);
+    let draw = breath_color(appearance, false);
     let hole_count = harp.hole_count();
     let lane_pct = 100.0 / hole_count as f32;
-    spawn_blow_draw_legend(col, loc);
+    spawn_blow_draw_legend(col, loc, appearance);
     col.spawn(Node {
         flex_direction: FlexDirection::Row,
         width: Val::Percent(100.0),
@@ -202,8 +216,8 @@ pub(super) fn spawn_harmonica_strip(
                         border_radius: {BorderRadius::all(Val::Px(8.0))},
                         padding: {UiRect::vertical(Val::Px(6.0))},
                     }
-                    BackgroundColor({Color::srgb(0.10, 0.12, 0.16)})
-                    ~{BorderColor::all(Color::srgb(0.28, 0.30, 0.40))}
+                    BackgroundColor({palette.control})
+                    ~{BorderColor::all(palette.border)}
                     HoleCell(hole)
                 })
                 .with_children(|cell| {
@@ -211,13 +225,13 @@ pub(super) fn spawn_harmonica_strip(
                         Text({b})
                             ~{TextLayout::no_wrap()}
                         TextFont { font_size: {FontSize::Px(15.0)} }
-                        TextColor({Color::srgb(0.50, 0.75, 1.00)})
+                        TextColor({blow})
                     });
                     cell.spawn_empty().apply_scene(bsn! {
                         Text({hole.to_string()})
                             ~{TextLayout::no_wrap()}
                         TextFont { font_size: {FontSize::Px(25.0)} }
-                        TextColor({Color::srgb(0.96, 0.92, 0.80)})
+                        TextColor({palette.text})
                         Node {
                             flex_shrink: {0.0_f32},
                             height: {Val::Px(34.0)},
@@ -227,14 +241,14 @@ pub(super) fn spawn_harmonica_strip(
                             border: {UiRect::all(Val::Px(1.0))},
                             justify_content: {JustifyContent::Center},
                         }
-                        BackgroundColor({Color::srgb(0.035, 0.045, 0.065)})
-                        ~{BorderColor::all(Color::srgb(0.45, 0.49, 0.56))}
+                        ~{ThemeSurface::Panel}
+                        ~{BorderColor::all(palette.border)}
                     });
                     cell.spawn_empty().apply_scene(bsn! {
                         Text({d})
                             ~{TextLayout::no_wrap()}
                         TextFont { font_size: {FontSize::Px(15.0)} }
-                        TextColor({Color::srgb(1.00, 0.62, 0.35)})
+                        TextColor({draw})
                     });
                 });
         }
@@ -242,7 +256,9 @@ pub(super) fn spawn_harmonica_strip(
 }
 
 /// A reserved action/legend row above the mouthpiece, outside its cells.
-fn spawn_blow_draw_legend(parent: &mut ChildSpawnerCommands, loc: &Localization) {
+fn spawn_blow_draw_legend(parent: &mut ChildSpawnerCommands, loc: &Localization, appearance: Appearance) {
+    let blow = breath_color(appearance, true);
+    let draw = breath_color(appearance, false);
     parent
         .spawn(Node {
             width: Val::Percent(100.0),
@@ -266,12 +282,12 @@ fn spawn_blow_draw_legend(parent: &mut ChildSpawnerCommands, loc: &Localization)
             leg.spawn_empty().apply_scene(bsn! {
                 Text({String::from(loc.msg("gameplay-legend-blow"))})
                 TextFont { font_size: {FontSize::Px(15.0)} }
-                TextColor({Color::srgb(0.50, 0.75, 1.00)})
+                TextColor({blow})
             });
             leg.spawn_empty().apply_scene(bsn! {
                 Text({String::from(loc.msg("gameplay-legend-draw"))})
                 TextFont { font_size: {FontSize::Px(15.0)} }
-                TextColor({Color::srgb(1.00, 0.62, 0.35)})
+                TextColor({draw})
             });
         });
 }
@@ -290,7 +306,7 @@ mod tests {
         world
             .commands()
             .spawn(Node::default())
-            .with_children(|col| spawn_harmonica_strip(col, harp, &loc));
+            .with_children(|col| spawn_harmonica_strip(col, harp, &loc, Appearance::Dark));
         world.flush();
         let mut texts: Vec<String> =
             world.query::<&Text>().iter(world).map(|t| t.0.clone()).collect();

@@ -75,7 +75,7 @@ pub fn spawn_song_progress(
                 height: Val::Px(BAR_HEIGHT),
                 ..default()
             },
-            BackgroundColor(harmonicon_platform::theme::HUD_PANEL_BG),
+            harmonicon_platform::theme::ThemeSurface::Panel,
             GlobalZIndex(BAR_Z_INDEX),
             GameplayRoot,
             // Display only: nothing here takes input.
