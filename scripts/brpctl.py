@@ -451,20 +451,26 @@ def enter_jam(artist, song):
 
 
 def enter_editor(artist, song, chart="chart.harpchart"):
-    """Main menu → the Song Editor with a bundled chart loaded, via its own
-    file dialog: 📂 → artist folder → song folder → `song/` → the chart.
+    """Open the Song Editor and load a chart from the local songs folder."""
+    to_main_menu()
+    _go("Play", exact=True)
+    _go("Create Song", exact=True)
+    picker_context = "Which instrument is this document for?"
+    if find("Harmonica", exact=True, context=picker_context):
+        _go("Harmonica", exact=True, context=picker_context)
+        if find("Harmonica", exact=True, context=picker_context):
+            raise SystemExit("The New document picker did not close after instrument selection")
 
-    The dialog's rows are a 📁 `Text` plus a `TextSpan` holding the name, so
-    they match on the name (see `TEXT_SPAN`)."""
-    set_state("app", "SongEditor2")
-    time.sleep(2.0)
-    _go("📂", exact=True)
-    _go(artist)
-    _go(song)
-    # Exact: a bare "song" also matches the editor's "‹ Record Song ›"
-    # toggle, which switched it to lesson mode and failed the load.
+    # The editor keeps an open document across visits. Load asks before
+    # replacing it, including when the previous visit was another BRP run.
+    _go("Load", exact=True)
+    replace_context = "Open another file and discard"
+    if any(text.startswith(replace_context) for text in texts()):
+        _go("Yes", exact=True)
+    _go(f"📁  {artist}", exact=True)
+    _go(f"📁  {song}", exact=True)
     _go("📁  song", exact=True)
-    _go(chart, settle=3.0)
+    _go(chart, exact=True, settle=3.0)
 
 
 def wait_for_results(timeout_secs=180.0):
