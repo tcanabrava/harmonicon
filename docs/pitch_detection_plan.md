@@ -59,6 +59,8 @@ reed at 40% amplitude. Exact chord recall was 85% for FFT, 70% for NMF and
 capture the interaction of reeds played together in one breath.
 [Versilian Community Sample Library recordings](https://github.com/sgossner/VCSL/tree/c1ea7bcc3c7309650ab0da9d15c9cd1fbc4a4c7e/Aerophones/Free%20Aerophones/Harmonica-Hohner-Special20-C)
 
+The SoundFont benchmark covers all nine instrument families and compares timbre templates on the recorded reed mixtures and GuitarSet performances. [Presets, measurements and reproduction commands](../assets/soundfonts/README.md)
+
 ## Current baseline
 
 - Preserve raw detector events for diagnostics.

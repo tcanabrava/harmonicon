@@ -27,6 +27,13 @@ JIT-MPE — pretrained polyphonic pitch detector by Yoshiyuki Kobayashi (Frieve-
 
 ---
 
+### SOUNDFONTS
+
+GeneralUser GS — S. Christian Collins, GeneralUser GS License 2.0
+Levi’s Cavaquinho — Levi Diniz, Creative Commons Attribution 3.0 Unported
+
+---
+
 ### SONG CREDITS
 
 "Boom Boom"
