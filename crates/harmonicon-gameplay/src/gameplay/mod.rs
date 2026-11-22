@@ -40,6 +40,7 @@ mod notes;
 pub mod pause_menu;
 mod pause_score;
 mod phrase_overlay;
+mod piano_fingering;
 mod piano_visuals;
 pub mod plugin;
 mod practice_badges;

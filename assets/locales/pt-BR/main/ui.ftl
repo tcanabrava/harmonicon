@@ -996,7 +996,7 @@ gameplay-guitar-neck-capo = Braço · capotraste { $capo } · dedos sugeridos 1�
 gameplay-guitar-neck-now = Agora { $chord }
 gameplay-guitar-neck-next = Próximo { $chord }
 
-gameplay-piano-hands = Esquerda / graves: azul · Direita / agudos: âmbar · Divisão no dó central (C4)
+gameplay-piano-hands = Mão esquerda: azul · Mão direita: âmbar · Dó central (C4): verde-azulado · Dedos sugeridos: 1 polegar, 2 indicador, 3 médio, 4 anelar, 5 mínimo
 
 pause-score-instructions = Selecione uma seção acima da partitura. Ative Repetir seção para praticar.
 

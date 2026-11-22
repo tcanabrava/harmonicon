@@ -49,6 +49,8 @@ pub struct ScheduledNote {
     /// technique. Drawing and coaching read it; scoring never does, since a
     /// microphone hears the pitch, not the hole (`expected_pitch`).
     pub position: PlayPosition,
+    /// Suggested finger on the piano visualizer, from thumb (1) to little finger (5).
+    pub suggested_piano_finger: Option<u8>,
     /// The MIDI note number this note expects, pre-computed at spawn
     /// (`None` for a hole/action/bend combination the harp can't actually
     /// produce — see [`target_pitch`] — which can never be hit).
@@ -132,6 +134,7 @@ impl Default for ScheduledNote {
                 action: Action::Blow,
                 technique: Technique::Natural,
             }),
+            suggested_piano_finger: None,
             expected_pitch: None,
             hit: false,
             missed: false,
@@ -448,6 +451,7 @@ pub fn build_scheduled_notes(
                     time: t,
                     duration: item.duration,
                     position,
+                    suggested_piano_finger: None,
                     expected_pitch,
                     hit: false,
                     missed: false,
@@ -467,7 +471,11 @@ pub fn build_scheduled_notes(
         }
     }
     combined.sort_by(|a, b| a.0.time.partial_cmp(&b.0.time).unwrap_or(std::cmp::Ordering::Equal));
-    combined.into_iter().unzip()
+    let (mut notes, tags): (Vec<_>, _) = combined.into_iter().unzip();
+    if notes.iter().any(|note| matches!(note.position, PlayPosition::Key(_))) {
+        super::piano_fingering::suggest(&mut notes);
+    }
+    (notes, tags)
 }
 
 /// Converts scored notes' real-time `time`/`duration` into the beat-based

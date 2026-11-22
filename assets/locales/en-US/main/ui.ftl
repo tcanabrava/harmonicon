@@ -999,7 +999,7 @@ gameplay-guitar-neck-capo = Fretboard 路 capo { $capo } 路 suggested fingers 1鈥
 gameplay-guitar-neck-now = Now { $chord }
 gameplay-guitar-neck-next = Next { $chord }
 
-gameplay-piano-hands = Left / bass: blue 路 Right / treble: amber 路 Split at middle C (C4)
+gameplay-piano-hands = Left hand: blue 路 Right hand: amber 路 C4: teal 路 Suggested fingers: 1 thumb, 2 index, 3 middle, 4 ring, 5 little
 
 pause-score-instructions = Select a section above the score. Use Repeat section to practise it.
 

@@ -271,6 +271,7 @@ fn loop_test_note(time: f64) -> ScheduledNote {
         time,
         duration: 0.5,
         position: PlayPosition::natural_hole(1, Action::Blow),
+        suggested_piano_finger: None,
         expected_pitch: Some(60), // C4
         hit: true,
         missed: true,
