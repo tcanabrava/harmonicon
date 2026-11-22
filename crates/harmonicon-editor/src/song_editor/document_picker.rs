@@ -8,6 +8,7 @@ use bevy::prelude::*;
 use bevy::ui_widgets::Activate;
 use harmonicon_app::app::AppState;
 use harmonicon_platform::localization::{Localization, LocalizationExt};
+use harmonicon_platform::theme::{LoadedTheme, MODAL_BACKDROP_BG, ThemeSurface};
 use harmonicon_ui::dialogs::{
     button,
     confirm_dialog::{ConfirmChosen, DialogId, OpenConfirmDialog},
@@ -72,6 +73,7 @@ pub(super) fn sync_picker(
     mut commands: Commands,
     picker: Res<DocumentPicker>,
     loc: Res<Localization>,
+    theme: Res<LoadedTheme>,
     roots: Query<Entity, With<PickerRoot>>,
 ) {
     if !picker.open {
@@ -83,6 +85,7 @@ pub(super) fn sync_picker(
     if !roots.is_empty() {
         return;
     }
+    let palette = theme.palette();
     commands
         .spawn((
             PickerRoot,
@@ -96,7 +99,7 @@ pub(super) fn sync_picker(
                 justify_content: JustifyContent::Center,
                 ..default()
             },
-            BackgroundColor(Color::srgba(0.03, 0.04, 0.06, 0.97)),
+            BackgroundColor(MODAL_BACKDROP_BG),
             GlobalZIndex(350),
         ))
         .with_children(|overlay| {
@@ -110,18 +113,19 @@ pub(super) fn sync_picker(
                         padding: UiRect::all(Val::Px(24.0)),
                         ..default()
                     },
-                    BackgroundColor(Color::srgb(0.08, 0.10, 0.14)),
+                    ThemeSurface::Panel,
+                    BackgroundColor(palette.panel),
                 ))
                 .with_children(|panel| {
                     panel.spawn((
                         Text::new(loc.msg("editor-new-title").to_string()),
                         TextFont { font_size: FontSize::Px(26.0), ..default() },
-                        TextColor(Color::WHITE),
+                        TextColor(palette.text),
                     ));
                     panel.spawn((
                         Text::new(loc.msg("editor-new-instrument-question").to_string()),
                         TextFont { font_size: FontSize::Px(16.0), ..default() },
-                        TextColor(Color::WHITE),
+                        TextColor(palette.text),
                     ));
                     for kind in InstrumentKind::ALL {
                         panel.spawn_empty().apply_scene(button::default(&loc.msg(&kind.label()),
