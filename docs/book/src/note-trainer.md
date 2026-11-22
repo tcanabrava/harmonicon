@@ -120,7 +120,7 @@ cannot accumulate into a completed chord. Stop the strings ringing between attem
 The count reports successful strums this session, not mastery. Auto-advance
 can cycle the chord list; leave it off to repeat one chord.
 
-A polyphonic detector is required. If a monophonic detector is selected, the
+FFT, NMF and JIT-MPE all use these chord rules. If a monophonic detector is selected, the
 trainer explains why it cannot assess the chord and offers **Use chord
 detection (JIT-MPE)**. The microphone checks pitches, not which finger or physical
 string produced them; use the diagram to check your hand and muted strings.

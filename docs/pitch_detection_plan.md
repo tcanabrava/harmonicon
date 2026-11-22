@@ -84,7 +84,7 @@ python scripts/guitar_chord_trainer_benchmark.py /tmp/harmonicon-chord-practice
 ```
 
 The benchmark downloads 55 recordings and tries each against the eight open
-guitar shapes with JIT-MPE, A4 at 440 Hz and the default 0.5-second hold.
+guitar shapes with FFT and JIT-MPE, A4 at 440 Hz and the default 0.5-second hold.
 The Fender set labels chord names and includes alternate fingerings. SpeedY’s
 recordings specify full or partial voicings. A trial counts as accepted if
 the trainer awards a hold anywhere in the recording. The smaller nylon-guitar
@@ -92,7 +92,7 @@ set was replayed after choosing the grading rules on the Fender set.
 [Isolated Guitar Chords dataset](https://huggingface.co/datasets/rodriler/isolated-guitar-chords) ·
 [Nylon Guitar Open Chords by SpeedY](https://freesound.org/people/SpeedY/packs/472/)
 
-| Recording group | Correct target accepted, before → after | Wrong target accepted, before → after |
+| JIT-MPE recording group | Correct target accepted, before → after | Wrong target accepted, before → after |
 | --- | ---: | ---: |
 | Fender acoustic, 47 strums and one noise clip | 2/16 → 8/16 | 0/368 → 0/368 |
 | Nylon guitar, full Em and six partial or suspended shapes | 0/1 → 1/1 | 0/55 → 1/55 |
@@ -102,6 +102,12 @@ already contain C, E and G, and their overtones can resemble the upper
 strings. Eight labeled Fender strums still missed. These figures measure
 trainer decisions across two guitars. Raw note transcription is evaluated
 separately above.
+
+On these same recordings, FFT accepted 0/17 target strums with the former
+exact-pitch grading and 3/17 with the current voicing rules. Both FFT runs
+rejected all 423 wrong targets. The trainer applies the same rules to every
+polyphonic detector. FFT suppresses peaks near integer multiples of a stronger
+peak, so an octave played on a second string can disappear before grading.
 
 A separate experiment averaged the calibrated outputs of two released JIT-MPE
 models. Mean exact chord recall on the five held-out GuitarSet performances

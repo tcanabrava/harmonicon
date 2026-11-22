@@ -8,7 +8,21 @@ use std::{collections::BTreeMap, fs, path::PathBuf};
 
 #[test]
 #[ignore = "run scripts/guitar_chord_trainer_benchmark.py to supply the recordings"]
-fn recorded_open_chords() {
+fn recorded_open_chords_jit_mpe() {
+    let (hits, false_accepts) = replay(PitchAlgorithm::JitMpe);
+    assert!(hits >= 9, "regression in recognizing target strums");
+    assert!(false_accepts <= 1, "regression in rejecting wrong targets");
+}
+
+#[test]
+#[ignore = "run scripts/guitar_chord_trainer_benchmark.py to supply the recordings"]
+fn recorded_open_chords_fft() {
+    let (hits, false_accepts) = replay(PitchAlgorithm::Fft);
+    assert!(hits >= 3, "regression in recognizing target strums");
+    assert_eq!(false_accepts, 0, "regression in rejecting wrong targets");
+}
+
+fn replay(algorithm: PitchAlgorithm) -> (usize, usize) {
     let dir = PathBuf::from(std::env::var_os("HARMONICON_CHORD_RECORDINGS").unwrap());
     let cases: BTreeMap<String, Option<String>> =
         serde_json::from_slice(&fs::read(dir.join("chords.json")).unwrap()).unwrap();
@@ -32,7 +46,7 @@ fn recorded_open_chords() {
                 chunk,
                 rate,
                 &mut fft,
-                PitchAlgorithm::JitMpe,
+                algorithm,
                 range.0,
                 None,
                 (i * HOP_SIZE + CHUNK_SIZE) as u64,
@@ -49,7 +63,7 @@ fn recorded_open_chords() {
                     HOP_SIZE as f32 / rate as f32,
                     settings.tolerance_cents,
                     settings.hold_secs,
-                    true,
+                    algorithm.is_polyphonic(),
                 );
             }
         }
@@ -59,21 +73,21 @@ fn recorded_open_chords() {
                 positives += 1;
                 hits += usize::from(accepted);
                 if !accepted {
-                    println!("Missed {id} {}", shape.name);
+                    println!("{} missed {id} {}", algorithm.label(), shape.name);
                 }
             } else {
                 negatives += 1;
                 false_accepts += usize::from(accepted);
                 if accepted {
-                    println!("Accepted {id} {label:?} as {}", shape.name);
+                    println!("{} accepted {id} {label:?} as {}", algorithm.label(), shape.name);
                 }
             }
         }
     }
     println!(
-        "Accepted {hits}/{positives} target strums and {false_accepts}/{negatives} wrong targets"
+        "{} accepted {hits}/{positives} target strums and {false_accepts}/{negatives} wrong targets",
+        algorithm.label()
     );
     assert_eq!((positives, negatives), (17, 423), "pinned corpus coverage");
-    assert!(hits >= 9, "regression in recognizing target strums");
-    assert!(false_accepts <= 1, "regression in rejecting wrong targets");
+    (hits, false_accepts)
 }
