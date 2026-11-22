@@ -1087,10 +1087,10 @@ trainer-chord-count = Toques corretos nesta sessão: {$count}
 trainer-chord-needs-poly = Este detector ouve uma nota por vez. Ative a detecção de acordes abaixo para avaliar notas simultâneas.
 trainer-chord-release = Bom. Abafe as cordas e toque novamente.
 trainer-chord-extra = Também ouço {$notes}. Confira as cordas abafadas e os trastes.
-trainer-chord-hold = Todos os tons alvo detectados. Sustente o acorde.
+trainer-chord-hold = Acorde reconhecido. Sustente-o.
 trainer-chord-missing = Detectados {$heard}/{$total} tons · faltam: {$notes}
 trainer-chord-diagram-help = Afinação padrão · ○ solta · × não tocar · 1–4 dedos
-trainer-chord-assessment-help = O microfone verifica tons, não dedos nem cordas físicas. Toque a posição marcada em conjunto.
+trainer-chord-assessment-help = Toque a posição indicada de uma vez. O treinador escuta o baixo e cada nota do acorde. Uma nota dobrada em outra oitava pode deixar de soar.
 trainer-chord-detector = Usar detecção de acordes (JIT-MPE)
 trainer-chord-board-help = Veja no diagrama as cordas soltas e abafadas. O braço marca a posição inteira.
 

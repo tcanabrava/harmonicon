@@ -1089,10 +1089,10 @@ trainer-chord-count = Rasgueos correctos en esta sesión: {$count}
 trainer-chord-needs-poly = Este detector oye una nota a la vez. Activa la detección de acordes abajo para evaluar notas simultáneas.
 trainer-chord-release = Bien. Silencia las cuerdas y vuelve a rasguear.
 trainer-chord-extra = También se oye {$notes}. Revisa las cuerdas silenciadas y los trastes.
-trainer-chord-hold = Todos los tonos objetivo detectados. Sostén el acorde.
+trainer-chord-hold = Acorde reconocido. Mantenlo.
 trainer-chord-missing = Detectados {$heard}/{$total} tonos · faltan: {$notes}
 trainer-chord-diagram-help = Afinación estándar · ○ al aire · × no tocar · 1–4 dedos
-trainer-chord-assessment-help = El micrófono comprueba tonos, no dedos ni cuerdas físicas. Rasguea la posición marcada a la vez.
+trainer-chord-assessment-help = Rasguea la posición marcada de una vez. El entrenador escucha el bajo y cada nota del acorde. Una nota duplicada en otra octava puede dejar de sonar.
 trainer-chord-detector = Usar detección de acordes (JIT-MPE)
 trainer-chord-board-help = Consulta el diagrama para las cuerdas al aire y silenciadas. El diapasón marca toda la posición.
 

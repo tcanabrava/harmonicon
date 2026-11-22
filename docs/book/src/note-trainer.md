@@ -108,9 +108,15 @@ a chord from the combobox. Its diagram marks open strings with ○, muted
 strings with ×, and fretting fingers with 1–4; the full fretboard and staff
 show the same shape and sounding pitches. **Listen** plays the whole chord.
 
-Strum the unmuted strings together and hold until the bar fills. Feedback
-names missing and unexpected pitches. Notes plucked one at a time cannot
-accumulate into a completed chord. Stop the strings ringing between attempts.
+Strum the unmuted strings together and hold until the bar fills. The trainer
+listens for the diagram’s bass and every distinct chord tone. One upper note
+may fade if another string still sounds that note in a different octave. For
+example, an open Em still needs the low E and the G that makes it minor.
+When all the marked pitches sound, the trainer also allows one upper octave
+that their overtones can produce. The chord exercise allows at least 25 cents
+of intonation variation per note.
+Feedback names missing and unexpected pitches. Notes plucked one at a time
+cannot accumulate into a completed chord. Stop the strings ringing between attempts.
 The count reports successful strums this session, not mastery. Auto-advance
 can cycle the chord list; leave it off to repeat one chord.
 
@@ -158,8 +164,8 @@ Other tunings can be authored per string in the Song Editor.
 In Brazilian traditional tuning with no capo, **Chords** offers G, C, D and Em
 shapes on four strings. The small chord diagram suggests finger numbers; the
 large fretboard marks fret numbers. Shapes are offered only for the tuning they
-were defined for. Chord assessment requires a polyphonic detector; the microphone
-checks pitches, not the fingering, strumming gesture or number of physical strings.
+were defined for. The same bass and octave-doubling rules apply to these shapes.
+Use a polyphonic detector for chord practice and the diagram to check your fingering.
 
 The open-string frequencies follow [UFERSA's acoustics study, table 6](https://mnpef.ufersa.edu.br/wp-content/uploads/sites/94/2021/03/Disserta%C3%A7%C3%A3o-Final.pdf).
 The named tuning variants follow [Musixe's teaching chart](https://static.musixe.com/wp-content/uploads/2021/05/15110318/Aula-1-Cavaquinho-Apresentacao-PDF.pdf).

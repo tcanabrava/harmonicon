@@ -1090,10 +1090,10 @@ trainer-chord-count = Successful strums this session: {$count}
 trainer-chord-needs-poly = This detector hears one pitch at a time. Enable chord detection below to assess simultaneous notes.
 trainer-chord-release = Good. Stop the strings ringing, then strum again.
 trainer-chord-extra = Also hearing {$notes}. Check the muted strings and frets.
-trainer-chord-hold = All target pitches detected. Hold the chord steady.
+trainer-chord-hold = Chord recognized. Hold it steady.
 trainer-chord-missing = Heard {$heard}/{$total} pitches · missing: {$notes}
 trainer-chord-diagram-help = Standard tuning · ○ open · × do not strum · 1–4 finger numbers
-trainer-chord-assessment-help = The microphone checks sounding pitches, not fingers or physical strings. Strum the marked shape together.
+trainer-chord-assessment-help = Strum the marked shape together. The trainer listens for the bass and each chord tone. One octave doubling may fade.
 trainer-chord-detector = Use chord detection (JIT-MPE)
 trainer-chord-board-help = Read the chord diagram for open and muted strings. The fretboard marks the full shape.
 

@@ -145,8 +145,23 @@ impl ChordPractice {
             *self = Self { shapes: self.shapes, index, landed: self.landed, ..default() };
         }
     }
-    /// Every expected absolute pitch must be in this frame. Do not collect
-    /// individually plucked strings over time and call that a chord.
+    // Shape::pitches gives the sounding voicing bass first. A strum may lose
+    // one upper doubling when its string decays below the detector threshold.
+    fn matches_voicing(&self, expected: &[u8]) -> bool {
+        let Some(bass) = expected.first() else { return false };
+        if !self.extras.is_empty() || !self.present.contains(bass) {
+            return false;
+        }
+        let mut missing = expected.iter().filter(|p| !self.present.contains(p));
+        match missing.next() {
+            None => true,
+            Some(pitch) => {
+                missing.next().is_none() && self.present.iter().any(|p| p % 12 == pitch % 12)
+            }
+        }
+    }
+
+    /// Assess simultaneous pitches. Separately plucked notes never accumulate.
     pub fn listen(
         &mut self,
         expected: &[u8],
@@ -162,22 +177,30 @@ impl ChordPractice {
             self.held = 0.0;
             return false;
         }
+        // Bend practice uses a six-cent default. Fretted chord recognition
+        // allows a quarter of a semitone for string intonation and peak drift.
+        let tolerance = tolerance.max(25.0);
+        let mut only_upper_octaves = true;
         for &pitch in heard.iter().filter(|p| p.is_finite()) {
-            let nearest = expected.iter().min_by(|&&a, &&b| {
-                (pitch - f32::from(a)).abs().total_cmp(&(pitch - f32::from(b)).abs())
-            });
-            if let Some(&note) =
-                nearest.filter(|&&note| (pitch - f32::from(note)).abs() * 100.0 <= tolerance)
-            {
+            let note = pitch.round() as u8;
+            let in_tune = (pitch - f32::from(note)).abs() * 100.0 <= tolerance;
+            if in_tune && expected.contains(&note) {
                 if !self.present.contains(&note) {
                     self.present.push(note);
                 }
             } else {
-                let note = pitch.round() as u8;
+                only_upper_octaves &= in_tune
+                    && note > expected[expected.len() - 1]
+                    && note.checked_sub(12).is_some_and(|lower| expected.contains(&lower));
                 if !self.extras.contains(&note) {
                     self.extras.push(note);
                 }
             }
+        }
+        // A fully observed shape can also trigger one detection at a string's
+        // second harmonic above the voicing. Never use it to supply a missing note.
+        if self.present.len() == expected.len() && self.extras.len() == 1 && only_upper_octaves {
+            self.extras.clear();
         }
         if self.awaiting_release {
             if heard.is_empty() {
@@ -186,7 +209,7 @@ impl ChordPractice {
             self.held = 0.0;
             return false;
         }
-        let complete = self.present.len() == expected.len() && self.extras.is_empty();
+        let complete = self.matches_voicing(expected);
         self.held = if complete { self.held + dt } else { 0.0 };
         if self.held >= hold.max(0.01) {
             self.landed += 1;
@@ -208,11 +231,11 @@ impl ChordPractice {
                 .to_string();
         }
         let expected = self.shape().pitches(guitar);
-        let missing: Vec<_> =
-            expected.iter().filter(|n| !self.present.contains(n)).copied().collect();
-        if missing.is_empty() {
+        if self.matches_voicing(&expected) {
             return loc.msg("trainer-chord-hold").to_string();
         }
+        let missing: Vec<_> =
+            expected.iter().filter(|n| !self.present.contains(n)).copied().collect();
         loc.msg_args(
             "trainer-chord-missing",
             &[
@@ -461,6 +484,63 @@ mod tests {
         assert_eq!(practice.landed, 2);
     }
     #[test]
+    fn em_requires_the_voiced_bass_and_minor_third_but_allows_one_missing_doubling() {
+        let expected = SHAPES[0].pitches(&Guitar::standard(GuitarBody::Acoustic));
+        assert_eq!(expected, [40, 47, 52, 55, 59, 64]);
+        let lands =
+            |heard: &[f32]| ChordPractice::default().listen(&expected, heard, 0.6, 20.0, 0.6, true);
+        assert!(lands(&[40., 47., 55., 59., 64.])); // E3 drops out
+        assert!(!lands(&[47., 52., 55., 59., 64.])); // missing bass E2
+        assert!(!lands(&[40., 47., 52., 59., 64.])); // missing G
+        assert!(!lands(&[40., 47., 52., 56., 59., 64.])); // major third
+        assert!(!lands(&[40., 47., 55., 64.])); // two missing doublings
+        assert!(!lands(&[40., 47., 55., 59., 64., 76.])); // off-shape E5
+    }
+
+    #[test]
+    fn a_full_shape_can_have_one_upper_octave_partial() {
+        let expected = SHAPES[0].pitches(&Guitar::standard(GuitarBody::Acoustic));
+        let lands = |extra: &[f32]| {
+            let mut heard: Vec<_> = expected.iter().copied().map(f32::from).collect();
+            heard.extend_from_slice(extra);
+            ChordPractice::default().listen(&expected, &heard, 0.5, 6., 0.5, true)
+        };
+        assert!(lands(&[67.07])); // second harmonic of the detected G3
+        assert!(!lands(&[67.42]));
+        assert!(!lands(&[68.])); // an extra major third
+        assert!(!lands(&[67., 71.]));
+        assert!(!lands(&[43.])); // an extra G inside the voicing
+        assert!(!lands(&[31.])); // an extra bass below the whole shape
+    }
+
+    #[test]
+    fn fretted_chord_accepts_small_intonation_errors_and_rejects_a_wrong_third() {
+        let expected = SHAPES[4].pitches(&Guitar::standard(GuitarBody::Acoustic));
+        let lands = |third| {
+            ChordPractice::default().listen(
+                &expected,
+                &[50.14, 56.88, 62.18, third],
+                0.6,
+                6.,
+                0.5,
+                true,
+            )
+        };
+        assert!(lands(66.20));
+        assert!(!lands(66.40));
+        assert!(!lands(65.00));
+    }
+
+    #[test]
+    fn inverted_cavaquinho_shape_requires_its_written_bass() {
+        let expected = CAVAQUINHO_SHAPES[0].pitches(&Guitar::cavaquinho());
+        assert_eq!(expected, [62, 67, 71, 74]); // G/D
+        let mut practice = ChordPractice::new(CAVAQUINHO_SHAPES);
+        assert!(!practice.listen(&expected, &[67., 71., 74.], 0.6, 20., 0.6, true));
+        assert!(practice.listen(&expected, &[62., 67., 71.], 0.6, 20., 0.6, true));
+    }
+
+    #[test]
     fn standard_shapes_match_their_chord_names_and_keep_muted_strings_out() {
         let guitar = Guitar::standard(GuitarBody::Electric);
         let e = SHAPES[0].pitches(&guitar);
@@ -524,3 +604,6 @@ mod cavaquinho_tests {
         assert!(shapes_for(&alternate).is_none(), "a shape is tied to its actual tuning");
     }
 }
+
+#[cfg(test)]
+mod recorded_tests;

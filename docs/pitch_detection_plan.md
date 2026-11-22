@@ -61,6 +61,53 @@ capture the interaction of reeds played together in one breath.
 
 The SoundFont benchmark covers all nine instrument families and compares timbre templates on the recorded reed mixtures and GuitarSet performances. [Presets, measurements and reproduction commands](../assets/soundfonts/README.md)
 
+## Recognition in fretted chord practice
+
+A guitar or cavaquinho drill supplies a target voicing. The trainer checks the
+observed pitches against its bass and distinct chord tones on each frame. It
+allows one missing upper octave doubling when that chord tone is still heard.
+When every marked pitch is present, one extra detection an octave above a
+marked note and above the diagram’s highest pitch can be its second harmonic.
+The chord pitch tolerance has a 25-cent floor. The player must sustain a
+matching strum for the configured hold time.
+
+Rocksmith+’s lead audio designer describes giving the bass and third substantial
+weight, requiring the color tone in seventh chords, and allowing some leeway
+for doubled notes. Ubisoft describes its grading criteria publicly. The
+spectral and neural algorithms behind its detector are unspecified in that
+account. [Ubisoft audio development diary](https://www.ubisoft.com/en-us/game/rocksmith/plus/news-updates/1Zcwvdcw0IwhBEYoCGCQtt/rocksmith-dev-diary-february-2022-audio-updates)
+
+### Replay recorded strums through the trainer
+
+```sh
+python scripts/guitar_chord_trainer_benchmark.py /tmp/harmonicon-chord-practice
+```
+
+The benchmark downloads 55 recordings and tries each against the eight open
+guitar shapes with JIT-MPE, A4 at 440 Hz and the default 0.5-second hold.
+The Fender set labels chord names and includes alternate fingerings. SpeedY’s
+recordings specify full or partial voicings. A trial counts as accepted if
+the trainer awards a hold anywhere in the recording. The smaller nylon-guitar
+set was replayed after choosing the grading rules on the Fender set.
+[Isolated Guitar Chords dataset](https://huggingface.co/datasets/rodriler/isolated-guitar-chords) ·
+[Nylon Guitar Open Chords by SpeedY](https://freesound.org/people/SpeedY/packs/472/)
+
+| Recording group | Correct target accepted, before → after | Wrong target accepted, before → after |
+| --- | ---: | ---: |
+| Fender acoustic, 47 strums and one noise clip | 2/16 → 8/16 | 0/368 → 0/368 |
+| Nylon guitar, full Em and six partial or suspended shapes | 0/1 → 1/1 | 0/55 → 1/55 |
+
+The false acceptance came from the lowest three strings of a C chord. They
+already contain C, E and G, and their overtones can resemble the upper
+strings. Eight labeled Fender strums still missed. These figures measure
+trainer decisions across two guitars. Raw note transcription is evaluated
+separately above.
+
+A separate experiment averaged the calibrated outputs of two released JIT-MPE
+models. Mean exact chord recall on the five held-out GuitarSet performances
+went from about 42% to 41%, with roughly twice the model inference cost.
+The trainer uses the original single model.
+
 ## Current baseline
 
 - Preserve raw detector events for diagnostics.
