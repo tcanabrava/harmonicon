@@ -15,6 +15,7 @@ harmonicon-core = { path = "../harmonicon-core" }
 rustfft = { workspace = true }
 simsimd = { workspace = true }
 serde = { workspace = true }
+ndarray = { version = "0.17", default-features = false, features = ["std"] }
 
 [lints]
 workspace = true

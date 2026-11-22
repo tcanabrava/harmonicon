@@ -9,7 +9,7 @@ use bevy::prelude::{Deref, DerefMut, Message, Resource};
 
 pub use harmonicon_dsp::{
     Analysis, FftState, PITCH_RANGE_MARGIN_SEMITONES, PitchAlgorithm, PitchInfo, WINDOW_FUNCTION,
-    analyze, analyze_with_silence_threshold,
+    analyze, analyze_stream, analyze_with_silence_threshold,
 };
 
 /// The frequency window pitch detection searches, as an ECS resource.

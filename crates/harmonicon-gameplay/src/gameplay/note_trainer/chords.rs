@@ -269,7 +269,7 @@ pub(super) fn spawn(parent: &mut ChildSpawnerCommands, loc: &Localization) {
                 row.spawn_empty().apply_scene(button::small(
                     &loc.msg("trainer-chord-detector"),
                     |_: On<Activate>, mut audio: ResMut<AudioSettings>| {
-                        audio.pitch_algorithm = PitchAlgorithm::Nmf
+                        audio.pitch_algorithm = PitchAlgorithm::JitMpe
                     },
                 ));
             });

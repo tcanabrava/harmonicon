@@ -2,8 +2,8 @@
 
 //! Offline pitch-detection benchmark: replays every "debug recording"
 //! (`song_editor::debug_record`, the Song Editor's dev-only "Debug
-//! Recording" checkbox) under `assets/debug_songs/<song>/` through each of
-//! the five selectable algorithms and prints per-algorithm hit/miss/phantom
+//! Recording" checkbox) under `assets/debug_songs/<song>/` through each
+//! selectable algorithm and prints per-algorithm hit/miss/phantom
 //! counts, analysis time per chunk, and common confusion pairs, then notes
 //! heard, frame precision/recall, exact-set chord precision/recall,
 //! direction accuracy and median onset/release latency — raw and through
@@ -34,9 +34,11 @@ use harmonicon_bench::note_bench::{
     AlgorithmReport, DEFAULT_TIMING_TOLERANCE_SECS, ExpectedNote, Frame, apply_live_constraints,
     compare, direction_accuracy, expected_notes_from_chart, median, note_timings, run_algorithm,
 };
+use harmonicon_core::chart::{HarpChart, migrate_chart_json};
+use harmonicon_core::instrument::InstrumentModel;
+use harmonicon_core::midi::midi_to_freq_hz;
 use harmonicon_core::wav::decode_wav_pcm16;
 use harmonicon_dsp::{PITCH_RANGE_MARGIN_SEMITONES, PitchAlgorithm, PitchRange};
-use harmonicon_core::chart::HarpChart;
 use std::path::{Path, PathBuf};
 
 fn main() {
@@ -110,7 +112,7 @@ struct Metrics {
 
 impl Metrics {
     fn measure(
-        harp: &harmonicon_core::harmonica::Harmonica,
+        harp: Option<&harmonicon_core::harmonica::Harmonica>,
         expected: &[ExpectedNote],
         frames: &[Frame],
         tolerance_secs: f64,
@@ -118,7 +120,7 @@ impl Metrics {
         let timings = note_timings(expected, frames, tolerance_secs);
         Self {
             report: compare(expected, frames, tolerance_secs),
-            direction: direction_accuracy(harp, expected, frames, tolerance_secs),
+            direction: harp.and_then(|h| direction_accuracy(h, expected, frames, tolerance_secs)),
             onset_ms: median(&timings.onset_secs).map(|s| s * 1000.0),
             release_ms: median(&timings.release_secs).map(|s| s * 1000.0),
             never_detected: timings.never_detected,
@@ -182,7 +184,10 @@ fn run_one(
             return;
         }
     };
-    let chart: HarpChart = match serde_json::from_str(&chart_json) {
+    let chart: HarpChart = match serde_json::from_str(&chart_json).and_then(|mut value| {
+        migrate_chart_json(&mut value);
+        serde_json::from_value(value)
+    }) {
         Ok(c) => c,
         Err(e) => {
             println!("  chart parse failed: {e}");
@@ -196,26 +201,34 @@ fn run_one(
             return;
         }
     };
-    let Some((samples, _channels, sample_rate)) = decode_wav_pcm16(&wav_bytes) else {
+    let Some((mut samples, channels, sample_rate)) = decode_wav_pcm16(&wav_bytes) else {
         println!("  wav decode failed (not a 16-bit PCM WAV?)");
         return;
     };
 
-    let Some(harp) = chart.harmonica.as_ref() else {
-        println!("  not a harmonica chart — the benchmark measures harmonica detection, skipping");
-        return;
-    };
+    if channels > 1 {
+        samples = samples
+            .chunks_exact(channels as usize)
+            .map(|frame| frame.iter().sum::<f32>() / f32::from(channels))
+            .collect();
+    }
+    let harp = chart.harmonica.as_ref();
     let expected = expected_notes_from_chart(&chart);
     if expected.is_empty() {
         println!("  chart has no expected notes — skipping");
         return;
     }
 
-    // Narrowed to the harp actually being played, same as gameplay/live
-    // recording both do — fewer candidates for every algorithm.
-    let range = harp
-        .frequency_range()
-        .map(|(lo, hi)| PitchRange::from_freqs([lo, hi], PITCH_RANGE_MARGIN_SEMITONES))
+    // Use the instrument range available to gameplay, independent of the expected notes.
+    let range = chart
+        .instrument()
+        .and_then(|instrument| instrument.range())
+        .map(|(lo, hi)| {
+            PitchRange::from_freqs(
+                [lo, hi].map(|n| midi_to_freq_hz(f32::from(n))),
+                PITCH_RANGE_MARGIN_SEMITONES,
+            )
+        })
         .unwrap_or_default();
 
     for &algorithm in PitchAlgorithm::all() {
@@ -236,13 +249,19 @@ fn run_one(
             println!("        {count:>4}x  played {want:?} -> detected {got:?}");
         }
 
+        summary.push(SummaryRow {
+            scenario: name.to_string(),
+            detector: algorithm.label().to_string(),
+            metrics: raw,
+        });
+        let Some(harp) = harp else { continue };
         // Same frames, re-filtered through exactly the policy live gameplay
         // applies (`harmonicon_core::note_tracker::NoteTracker`: one wind
         // direction at a time on a harmonica, plus onset
         // confirmation and release) — printed alongside the raw algorithm so
         // the cost and benefit of that stage are visible side by side.
         let constrained = apply_live_constraints(harp, &frames);
-        let live = Metrics::measure(harp, &expected, &constrained, tolerance_secs);
+        let live = Metrics::measure(Some(harp), &expected, &constrained, tolerance_secs);
         println!(
             "  {:>5}+HC: hit {:>5}  miss {:>5}  phantom {:>5}",
             algorithm.label(),
@@ -252,11 +271,6 @@ fn run_one(
         );
         println!("         {}", live.columns());
 
-        summary.push(SummaryRow {
-            scenario: name.to_string(),
-            detector: algorithm.label().to_string(),
-            metrics: raw,
-        });
         summary.push(SummaryRow {
             scenario: name.to_string(),
             detector: format!("{}+HC", algorithm.label()),

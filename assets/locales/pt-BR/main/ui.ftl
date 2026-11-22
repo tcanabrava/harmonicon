@@ -827,7 +827,7 @@ options-mic-awaiting-permission = Aguardando permissão do microfone — conceda
 # já que escolhê-lo torna impossível acertar qualquer acorde da partitura.
 algo-single-notes-only = só notas isoladas
 # Aviso durante o jogo para essa combinação (gameplay::warning_banner).
-chord-warning-monophonic = Esta música tem acordes, e o detector de tom escolhido ouve uma nota por vez. Escolha FFT ou NMF nas Opções para pontuá-los.
+chord-warning-monophonic = Esta música tem acordes, e o detector de tom escolhido ouve uma nota por vez. Escolha JIT-MPE nas Opções para pontuá-los.
 # "Qual gaita você tem?" (menu::pages::harp_check) — entre escolher a
 # música e carregá-la.
 harp-check-title = Sua gaita
@@ -1091,7 +1091,7 @@ trainer-chord-hold = Todos os tons alvo detectados. Sustente o acorde.
 trainer-chord-missing = Detectados {$heard}/{$total} tons · faltam: {$notes}
 trainer-chord-diagram-help = Afinação padrão · ○ solta · × não tocar · 1–4 dedos
 trainer-chord-assessment-help = O microfone verifica tons, não dedos nem cordas físicas. Toque a posição marcada em conjunto.
-trainer-chord-detector = Usar detecção de acordes (NMF)
+trainer-chord-detector = Usar detecção de acordes (JIT-MPE)
 trainer-chord-board-help = Veja no diagrama as cordas soltas e abafadas. O braço marca a posição inteira.
 
 trainer-reference-playing = Referência tocando — sua entrada não está sendo avaliada.

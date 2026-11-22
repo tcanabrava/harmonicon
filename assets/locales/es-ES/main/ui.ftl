@@ -828,7 +828,7 @@ options-mic-awaiting-permission = Esperando permiso del micrófono — concédel
 # la vez, porque elegirlo hace imposible acertar cualquier acorde.
 algo-single-notes-only = solo notas sueltas
 # Aviso durante el juego para esa combinación (gameplay::warning_banner).
-chord-warning-monophonic = Esta canción tiene acordes, y el detector de tono elegido oye una nota a la vez. Elige FFT o NMF en Opciones para puntuarlos.
+chord-warning-monophonic = Esta canción tiene acordes, y el detector de tono elegido oye una nota a la vez. Elige JIT-MPE en Opciones para puntuarlos.
 # "¿Qué armónica tienes?" (menu::pages::harp_check) — entre elegir la
 # canción y cargarla.
 harp-check-title = Tu armónica
@@ -1093,7 +1093,7 @@ trainer-chord-hold = Todos los tonos objetivo detectados. Sostén el acorde.
 trainer-chord-missing = Detectados {$heard}/{$total} tonos · faltan: {$notes}
 trainer-chord-diagram-help = Afinación estándar · ○ al aire · × no tocar · 1–4 dedos
 trainer-chord-assessment-help = El micrófono comprueba tonos, no dedos ni cuerdas físicas. Rasguea la posición marcada a la vez.
-trainer-chord-detector = Usar detección de acordes (NMF)
+trainer-chord-detector = Usar detección de acordes (JIT-MPE)
 trainer-chord-board-help = Consulta el diagrama para las cuerdas al aire y silenciadas. El diapasón marca toda la posición.
 
 trainer-reference-playing = Sonando la referencia — tu entrada no se está evaluando.

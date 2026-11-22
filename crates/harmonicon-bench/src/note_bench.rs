@@ -37,9 +37,9 @@ pub struct ExpectedNote {
     pub start_secs: f64,
     pub end_secs: f64,
     pub midi: u8,
-    /// Whether the note is played blowing (`false` for drawing) — what
+    /// Breath direction when the event has harmonica tab — what
     /// [`direction_accuracy`] checks a detection's breath against.
-    pub blow: bool,
+    pub blow: Option<bool>,
     /// Hole/action tab label (e.g. `"-4"` for a hole-4 draw, following the
     /// roadmap's own notation) — display only, never compared against.
     pub label: String,
@@ -75,21 +75,18 @@ pub fn expected_notes_from_chart(chart: &HarpChart) -> Vec<ExpectedNote> {
             let Ok(midi) = u8::try_from(midi) else {
                 continue;
             };
-            // The benchmark measures harmonica detection; a note with no
-            // hole has no breath to score direction accuracy against.
-            let Some((hole, action)) = event.hole_action() else {
-                continue;
-            };
-            let sign = match action {
-                Action::Draw => "-",
-                Action::Blow => "",
+            let tab = event.hole_action();
+            let label = match tab {
+                Some((hole, Action::Draw)) => format!("-{hole}"),
+                Some((hole, Action::Blow)) => hole.to_string(),
+                None => note_name.to_owned(),
             };
             notes.push(ExpectedNote {
                 start_secs,
                 end_secs,
                 midi,
-                blow: action == Action::Blow,
-                label: format!("{sign}{hole}"),
+                label,
+                blow: tab.map(|(_, action)| action == Action::Blow),
             });
         }
     }
@@ -127,8 +124,7 @@ pub fn expected_at(notes: &[ExpectedNote], t: f64, tolerance_secs: f64) -> Vec<u
 // ── Running a detector offline ───────────────────────────────────────────────
 
 /// One analysis frame's result: `time_secs` is this chunk's end position in
-/// the recording, `detected` the (deduplicated, sorted) MIDI pitches the
-/// algorithm reported for it.
+/// the recording, `detected` the MIDI pitches in detector strength order.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Frame {
     pub time_secs: f64,
@@ -154,11 +150,18 @@ pub fn run_algorithm(
     let mut pos = 0;
     while pos + CHUNK_SIZE <= samples.len() {
         let chunk = &samples[pos..pos + CHUNK_SIZE];
-        let analysis = pitch_detect::analyze(chunk, sample_rate, &mut fft, algorithm, range);
+        let analysis = pitch_detect::analyze_stream(
+            chunk,
+            sample_rate,
+            &mut fft,
+            algorithm,
+            range,
+            None,
+            (pos + CHUNK_SIZE) as u64,
+        );
         let time_secs = (pos + CHUNK_SIZE) as f64 / sample_rate.max(1) as f64;
-        let mut detected: Vec<u8> = analysis.pitches.iter().map(|p| p.midi).collect();
-        detected.sort_unstable();
-        detected.dedup();
+        // The live instrument filter uses strongest-first order.
+        let detected = analysis.pitches.iter().map(|pitch| pitch.midi).collect();
         frames.push(Frame { time_secs, detected });
         pos += HOP_SIZE;
     }
@@ -273,8 +276,11 @@ pub fn compare(
 
     for frame in frames {
         let want = expected_at(expected, frame.time_secs, tolerance_secs);
+        let mut heard = frame.detected.clone();
+        heard.sort_unstable();
+        heard.dedup();
         for &m in &want {
-            if frame.detected.contains(&m) {
+            if heard.contains(&m) {
                 report.true_positive += 1;
             } else {
                 report.false_negative += 1;
@@ -286,21 +292,21 @@ pub fn compare(
         // active" for what's actually one clean note): a real detection
         // isn't fully correct just because *a* correct pitch happened to be
         // among several reported ones.
-        for &m in &frame.detected {
+        for &m in &heard {
             if !want.contains(&m) {
                 report.false_positive += 1;
             }
         }
         if want.len() >= 2 {
             report.chord_frames_expected += 1;
-            if frame.detected == want {
+            if heard == want {
                 report.chord_frames_exact += 1;
             }
         }
-        if frame.detected.len() >= 2 {
+        if heard.len() >= 2 {
             report.chord_frames_detected += 1;
         }
-        *confusion.entry((want, frame.detected.clone())).or_insert(0) += 1;
+        *confusion.entry((want, heard)).or_insert(0) += 1;
     }
 
     // Ties are ordered by pitch set, so repeated runs print the same table.
@@ -388,7 +394,7 @@ pub fn direction_accuracy(
         let mut due = expected
             .iter()
             .filter(|n| t >= n.start_secs - tolerance_secs && t < n.end_secs + tolerance_secs)
-            .map(|n| n.blow);
+            .filter_map(|n| n.blow);
         let Some(blow) = due.next() else {
             continue;
         };
@@ -611,7 +617,13 @@ mod tests {
     // ── compare ───────────────────────────────────────────────────────────────
 
     fn expected(midi: u8) -> ExpectedNote {
-        ExpectedNote { start_secs: 0.0, end_secs: 1.0, midi, blow: true, label: String::new() }
+        ExpectedNote {
+            start_secs: 0.0,
+            end_secs: 1.0,
+            midi,
+            blow: Some(true),
+            label: String::new(),
+        }
     }
 
     fn frame(time_secs: f64, detected: &[u8]) -> Frame {
@@ -711,7 +723,13 @@ mod tests {
     // ── timing ───────────────────────────────────────────────────────────────
 
     fn note(midi: u8, start: f64, end: f64) -> ExpectedNote {
-        ExpectedNote { start_secs: start, end_secs: end, midi, blow: true, label: String::new() }
+        ExpectedNote {
+            start_secs: start,
+            end_secs: end,
+            midi,
+            blow: Some(true),
+            label: String::new(),
+        }
     }
 
     /// A 10 ms frame grid where `midi` is detected over `[on, off)`.
@@ -787,7 +805,7 @@ mod tests {
         let harp = richter_harp("C");
         // G4 is hole 3 blow and hole 2 draw on a C harp.
         let mut draw = note(67, 0.0, 1.0);
-        draw.blow = false;
+        draw.blow = Some(false);
         let accuracy = direction_accuracy(&harp, &[draw], &[frame(0.5, &[67])], 0.0);
         assert_eq!(accuracy, Some(1.0));
     }

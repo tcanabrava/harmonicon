@@ -92,7 +92,7 @@ a C-major chord lesson is optional afterward.
 
 The eight playable exercises fit any keyboard covering C3–G4 and use the
 normal grand staff and full keyboard view. For simultaneous notes, select
-FFT or NMF chord detection in Options. The microphone checks sounding pitches
+a polyphonic detector such as JIT-MPE in Options. The microphone checks sounding pitches
 and timing; hand choice, fingering, posture and balance need your own
 attention or a teacher’s feedback.
 
@@ -105,7 +105,7 @@ An Em strum is optional after the main path.
 
 The nine playable exercises carry explicit string and fret positions and
 show sounding pitches. The arpeggio sounds one string at a time; the optional
-strum needs FFT or NMF chord detection. Scoring cannot identify the string,
+strum needs a polyphonic detector such as JIT-MPE. Scoring cannot identify the string,
 finger or strum direction, so check the written positions and listen for
 unwanted string noise as well as following the score.
 

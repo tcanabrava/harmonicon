@@ -116,7 +116,7 @@ can cycle the chord list; leave it off to repeat one chord.
 
 A polyphonic detector is required. If a monophonic detector is selected, the
 trainer explains why it cannot assess the chord and offers **Use chord
-detection (NMF)**. The microphone checks pitches, not which finger or physical
+detection (JIT-MPE)**. The microphone checks pitches, not which finger or physical
 string produced them; use the diagram to check your hand and muted strings.
 
 Guitar opens with Auto-advance off and preserves that choice across exercise

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-//! Pitch detection: five interchangeable algorithms (FFT peak-picking, YIN,
+//! Pitch detection: six interchangeable algorithms (JIT-MPE, FFT peak-picking, YIN,
 //! pYIN, MPM, template NMF) over one shared FFT, plus the note-template
 //! dictionary NMF decomposes against, and the analysis window everything
 //! chunks audio by.
@@ -12,6 +12,8 @@
 //! `Resource`, `PitchEvent` as a `Message`, `AudioFrame` — live in
 //! `harmonicon-audio`, which is also where the tracing spans went: they are
 //! Bevy's, and the hot paths they covered are all entered from there.
+
+mod jit_mpe;
 
 /// Samples per analysed block. One FFT covers this many samples.
 pub const CHUNK_SIZE: usize = 4096;
@@ -91,6 +93,8 @@ pub enum PitchAlgorithm {
     /// Template NMF: decompose the FFT spectrum onto a dictionary of harmonic
     /// note templates. Polyphonic — reports all notes of a chord.
     Nmf,
+    /// Causal multi-pitch neural network with pretrained, instrument-independent weights.
+    JitMpe,
 }
 
 impl PitchAlgorithm {
@@ -106,7 +110,7 @@ impl PitchAlgorithm {
     /// compares this against what the detectors actually do rather than
     /// letting the two drift.
     pub fn is_polyphonic(self) -> bool {
-        matches!(self, PitchAlgorithm::Fft | PitchAlgorithm::Nmf)
+        matches!(self, PitchAlgorithm::Fft | PitchAlgorithm::Nmf | PitchAlgorithm::JitMpe)
     }
 
     /// All selectable algorithms, in display order.
@@ -117,6 +121,7 @@ impl PitchAlgorithm {
             PitchAlgorithm::Pyin,
             PitchAlgorithm::Mcleod,
             PitchAlgorithm::Nmf,
+            PitchAlgorithm::JitMpe,
         ]
     }
 
@@ -128,6 +133,7 @@ impl PitchAlgorithm {
             PitchAlgorithm::Pyin => "pYIN",
             PitchAlgorithm::Mcleod => "MPM",
             PitchAlgorithm::Nmf => "NMF",
+            PitchAlgorithm::JitMpe => "JIT-MPE",
         }
     }
 
@@ -161,6 +167,9 @@ impl PitchAlgorithm {
                 "McLeod Pitch Method (MPM): normalized square-difference with \
                  clarity-based peak picking. Monophonic; fast and robust against \
                  octave jumps, a strong choice for live single-note playing."
+            }
+            PitchAlgorithm::JitMpe => {
+                "Live polyphonic transcription with a trained neural network. Resolves overlapping notes across the 88-key piano range."
             }
             PitchAlgorithm::Nmf => {
                 "Template NMF: matches the spectrum against harmonic templates for \
@@ -208,6 +217,7 @@ pub struct Analysis {
 // System-local state for the Bevy `Local<FftState>` parameter — avoids
 // re-allocating the FFT plan on every frame.
 pub struct FftState {
+    neural: Option<jit_mpe::Detector>,
     planner: FftPlanner<f32>,
     plan: Option<Arc<dyn Fft<f32>>>,
     last_size: usize,
@@ -232,6 +242,7 @@ pub struct FftState {
 impl Default for FftState {
     fn default() -> Self {
         Self {
+            neural: None,
             planner: FftPlanner::new(),
             plan: None,
             last_size: 0,
@@ -276,15 +287,63 @@ pub fn analyze_with_silence_threshold(
     range: PitchRange,
     silence_threshold: f32,
 ) -> Analysis {
+    analyze_block(samples, sample_rate, state, algorithm, range, silence_threshold, None)
+}
+
+/// Analyze overlapping capture windows. The end position counts mono samples
+/// from the start of this stream and identifies the genuinely new suffix.
+pub fn analyze_stream(
+    samples: &[f32],
+    sample_rate: u32,
+    state: &mut FftState,
+    algorithm: PitchAlgorithm,
+    range: PitchRange,
+    threshold: Option<f32>,
+    end_sample: u64,
+) -> Analysis {
+    analyze_block(
+        samples,
+        sample_rate,
+        state,
+        algorithm,
+        range,
+        threshold.unwrap_or(SILENCE_THRESHOLD),
+        Some(end_sample),
+    )
+}
+
+impl FftState {
+    /// Invalidate recurrent history on capture disconnect or a gap in delivery.
+    pub fn reset_stream(&mut self) {
+        if let Some(detector) = &mut self.neural {
+            detector.invalidate();
+        }
+    }
+}
+
+fn analyze_block(
+    samples: &[f32],
+    sample_rate: u32,
+    state: &mut FftState,
+    algorithm: PitchAlgorithm,
+    range: PitchRange,
+    silence_threshold: f32,
+    end: Option<u64>,
+) -> Analysis {
+    if algorithm != PitchAlgorithm::JitMpe {
+        state.reset_stream();
+    }
     let n = samples.len();
     let freq_res = if n > 0 { sample_rate as f32 / n as f32 } else { 0.0 };
     let silent = Analysis { pitches: vec![], magnitudes: vec![], freq_res };
 
     if n < 2 {
+        state.reset_stream();
         return silent;
     }
     let rms = (samples.iter().map(|&s| s * s).sum::<f32>() / n as f32).sqrt();
-    if rms < silence_threshold {
+    if !rms.is_finite() || rms < silence_threshold {
+        state.reset_stream();
         return silent;
     }
 
@@ -317,6 +376,17 @@ pub fn analyze_with_silence_threshold(
     // NMF's dictionary matching), hence one span per branch rather than a
     // single span with an `algorithm` field.
     let pitches = match algorithm {
+        PitchAlgorithm::JitMpe => {
+            if (1000..=384000).contains(&sample_rate) {
+                if state.neural.as_ref().is_none_or(|detector| detector.rate != sample_rate) {
+                    state.neural = Some(jit_mpe::Detector::new(sample_rate));
+                }
+                state.neural.as_mut().unwrap().analyze(samples, end, range)
+            } else {
+                state.reset_stream();
+                vec![]
+            }
+        }
         PitchAlgorithm::Fft => {
             pitches_from_magnitudes(&magnitudes, freq_res, range, &mut state.raw_peaks)
         }

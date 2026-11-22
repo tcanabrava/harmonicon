@@ -85,10 +85,14 @@ pub fn process_audio(
             }
         }
         *last_received = None;
+        fft.reset_stream();
         clear_detection(&mut frame, &mut writer);
         return;
     }
     let capture = capture.unwrap();
+    if capture.is_added() {
+        fft.reset_stream();
+    }
     // Snapshot the bounded queue length: producers cannot extend this frame's
     // work indefinitely. Raw recording keeps every delivered hop; live pitch
     // feedback analyzes at most the newest fresh chunk.
@@ -115,19 +119,16 @@ pub fn process_audio(
             Some(time.elapsed().saturating_sub(now.saturating_duration_since(chunk.captured_at)));
         let samples = chunk.samples;
         let _span = info_span!("process_audio_chunk", samples = samples.len()).entered();
-        // One FFT per chunk for the spectrum; pitches use the chosen algorithm.
-        let analysis = if let Some(threshold) = threshold.as_ref() {
-            pitch_detect::analyze_with_silence_threshold(
-                &samples,
-                capture.sample_rate,
-                &mut fft,
-                algorithm,
-                **range,
-                threshold.0,
-            )
-        } else {
-            pitch_detect::analyze(&samples, capture.sample_rate, &mut fft, algorithm, **range)
-        };
+        // Publish the shared spectrum and analyze only fresh samples in streaming detectors.
+        let analysis = pitch_detect::analyze_stream(
+            &samples,
+            capture.sample_rate,
+            &mut fft,
+            algorithm,
+            **range,
+            threshold.as_ref().map(|t| t.0),
+            chunk.end_sample,
+        );
         // Placed before `analysis.pitches` moves into the `PitchEvent` below
         // — this needs to read it first.
         #[cfg(feature = "dev")]
@@ -156,6 +157,7 @@ pub fn process_audio(
         }
     }
     if last_received.is_none_or(|last| time.elapsed().saturating_sub(last) >= CAPTURE_TIMEOUT) {
+        fft.reset_stream();
         clear_detection(&mut frame, &mut writer);
     }
 }

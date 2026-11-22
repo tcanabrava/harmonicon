@@ -13,11 +13,10 @@
   A warning banner appears here (and nowhere else) if no working
   microphone is detected; see
   [Troubleshooting](troubleshooting.md#no-microphone-detected).
-- **Pitch detect** — which pitch-detection algorithm to use (FFT, YIN,
-  pYIN, MPM, or NMF), each with a short explanation of its trade-offs
-  shown alongside the picker. The default works well for most setups;
-  switch algorithms here if pitch detection feels unreliable for your
-  particular mic/harmonica combination.
+- **Pitch detect** — choose **JIT-MPE** for live chords, including strummed
+  guitar. The trained detector runs on your device. **FFT** is the
+  low-cost default. **NMF** also detects chords. **YIN**, **pYIN**, and
+  **MPM** follow one pitch at a time.
 - **Note labels** — swaps the up/down arrow on falling notes for the
   actual hole number in [Play 2D](play-2d.md).
 - **Adaptive Difficulty** — off by default; turns on gradual note

@@ -23,6 +23,7 @@ Rust Programming Language
 
 cpal — cross-platform audio capture
 rustfft — frequency-domain analysis
+JIT-MPE — pretrained polyphonic pitch detector by Yoshiyuki Kobayashi (Frieve-A), MIT License
 
 ---
 

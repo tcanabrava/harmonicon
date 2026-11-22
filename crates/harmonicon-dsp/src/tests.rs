@@ -571,7 +571,7 @@ fn bass_low_b_and_e_are_detectable_in_the_live_window_with_a_bass_range() {
     let range = PitchRange::from_freqs([30.8677, 130.8128], 1.0);
     for sr in [44_100, 48_000] {
         for (hz, midi) in [(30.8677, 23), (41.2034, 28)] {
-            let samples: Vec<_> = (0..CHUNK_SIZE)
+            let samples: Vec<_> = (0..CHUNK_SIZE + 2 * HOP_SIZE)
                 .map(|i| {
                     let t = i as f32 / sr as f32;
                     let phase = 2.0 * PI * hz * t;
@@ -582,11 +582,28 @@ fn bass_low_b_and_e_are_detectable_in_the_live_window_with_a_bass_range() {
                 })
                 .collect();
             for &algorithm in PitchAlgorithm::all() {
-                let result = analyze(&samples, sr, &mut FftState::default(), algorithm, range);
+                // The neural model resolves these low fundamentals after about
+                // 140 ms. Keep the first-window guarantee for the block detectors.
+                let windows = if algorithm == PitchAlgorithm::JitMpe { 3 } else { 1 };
+                let mut state = FftState::default();
+                let mut pitches = Vec::new();
+                for i in 0..windows {
+                    let start = i * HOP_SIZE;
+                    let end = start + CHUNK_SIZE;
+                    pitches = analyze_stream(
+                        &samples[start..end],
+                        sr,
+                        &mut state,
+                        algorithm,
+                        range,
+                        None,
+                        end as u64,
+                    )
+                    .pitches;
+                }
                 assert!(
-                    result.pitches.iter().any(|pitch| pitch.midi == midi),
-                    "{algorithm:?}, {sr} Hz, {hz} Hz: {:?}",
-                    result.pitches
+                    pitches.iter().any(|pitch| pitch.midi == midi),
+                    "{algorithm:?}, {sr} Hz, {hz} Hz: {pitches:?}"
                 );
             }
         }
