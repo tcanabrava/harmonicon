@@ -1,5 +1,218 @@
 # Changelog
 
+## v0.0.16 — 2026-11-23
+
+- Fix Clippy, dependency audit, Wasm and formatting checks
+- Verify chord study sources and illustrate detector and sustain results
+- Document chord recognition experiments and reproduce the piano comparison
+- Benchmark FFT chord grading on recorded guitar strums
+- Recognize fretted chord voicings across intonation and octave dropouts
+- Bundle and benchmark SoundFonts for every supported instrument
+- Add pretrained streaming chord detection and benchmark recorded performances
+- Highlight middle C and suggest piano fingers during play
+- Apply the active theme to the pause menu and practice score
+- Apply the active palette across live song gameplay
+- Complete the new document flow before BRP editor captures
+- Theme the save and load dialogs
+- Theme the new document dialog
+- Use light notation colors in the song editor
+- Refresh Cargo dependencies
+- Translate tuner and fretting instructions into Spanish and Portuguese
+- Apply theme palettes to the song list and lessons
+- Replace image themes with coordinated light and dark palettes
+- Encode fretting fingers and barres in song charts
+- Add capo-aware tuning and configurable headstock geometry
+- Guide tuning with selectable headstock diagrams
+- Give the tuner a focused visual layout
+- Redesign tuner for guitar and bass setups
+- Detect quieter guitar notes and clarify tuner feedback
+- Show live microphone input percentage in Options
+- Add live guitar tuning meter and monophonic microphone detection
+- Localize guitar tuner text and pass root build enforcement
+- Add guided classical and electric guitar tuner
+- Update libraries
+- Cargo update / upgrade
+- test(core): every MIDI note name parses back to its own semitone
+- chore(deps): bevy 0.20.1, guitarpro 0.4.5
+- docs(book): Jam Session on any instrument
+- docs(plan): drop the jam seam leftover; other instruments use instrument_map
+- docs(plan): flute jam map checked on screen; piano waits for a piano part
+- feat(jam): jam on any instrument, drawn with its in-scale notes
+- docs: add a generated code map to find code without searching
+- feat(jam): count every pitch heard, whatever made it
+- refactor(jam): count pitches through an instrument-free set
+- docs(plan): design per-instrument Jam Session for review
+- docs(plan): phase 5 is in but for per-instrument Jam Session
+- chore(deps): drop the Bevy git exemption now that 0.20 is on crates.io
+- docs(plan): close out the code review's hazards
+- fix(packs): stop a clone before it fills the disk
+- fix(build): flag single-word UI labels in the localization scan
+- fix(themes): find bundled themes wherever the game is started from
+- fix(packs): don't count a player's kept songs against the download limit
+- fix(persistence): recover a damaged profile map entry by entry
+- refactor(instrument): mark keyboard lane layouts explicitly
+- fix(localization): warn once per missing key, not on every lookup
+- test(packs): hold the retained-song extensions to the importable formats
+- fix(notation): scope each staff's clef and time signature to its own panel
+- fix(gameplay): make Tab reach the controls on every gameplay screen
+- perf(notation): resolve the key signature's clef only when its inputs change
+- feat(strings): add viola with alto-clef teaching views
+- refactor(editor): unify event codec and family operation registration
+- refactor(instruments): isolate family adapters and note performance metadata
+- feat(strings): add fretless bowed-string geometry and bow guidance
+- feat(instruments): integrate clarinet with score-led horizontal play
+- refactor(trainer): build wind exercises from fingering metadata
+- feat(winds): add verified Boehm clarinet fingering model
+- fix(notation): project instrument scores into written pitch and key
+- docs(plan): narrow the code review item to its two deferred parts
+- fix(build): test the PointerClick and SceneRoot lints; tighten the excuse
+- fix(editor): Load asks before replacing a document with content
+- docs: record the gameplay crate review; drop the resolved carried items
+- refactor(guitar): drop the neck overview's unused next-group region
+- fix(notation): a high bass-8vb part moves to treble-8vb
+- fix(notation): bring music_score under its line budget; unpin a test
+- wip(notation): key signatures and written-pitch spelling on the score
+- fix(chart): require scoring windows to nest; the editor saves them nested
+- fix(gameplay): a song starting with a loop no longer skips its countdown
+- docs: record the ui crate review; the staff is no longer under a progress bar
+- refactor(notation): separate written pitch and share wind fingering metadata
+- feat(instruments): add cavaquinho tunings and four-string chord practice
+- feat(instruments): add fretted electric bass on the shared string model
+- refactor(instruments): extract shared fretted-string geometry
+- feat(catalog): filter songs by instruments present in the library
+- docs: record the multi-instrument architecture and rollout plan
+- fix(ui): move keyboard focus into any modal that opens
+- fix(ui): keyboard focus starts in the file dialog; Enter acts once
+- fix(ui): put focus inside the confirm dialog; translate Save
+- docs: record the app crate review
+- fix(profile): one unreadable field no longer wipes the player's progress
+- docs: record the song crate review
+- perf(song): stop decoding every song's music twice to draw nothing
+- refactor(song): drop the re-export facade over harmonicon-core
+- fix(localization): only a pack's top-level folders are curricula
+- fix(packs): a pack removed during its download no longer comes back
+- fix(theme): fall back to the bundled default when a theme fails to load
+- fix(settings): one unreadable field no longer resets every setting
+- chore(audio): log the input device through info!; record the review
+- docs: fix two references to the note detection roadmap
+- docs(packs): record the packs review; correct PackManifest::id's doc
+- fix(packs): never resolve an empty slug to the packs directory
+- docs(lessons): describe piano, guitar and extended flute courses
+- fix(score): contain guitarpro reader panics and bound zipped scores
+- fix(dsp): guard every detector against a degenerate PitchRange
+- refactor(gameplay): strip the song-progress bar down to what it draws
+- chore(core): delete the unused note_parser; record core review findings
+- fix(synth): bound the render buffer so a corrupt MIDI can't abort a load
+- fix(chart): reject out-of-order tempo maps and malformed format versions
+- fix: make clippy pass across the workspace again
+- feat(lessons): choose an instrument before loading a curriculum
+- docs: add a per-crate code review plan
+- fix(trainer): select and remember the flute foot joint
+- feat(trainer): select flute practice notes directly on the score
+- fix(guitar): center finger numbers inside circular markers
+- fix(trainer): map centered cursor coordinates to the correct fret
+- feat(trainer): add guitar chord practice with simultaneous pitch feedback
+- feat(trainer): teach bends with start-pitch gating and a live trace
+- feat(trainer): select and repeat guitar targets in a full-width workspace
+- feat(trainer): connect harmonica breath guidance to target notation
+- feat(trainer): guide guitar practice on the full fretboard
+- feat(trainer): show full piano with suggested hand positions
+- feat(trainer): teach flute notes with horizontal fingering and notation
+- fix(editor): show a reactive piano grand staff with both clefs
+- refactor(editor): move scale and meter controls into Details
+- fix(editor): reserve notation clearance above score controls
+- fix(editor): keep flute keyboard and pitch rows within playable range
+- fix(editor): stop interpreting piano minimap notes as harmonica tabs
+- feat(editor): choose guitar tuning from a combobox
+- feat(editor): edit guitar tunings and support up to twelve strings
+- feat(editor): animate guitar string moves and refused attempts
+- fix(editor): render piano notes safely and show flute pitch keyboard
+- fix(editor): localize cancel and expose document actions in details
+- docs(editor): clarify shared and instrument-specific authoring
+- feat(editor): choose an instrument when creating a document
+- refactor(editor): separate shared forms from instrument adapters
+- feat(guitar): label fretboard targets with suggested fingers
+- fix(flute): refresh highway pitch rows when phrase coverage changes
+- feat(practice): integrate section navigation into the score timeline
+- feat(practice): separate coverage from achievement and repeat by section
+- fix(practice): hide resumed scrollbars and retain harmonica note overview
+- fix(practice): convert centered cursor coordinates before selecting loops
+- fix(practice): isolate paused score and clarify selection hierarchy
+- fix(build): document pointer-only score selection zones
+- feat(practice): add scrollable pause score with aligned loop selection
+- fix(piano): hide progress note markers while preserving practice timeline
+- fix(piano): use one full-width 88-key keyboard and fixed highway range
+- feat(piano): add falling-key highway grand staff and two-hand practice song
+- fix(flute): preview only the next different fingering
+- fix(flute): ease chart transitions and retain outgoing fingering during exit
+- feat(guitar): animate hand position and preview changed chords
+- feat(guitar): add full neck guidance and move chord diagram to side panel
+- feat(flute): distinguish auxiliary keys and animate preview promotion
+- fix(harmonica): contain strip labels and clarify sustained breath guidance
+- feat: implement multi-instrument piano support across editor and gameplay
+- test(piano): verify extended white key boundaries with float tolerance
+- feat(harmonica): clarify mouthpiece holes and breath direction cues
+- feat(flute): widen fingering stage and place preview above current note
+- fix(piano): place black keys between continuous white keys
+- feat(gameplay): add conventional guitar chord fingering diagram
+- Put a bend on the breath whose reed bends, in the Song Editor
+- Keep the guitar's and flute's Note Trainer progress in the profile
+- Draw every instrument's notes on the progress bar, in its highway's lanes
+- Let the hit line consume a note, rather than scroll it past
+- Add port-part: a guitar or flute part from a harmonica chart
+- Play a flute on a named pitch-row highway, with a fingering chart under it
+- Show in song select how much of each guitar or flute part the player's setup reaches
+- Ask for a guitar's capo, remember it, and draw the highway from it
+- Remember the player's instruments: guitar tuning, flute foot joint and view
+- Draw the flute as a fingering chart does: six holes on the tube, side keys beside it
+- Name each song's instrument, and ask for tuning or foot joint before play
+- Bring the multi-instrument plan, roadmap and PLAN up to date
+- Open the Note Trainer on a flute as well as a guitar
+- Let a flute part play in note view as well as fingering view
+- Edit flute charts in the Song Editor, in note or fingering view
+- Draw a flute part on the highway as its keys and fingerings
+- Model the Boehm flute and name it in chart format 1.9.0
+- Add a Note Trainer for the guitar beside the Bending Trainer
+- Model the Note Trainer's drills for any instrument in core
+- Check a guitar's hand span when a note is resized or pasted
+- Edit guitar charts on the Song Editor's shared grid
+- Draw Song Editor grid rows and notes in the instrument's vocabulary
+- Address Song Editor grid notes by row, not hole
+- Give the guitar tab view a timeline like the harmonica grid's
+- Make the guitar tab view readable and its edits testable
+- Edit guitar charts in the Song Editor's tab view
+- Add instrument-aware chart event conversion for editor note targets
+- Separate editor note intent from instrument placement and visual rows
+- Give the guitar a plucked-string voice, and demo its calls right
+- PLAN.md: the guitar highway's strip, colours and chord stems have landed
+- Offer Jam Session only harmonica parts
+- Keep the score readout out of a horizontal highway's hit zone
+- Play guitar charts on a horizontal tab highway
+- Leave other instruments' charts out of the editor round-trip
+- Let the play highway scroll along either axis
+- Finger a guitar part as a whole, keeping the hand in position
+- PLAN.md: the guitar importer has landed
+- Convert a score part onto a guitar, keeping a tab's own fingering
+- Bring CLAUDE.md's multi-instrument status up to date
+- Record chart format 1.8.0 in the plans and the song crate's notes
+- Chart format 1.8.0: a chart can name a guitar
+- Fold the chart format change into the guitar phase
+- Add the guitar to the instrument model
+- Close out phase 1 of the multi-instrument plan
+- Record the Song Editor's bend-breath bug as a 1.0 blocker
+- Reconcile overlapping editor notes through the instrument model
+- Let a fractional bend sound the semitone it rounds to
+- Name NoteTracker where the bench docs mention it
+- Track notes per instrument rather than per harmonica
+- Lock nothing when a chart's phrase sections were never grouped
+- Give each scheduled note a play position
+- Add scripts/replace_exact.py for all-or-nothing refactor edits
+- Lay the play highway out from the instrument's lanes
+- Add the instrument model to core, harmonica only
+- Make multiple instruments a 1.0 requirement
+- Adopt the multi-instrument plan
+- Plan multi-instrument support
+
 ## v0.0.15 — 2026-10-29
 
 - Cargo update

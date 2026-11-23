@@ -4580,7 +4580,7 @@ dependencies = [
 
 [[package]]
 name = "harmonicon"
-version = "0.0.15"
+version = "0.0.16"
 dependencies = [
  "bevy",
  "dirs",
