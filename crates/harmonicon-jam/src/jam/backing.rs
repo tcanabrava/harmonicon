@@ -665,10 +665,10 @@ fn generate_drums_pcm(bpm: f32, genre: Genre, energy: BandEnergy, seed: u64) -> 
     for chorus in 0..CHORUSES as usize {
         for bar in 0..12 {
             let arrangement = groove_arrangement_for_energy(genre, energy, chorus, bar);
-            for slot in 0..8 {
+            for (slot, &event) in arrangement.drums.iter().enumerate() {
                 let secs = if slot % 2 == 0 { long } else { short };
                 out.extend(varied_slot(
-                    drum_slot(arrangement.drums[slot], slot, secs, genre),
+                    drum_slot(event, slot, secs, genre),
                     secs,
                     performance_variation(seed, genre, GrooveRole::Drums, chorus, bar, slot),
                 ));
@@ -695,9 +695,8 @@ fn generate_comping_pcm(
     for chorus in 0..CHORUSES as usize {
         for (bar, (root, quality)) in bars.iter().enumerate() {
             let arrangement = groove_arrangement_for_energy(genre, energy, chorus, bar);
-            for slot in 0..8 {
+            for (slot, &event) in arrangement.comping.iter().enumerate() {
                 let secs = if slot % 2 == 0 { long } else { short };
-                let event = arrangement.comping[slot];
                 if event.hit {
                     let mut sound = comping_slot(root, *quality, secs, genre);
                     for sample in &mut sound {

@@ -308,8 +308,7 @@ mod tests {
     fn a_flute_is_its_range_an_octave_to_a_row_highest_on_top() {
         let flute = Flute::default();
         let (low, high) = flute.range().unwrap();
-        let Some(InstrumentMap::Cells { rows, columns, cells }) =
-            instrument_map(&flute.into())
+        let Some(InstrumentMap::Cells { rows, columns, cells }) = instrument_map(&flute.into())
         else {
             panic!("a flute draws cells");
         };

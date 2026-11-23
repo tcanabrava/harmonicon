@@ -117,7 +117,8 @@ mod tests {
     use crate::music_score::MeterMap;
 
     fn note(start: f64, duration: f64) -> NotationNote {
-        NotationNote { spelling: None, 
+        NotationNote {
+            spelling: None,
             start_beat: start,
             duration_beats: duration,
             midi: 60,

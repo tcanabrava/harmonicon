@@ -256,7 +256,11 @@ pub(super) fn spawn_harmonica_strip(
 }
 
 /// A reserved action/legend row above the mouthpiece, outside its cells.
-fn spawn_blow_draw_legend(parent: &mut ChildSpawnerCommands, loc: &Localization, appearance: Appearance) {
+fn spawn_blow_draw_legend(
+    parent: &mut ChildSpawnerCommands,
+    loc: &Localization,
+    appearance: Appearance,
+) {
     let blow = breath_color(appearance, true);
     let draw = breath_color(appearance, false);
     parent

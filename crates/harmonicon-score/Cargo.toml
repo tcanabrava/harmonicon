@@ -20,7 +20,7 @@ quick-xml = { version = "0.42.0", features = ["serialize"] }
 # Already in the tree through `guitarpro` (its `.mscz` reader); the same
 # version, so this adds nothing to the build — it just lets `.mxl`, a zip
 # around a MusicXML, be opened here.
-zip = { version = "8.6.0", default-features = false, features = ["deflate"] }
+zip = { version = "9.8.1", default-features = false, features = ["deflate"] }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
 

@@ -67,13 +67,21 @@ pub(super) fn rebuild_full_score(
     existing: Query<(Entity, &ChildOf), With<MusicScoreNoteGlyph>>,
     mut clefs: ClefQuery,
     mut signatures: TimeSigQuery,
-    mut roots: Query<(&mut Node, Option<&InstrumentScoreClef>, Option<&InstrumentOctaveAnnotation>), Without<MusicScoreClef>>,
+    mut roots: Query<
+        (&mut Node, Option<&InstrumentScoreClef>, Option<&InstrumentOctaveAnnotation>),
+        Without<MusicScoreClef>,
+    >,
 ) {
     let spacing = &engraving.spacing;
     let signature = &engraving.signature;
     let (Some(bravura), Some(tie)) = (bravura, tie) else { return };
     for (layer, mut full) in &mut layers {
-        if notes.is_changed() || bars.is_changed() || meter.is_changed() || spacing.is_changed() || signature.is_changed() {
+        if notes.is_changed()
+            || bars.is_changed()
+            || meter.is_changed()
+            || spacing.is_changed()
+            || signature.is_changed()
+        {
             full.dirty = true;
         }
         if !full.dirty || !visibility.get(full.root).is_ok_and(|v| v.get()) {
@@ -82,7 +90,11 @@ pub(super) fn rebuild_full_score(
         full.dirty = false;
         let end = notes.0.iter().map(|n| n.start_beat + n.duration_beats).fold(full.end, f64::max);
         let forced = roots.get(full.root).ok().and_then(|(_, clef, _)| clef.map(|clef| clef.0));
-        let octave_annotation = roots.get(full.root).ok().and_then(|(_, _, octave)| octave.map(|octave| octave.0)).unwrap_or(0);
+        let octave_annotation = roots
+            .get(full.root)
+            .ok()
+            .and_then(|(_, _, octave)| octave.map(|octave| octave.0))
+            .unwrap_or(0);
         if let Ok((mut root, _, _)) = roots.get_mut(full.root) {
             root.width = Val::Px(score_beat_x(end, spacing.0) + 80.0);
             root.flex_shrink = 0.0;
@@ -104,7 +116,10 @@ pub(super) fn rebuild_full_score(
             &mut clefs,
             &mut signatures,
             full.grand,
-            forced, octave_annotation, &signature.0, full.appearance,
+            forced,
+            octave_annotation,
+            &signature.0,
+            full.appearance,
         );
         commands.entity(layer).with_children(|parent| {
             for (index, beat) in std::iter::once(0.0).chain(bars.beats(0.0, end)).enumerate() {

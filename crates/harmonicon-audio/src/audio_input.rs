@@ -245,7 +245,9 @@ pub fn create_audio_capture(
     let sample_format = config.sample_format();
     let stream_config: StreamConfig = config.into();
 
-    info!("Input device \"{device_name}\": {sample_rate} Hz, {channels} channel(s), {sample_format:?}");
+    info!(
+        "Input device \"{device_name}\": {sample_rate} Hz, {channels} channel(s), {sample_format:?}"
+    );
 
     let (tx, rx) = bounded::<AudioChunk>(POOL_SIZE);
 

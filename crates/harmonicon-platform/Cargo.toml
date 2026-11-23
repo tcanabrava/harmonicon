@@ -7,7 +7,6 @@ publish = false
 
 [dependencies]
 harmonicon-core = { path = "../harmonicon-core", version = "*" }
-harmonicon-score = { path = "../harmonicon-score", version = "*" }
 harmonicon-audio = { path = "../harmonicon-audio", version = "*" }
 harmonicon-packs = { path = "../harmonicon-packs", version = "*" }
 bevy = { workspace = true }
@@ -30,6 +29,9 @@ thiserror = { workspace = true }
 crossbeam-channel = { workspace = true }
 notify-debouncer-full = { workspace = true }
 web-time = { workspace = true }
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+harmonicon-score = { path = "../harmonicon-score", version = "*" }
 
 # The build script generates the bundled-asset manifest, and has to mirror
 # `assets_management`'s discovery rules exactly — including *which* score

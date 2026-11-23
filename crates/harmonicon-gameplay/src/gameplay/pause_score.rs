@@ -3,13 +3,13 @@
 use super::pause_menu::{PauseMenuRoot, SelectedPhraseIndex};
 use super::{LoopConfig, Paused, adaptive_difficulty::AdaptiveDifficulty};
 use bevy::prelude::*;
-use harmonicon_platform::theme::{Appearance, LoadedTheme, ThemeSurface};
 use bevy::ui::{RelativeCursorPosition, ScrollPosition};
 use harmonicon_app::app::{GameplayMode, SelectedSong};
 use harmonicon_core::chart::seconds_to_tick;
 #[cfg(test)]
 use harmonicon_core::chart::tick_to_seconds;
 use harmonicon_platform::localization::{Localization, LocalizationExt};
+use harmonicon_platform::theme::{Appearance, LoadedTheme, ThemeSurface};
 use harmonicon_song::song::SongManifest;
 use harmonicon_ui::music_score::{
     self, BravuraFont, MusicScoreBarMap, MusicScoreNotes, MusicScorePlayhead, MusicScoreSpacing,
@@ -56,7 +56,8 @@ fn cursor_beat(normalized: Option<Vec2>, width: f32, spacing: f32) -> Option<f64
     // Bevy's node coordinates are centred: -0.5 is the left edge,
     // +0.5 the right edge. Convert to a left-based score coordinate.
     let x = (normalized?.x + 0.5) * width;
-    Some(((x - music_score::full_score::score_beat_x(0.0, spacing)) / spacing.max(1.0)).max(0.0) as f64)
+    Some(((x - music_score::full_score::score_beat_x(0.0, spacing)) / spacing.max(1.0)).max(0.0)
+        as f64)
 }
 
 #[derive(bevy::ecs::system::SystemParam)]
@@ -157,126 +158,125 @@ pub(super) fn update_pause_score(
                     palette.inset,
                 );
             });
-            commands
-                .entity(viewport)
-                .insert((Viewport, ThemeSurface::Inset))
-                .with_children(|p| {
-                    p.spawn((
-                        Content,
-                        Node {
-                            width: Val::Px(width),
-                            flex_shrink: 0.0,
-                            height: Val::Px(score_height + 32.0),
-                            flex_direction: FlexDirection::Column,
-                            ..default()
-                        },
-                    ))
-                    .with_children(|content| {
-                        content
-                            .spawn((
-                                Band,
-                                RelativeCursorPosition::default(),
-                                Node {
-                                    width: Val::Percent(100.0),
-                                    height: Val::Px(32.0),
-                                    flex_shrink: 0.0,
-                                    ..default()
-                                },
-                                ThemeSurface::Panel,
-                            ))
-                            .with_children(|band| {
-                                for (index, section) in adaptive.sections.iter().enumerate() {
-                                    let left = music_score::full_score::score_beat_x(
-                                        time_beat(section.start_time, chart),
-                                        spacing.0,
-                                    );
-                                    let right = music_score::full_score::score_beat_x(
-                                        time_beat(section.end_time, chart),
-                                        spacing.0,
-                                    );
-                                    band.spawn((
-                                        bevy::ui_widgets::Button,
-                                        bevy::input_focus::tab_navigation::TabIndex(0),
-                                        Zone {
-                                            index,
-                                            start: section.start_time,
-                                            end: section.end_time,
-                                        },
-                                        Node {
-                                            position_type: PositionType::Absolute,
-                                            left: Val::Px(left),
-                                            width: Val::Px((right - left).max(1.0)),
-                                            height: Val::Percent(100.0),
-                                            padding: UiRect::horizontal(Val::Px(14.0)),
-                                            border: UiRect::all(Val::Px(1.0)),
-                                            overflow: Overflow::clip(),
-                                            ..default()
-                                        },
-                                        BorderColor::all(palette.border),
-                                        ThemeSurface::Control,
-                                    ))
-                                    .observe(select_zone)
-                                    .with_children(|p| {
-                                        p.spawn((
-                                            Text::new(section.name.clone()),
-                                            TextLayout::no_wrap(),
-                                            TextFont { font_size: FontSize::Px(13.0), ..default() },
-                                            TextColor(palette.text),
-                                            Pickable::IGNORE,
-                                        ));
-                                    });
-                                }
-                            });
-                        let score = music_score::full_score::spawn_full_score(content, &bravura, grand, end, light);
-                        if let Some(instrument) = chart.instrument() {
-                            music_score::apply_instrument_clef(content, score, instrument.kind());
-                        }
-                        content
-                            .spawn((
-                                Selection,
-                                Node {
-                                    position_type: PositionType::Absolute,
-                                    top: Val::Px(0.0),
-                                    height: Val::Percent(100.0),
-                                    display: Display::None,
-                                    border: UiRect::horizontal(Val::Px(2.0)),
-                                    ..default()
-                                },
-                                BackgroundColor(palette.selected.with_alpha(0.22)),
-                                BorderColor::all(palette.accent),
-                                Pickable::IGNORE,
-                            ))
-                            .with_children(|p| {
-                                for (right, text) in [(false, "A"), (true, "B")] {
+            commands.entity(viewport).insert((Viewport, ThemeSurface::Inset)).with_children(|p| {
+                p.spawn((
+                    Content,
+                    Node {
+                        width: Val::Px(width),
+                        flex_shrink: 0.0,
+                        height: Val::Px(score_height + 32.0),
+                        flex_direction: FlexDirection::Column,
+                        ..default()
+                    },
+                ))
+                .with_children(|content| {
+                    content
+                        .spawn((
+                            Band,
+                            RelativeCursorPosition::default(),
+                            Node {
+                                width: Val::Percent(100.0),
+                                height: Val::Px(32.0),
+                                flex_shrink: 0.0,
+                                ..default()
+                            },
+                            ThemeSurface::Panel,
+                        ))
+                        .with_children(|band| {
+                            for (index, section) in adaptive.sections.iter().enumerate() {
+                                let left = music_score::full_score::score_beat_x(
+                                    time_beat(section.start_time, chart),
+                                    spacing.0,
+                                );
+                                let right = music_score::full_score::score_beat_x(
+                                    time_beat(section.end_time, chart),
+                                    spacing.0,
+                                );
+                                band.spawn((
+                                    bevy::ui_widgets::Button,
+                                    bevy::input_focus::tab_navigation::TabIndex(0),
+                                    Zone {
+                                        index,
+                                        start: section.start_time,
+                                        end: section.end_time,
+                                    },
+                                    Node {
+                                        position_type: PositionType::Absolute,
+                                        left: Val::Px(left),
+                                        width: Val::Px((right - left).max(1.0)),
+                                        height: Val::Percent(100.0),
+                                        padding: UiRect::horizontal(Val::Px(14.0)),
+                                        border: UiRect::all(Val::Px(1.0)),
+                                        overflow: Overflow::clip(),
+                                        ..default()
+                                    },
+                                    BorderColor::all(palette.border),
+                                    ThemeSurface::Control,
+                                ))
+                                .observe(select_zone)
+                                .with_children(|p| {
                                     p.spawn((
-                                        Text::new(text),
+                                        Text::new(section.name.clone()),
+                                        TextLayout::no_wrap(),
                                         TextFont { font_size: FontSize::Px(13.0), ..default() },
-                                        TextColor(palette.accent),
-                                        Node {
-                                            position_type: PositionType::Absolute,
-                                            left: if right { Val::Auto } else { Val::Px(2.0) },
-                                            right: if right { Val::Px(2.0) } else { Val::Auto },
-                                            top: Val::Px(0.0),
-                                            ..default()
-                                        },
+                                        TextColor(palette.text),
                                         Pickable::IGNORE,
                                     ));
-                                }
-                            });
-                        content.spawn((
-                            Playhead,
+                                });
+                            }
+                        });
+                    let score = music_score::full_score::spawn_full_score(
+                        content, &bravura, grand, end, light,
+                    );
+                    if let Some(instrument) = chart.instrument() {
+                        music_score::apply_instrument_clef(content, score, instrument.kind());
+                    }
+                    content
+                        .spawn((
+                            Selection,
                             Node {
                                 position_type: PositionType::Absolute,
                                 top: Val::Px(0.0),
                                 height: Val::Percent(100.0),
-                                width: Val::Px(3.0),
+                                display: Display::None,
+                                border: UiRect::horizontal(Val::Px(2.0)),
                                 ..default()
                             },
-                            BackgroundColor(Color::srgb(1.0, 0.15, 0.18)),
+                            BackgroundColor(palette.selected.with_alpha(0.22)),
+                            BorderColor::all(palette.accent),
                             Pickable::IGNORE,
-                        ));
-                    });
+                        ))
+                        .with_children(|p| {
+                            for (right, text) in [(false, "A"), (true, "B")] {
+                                p.spawn((
+                                    Text::new(text),
+                                    TextFont { font_size: FontSize::Px(13.0), ..default() },
+                                    TextColor(palette.accent),
+                                    Node {
+                                        position_type: PositionType::Absolute,
+                                        left: if right { Val::Auto } else { Val::Px(2.0) },
+                                        right: if right { Val::Px(2.0) } else { Val::Auto },
+                                        top: Val::Px(0.0),
+                                        ..default()
+                                    },
+                                    Pickable::IGNORE,
+                                ));
+                            }
+                        });
+                    content.spawn((
+                        Playhead,
+                        Node {
+                            position_type: PositionType::Absolute,
+                            top: Val::Px(0.0),
+                            height: Val::Percent(100.0),
+                            width: Val::Px(3.0),
+                            ..default()
+                        },
+                        BackgroundColor(Color::srgb(1.0, 0.15, 0.18)),
+                        Pickable::IGNORE,
+                    ));
                 });
+            });
         }
     }
     if !paused.0 {

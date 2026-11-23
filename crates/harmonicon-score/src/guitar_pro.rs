@@ -589,7 +589,11 @@ fn check_zip_sizes(format: &'static str, bytes: &[u8]) -> Result<(), ScoreError>
         if entry.size() > MAX_ZIP_ENTRY_BYTES {
             return Err(parse_error(
                 format,
-                format!("{} unpacks to {} bytes, more than a score holds", entry.name(), entry.size()),
+                format!(
+                    "{} unpacks to {} bytes, more than a score holds",
+                    entry.name().map_err(|e| parse_error(format, e))?,
+                    entry.size()
+                ),
             ));
         }
     }
@@ -603,7 +607,11 @@ pub(crate) fn unzip_mxl(bytes: &[u8]) -> Result<Vec<u8>, ScoreError> {
     use std::io::Read;
     let mut archive =
         zip::ZipArchive::new(std::io::Cursor::new(bytes)).map_err(|e| parse_error("mxl", e))?;
-    let names: Vec<String> = archive.file_names().map(str::to_string).collect();
+    let names = archive
+        .file_names()
+        .map(|name| name.map(std::borrow::Cow::into_owned))
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| parse_error("mxl", e))?;
     let root = names
         .iter()
         .find(|n| *n == "META-INF/container.xml")

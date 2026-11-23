@@ -255,7 +255,8 @@ mod tests {
     /// over the songs pack when it is checked out beside this repo.
     #[test]
     fn the_stated_ogg_duration_matches_a_full_count_on_real_songs() {
-        let pack = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../harmonicon-songs");
+        let pack =
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../harmonicon-songs");
         let mut stack = vec![pack];
         let mut checked = 0;
         while let Some(dir) = stack.pop() {
@@ -268,7 +269,11 @@ mod tests {
                     let bytes = std::fs::read(&path).unwrap();
                     let counted = analyze_ogg_waveform(&bytes, 1).1;
                     let stated = ogg_duration_secs(&bytes);
-                    assert!((counted - stated).abs() < 0.05, "{}: {counted} vs {stated}", path.display());
+                    assert!(
+                        (counted - stated).abs() < 0.05,
+                        "{}: {counted} vs {stated}",
+                        path.display()
+                    );
                     checked += 1;
                 }
             }

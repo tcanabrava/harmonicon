@@ -210,8 +210,6 @@ fn override_default_font(mut fonts: ResMut<Assets<Font>>) {
     }
 }
 
-/// Collects the names of subfolders under `root` that contain a `theme.json`.
-
 /// `songs_root` is the folder holding artist folders, and `source_prefix`
 /// is what each built `SongEntry::asset_path` starts with, so it loads from
 /// the right [`AssetSource`](bevy::asset::io::AssetSource): `songs/` for the

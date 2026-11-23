@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 
 //! Guitar-only guidance. Positions guide the hands; scoring remains pitch-only.
-use harmonicon_platform::theme::{Appearance, LoadedTheme, ThemeSurface};
 use super::{GameplayClock, LOOKAHEAD, ScheduledNote, SongNotes};
 use bevy::prelude::*;
 use harmonicon_core::instrument::{
@@ -9,6 +8,7 @@ use harmonicon_core::instrument::{
     guitar::{FretAssignment, Guitar, HAND_SPAN_FRETS},
 };
 use harmonicon_platform::localization::LocalizationExt;
+use harmonicon_platform::theme::{Appearance, LoadedTheme, ThemeSurface};
 
 /// A separate child lets flex layout center the label inside its circular marker.
 #[derive(Component)]
@@ -501,12 +501,22 @@ pub(super) struct ChordDiagram(u8, bool, f32);
 #[derive(Component)]
 pub(super) struct DiagramRoot(bool);
 
-pub(super) fn spawn_chord_diagram(parent: &mut ChildSpawnerCommands, guitar: &Guitar, appearance: Appearance) {
+pub(super) fn spawn_chord_diagram(
+    parent: &mut ChildSpawnerCommands,
+    guitar: &Guitar,
+    appearance: Appearance,
+) {
     spawn_diagram(parent, guitar, false, 1.0, appearance);
     spawn_diagram(parent, guitar, true, 0.65, appearance);
 }
 
-fn spawn_diagram(parent: &mut ChildSpawnerCommands, guitar: &Guitar, next: bool, scale: f32, appearance: Appearance) {
+fn spawn_diagram(
+    parent: &mut ChildSpawnerCommands,
+    guitar: &Guitar,
+    next: bool,
+    scale: f32,
+    appearance: Appearance,
+) {
     parent
         .spawn((
             DiagramRoot(next),
@@ -672,7 +682,8 @@ fn spawn_neck(
     appearance: Appearance,
 ) -> Entity {
     let now_ink = neck_now(appearance);
-    let next_ink = if appearance == Appearance::Light { Color::srgb_u8(34, 91, 148) } else { NECK_NEXT };
+    let next_ink =
+        if appearance == Appearance::Light { Color::srgb_u8(34, 91, 148) } else { NECK_NEXT };
     let palette = appearance.palette();
     let mut board_id = Entity::PLACEHOLDER;
     parent
@@ -712,7 +723,11 @@ fn spawn_neck(
                         flex_shrink: 0.0,
                         ..default()
                     },
-                    BackgroundColor(if appearance == Appearance::Light { palette.panel } else { Color::srgb(0.10, 0.09, 0.08) }),
+                    BackgroundColor(if appearance == Appearance::Light {
+                        palette.panel
+                    } else {
+                        Color::srgb(0.10, 0.09, 0.08)
+                    }),
                 ))
                 .with_children(|board| {
                     let columns = f32::from(guitar.frets) + 1.0;
@@ -821,7 +836,11 @@ fn spawn_neck(
                                         TextColor(if next {
                                             next_ink
                                         } else {
-                                            if appearance == Appearance::Light { Color::WHITE } else { Color::srgb(0.08, 0.08, 0.10) }
+                                            if appearance == Appearance::Light {
+                                                Color::WHITE
+                                            } else {
+                                                Color::srgb(0.08, 0.08, 0.10)
+                                            }
                                         }),
                                     ));
                                 });

@@ -9,7 +9,6 @@ pub struct SelectedLessonInstrument(pub Option<InstrumentKind>);
 
 /// Namespaced curricula are preferred. Existing unscoped packs remain usable
 /// as harmonica packs, preserving their lesson ids and progress records.
-#[cfg(not(target_arch = "wasm32"))]
 pub fn lesson_roots(root: &std::path::Path, kind: InstrumentKind) -> Vec<std::path::PathBuf> {
     let mut roots = Vec::new();
     let scoped = root.join(kind.slug());

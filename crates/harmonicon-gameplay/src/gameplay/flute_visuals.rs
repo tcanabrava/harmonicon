@@ -13,12 +13,12 @@
 //! mid-song.
 use super::{GameplayClock, ScheduledNote, SongNotes};
 use bevy::prelude::*;
-use harmonicon_platform::theme::{Appearance, LoadedTheme, ThemeSurface};
 use bevy::ui_widgets::Activate;
 use harmonicon_core::instrument::flute::{FingeringAssignment, Flute, Side, key_rows};
 use harmonicon_core::instrument::{InstrumentModel, LaneLayout, PlayPosition};
 use harmonicon_platform::localization::{Localization, LocalizationExt};
 use harmonicon_platform::settings::{FluteView, MyInstruments};
+use harmonicon_platform::theme::{Appearance, LoadedTheme, ThemeSurface};
 
 /// A pending flute note's ribbon: a cool silver, the colour of the
 /// instrument.

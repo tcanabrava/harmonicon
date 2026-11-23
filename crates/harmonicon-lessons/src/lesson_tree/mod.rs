@@ -114,10 +114,6 @@ const LABEL_PAD_Y: f32 = 2.0;
 /// padding, so a backdrop is never wider than the label allowance it was
 /// sized against and `COL_PX > LABEL_PX` keeps meaning what it says.
 const LABEL_TEXT_PX: f32 = LABEL_PX - LABEL_PAD_X * 2.0;
-/// Sits behind a lesson title. Edges run underneath the labels, and text
-/// drawn straight over a line is hard to read; this is dark and mostly
-/// opaque so the words win, without becoming a solid card.
-
 /// Edge thickness.
 const EDGE_PX: f32 = 3.5;
 

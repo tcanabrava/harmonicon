@@ -9,8 +9,8 @@
 //! All the lyric logic — lines, word joins, where the singer is — is
 //! `harmonicon_core::lyrics`; this module only draws its answer.
 
-use harmonicon_platform::theme::{Appearance, ThemeSurface};
 use bevy::prelude::*;
+use harmonicon_platform::theme::{Appearance, ThemeSurface};
 
 use harmonicon_app::app::{AppState, GameplayMode};
 use harmonicon_core::lyrics::{KaraokePosition, LyricLine, karaoke_at};
@@ -71,7 +71,12 @@ pub(super) fn strip_top(staff: bool) -> f32 {
 /// a sibling top-level entity at the staff's `GlobalZIndex(100)` for the
 /// same reason as `gameplay_2d::spawn_gameplay_music_score`. Nothing is
 /// spawned for a chart without lyrics.
-pub(super) fn spawn_karaoke(commands: &mut Commands, lines: Vec<LyricLine>, top: f32, appearance: Appearance) {
+pub(super) fn spawn_karaoke(
+    commands: &mut Commands,
+    lines: Vec<LyricLine>,
+    top: f32,
+    appearance: Appearance,
+) {
     if lines.is_empty() {
         return;
     }
@@ -210,7 +215,9 @@ mod tests {
     fn a_chart_without_lyrics_spawns_nothing() {
         let mut world = World::new();
         world
-            .run_system_once(|mut commands: Commands| spawn_karaoke(&mut commands, Vec::new(), 0.0, Appearance::Dark))
+            .run_system_once(|mut commands: Commands| {
+                spawn_karaoke(&mut commands, Vec::new(), 0.0, Appearance::Dark)
+            })
             .unwrap();
         assert_eq!(world.query::<&KaraokeStrip>().iter(&world).count(), 0);
     }

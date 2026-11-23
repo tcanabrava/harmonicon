@@ -110,11 +110,19 @@ mod spelling_tests {
     #[test]
     fn accidentals_reset_at_actual_meter_changes() {
         let bars = MusicScoreBarMap {
-            meter: MeterMap::new([(0, "4/4"), (24, "3/4")], 12), quarter_ticks: 12,
+            meter: MeterMap::new([(0, "4/4"), (24, "3/4")], 12),
+            quarter_ticks: 12,
         };
         let notes = [note("F#4", 1.0), note("F#4", 2.0), note("F#4", 3.0), note("F#4", 5.0)];
-        assert_eq!(super::super::notation::accidentals_in_bars(&notes, Clef::Treble, &bars, KeySignature::default()),
-            vec![Accidental::Sharp, Accidental::Sharp, Accidental::None, Accidental::Sharp]);
+        assert_eq!(
+            super::super::notation::accidentals_in_bars(
+                &notes,
+                Clef::Treble,
+                &bars,
+                KeySignature::default()
+            ),
+            vec![Accidental::Sharp, Accidental::Sharp, Accidental::None, Accidental::Sharp]
+        );
     }
 
     #[test]

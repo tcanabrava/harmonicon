@@ -26,6 +26,7 @@ use unic_langid::LanguageIdentifier;
 use super::ftl::LocaleBundle;
 use crate::content_packs::{ContentPacks, ContentPacksChanged};
 use crate::lesson_selection::SelectedLessonInstrument;
+#[cfg(not(target_arch = "wasm32"))]
 use harmonicon_core::instrument::InstrumentKind;
 
 /// One bundle per language found in any usable pack, sorted by language tag.

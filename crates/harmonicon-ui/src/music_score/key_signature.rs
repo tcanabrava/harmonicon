@@ -3,13 +3,25 @@
 use super::*;
 
 #[derive(Component)]
-pub(super) struct KeySignatureSlot { root: Entity, lower: bool, last: Option<(harmonicon_core::notation::KeySignature, Clef)> }
+pub(super) struct KeySignatureSlot {
+    root: Entity,
+    lower: bool,
+    last: Option<(harmonicon_core::notation::KeySignature, Clef)>,
+}
 
 pub(super) fn spawn(parent: &mut ChildSpawnerCommands, root: Entity, lower: bool) {
     parent.spawn((
         KeySignatureSlot { root, lower, last: None },
-        Node { position_type: PositionType::Absolute, left: Val::Px(34.0), top: Val::Px(if lower { PANEL_HEIGHT } else { 0.0 }), width: Val::Px(64.0), height: Val::Px(PANEL_HEIGHT), ..default() },
-        ZIndex(2), bevy::picking::Pickable::IGNORE,
+        Node {
+            position_type: PositionType::Absolute,
+            left: Val::Px(34.0),
+            top: Val::Px(if lower { PANEL_HEIGHT } else { 0.0 }),
+            width: Val::Px(64.0),
+            height: Val::Px(PANEL_HEIGHT),
+            ..default()
+        },
+        ZIndex(2),
+        bevy::picking::Pickable::IGNORE,
     ));
 }
 pub(super) fn rebuild(
@@ -30,15 +42,35 @@ pub(super) fn rebuild(
         if slot.last.is_some() && !inputs_changed && !clef_changed {
             continue;
         }
-        let clef = if slot.lower { Clef::Bass } else if grand { Clef::Treble } else { notation::resolve_clef(&notes.0, forced.map(|forced| forced.0)) };
-        if slot.last == Some((signature.0, clef)) { continue; }
+        let clef = if slot.lower {
+            Clef::Bass
+        } else if grand {
+            Clef::Treble
+        } else {
+            notation::resolve_clef(&notes.0, forced.map(|forced| forced.0))
+        };
+        if slot.last == Some((signature.0, clef)) {
+            continue;
+        }
         slot.last = Some((signature.0, clef));
         commands.entity(entity).despawn_children();
         let flat = signature.0.fifths() < 0;
         let steps = signature_steps(clef, flat);
         commands.entity(entity).with_children(|parent| {
-            for (index, &step) in steps.iter().take(usize::from(signature.0.fifths().unsigned_abs())).enumerate() {
-                parent.spawn(glyph(&font, if flat { notation::glyph::ACCIDENTAL_FLAT } else { notation::glyph::ACCIDENTAL_SHARP }, index as f32 * 9.0, y_for_step(step), appearance.ink()));
+            for (index, &step) in
+                steps.iter().take(usize::from(signature.0.fifths().unsigned_abs())).enumerate()
+            {
+                parent.spawn(glyph(
+                    &font,
+                    if flat {
+                        notation::glyph::ACCIDENTAL_FLAT
+                    } else {
+                        notation::glyph::ACCIDENTAL_SHARP
+                    },
+                    index as f32 * 9.0,
+                    y_for_step(step),
+                    appearance.ink(),
+                ));
             }
         });
     }
@@ -61,7 +93,8 @@ mod tests {
     use super::*;
     #[test]
     fn alto_key_signature_has_conventional_letters_and_octaves() {
-        let sharps = [65, 60, 67, 62, 57, 64, 59].map(|midi| notation::staff_step(midi, Clef::Alto));
+        let sharps =
+            [65, 60, 67, 62, 57, 64, 59].map(|midi| notation::staff_step(midi, Clef::Alto));
         let flats = [59, 64, 57, 62, 55, 60, 53].map(|midi| notation::staff_step(midi, Clef::Alto));
         assert_eq!(signature_steps(Clef::Alto, false), sharps);
         assert_eq!(signature_steps(Clef::Alto, true), flats);

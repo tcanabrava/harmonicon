@@ -249,8 +249,11 @@ fn pointer_click_violations(sources: &[(String, String)]) -> Vec<String> {
             {
                 k -= 1;
             }
-            let excused =
-                lines[..k].iter().rev().take_while(|l| is_comment(l)).any(|l| l.contains(NOT_A_BUTTON));
+            let excused = lines[..k]
+                .iter()
+                .rev()
+                .take_while(|l| is_comment(l))
+                .any(|l| l.contains(NOT_A_BUTTON));
             if !excused {
                 out.push(format!("{path}:{}: `On<PointerClick>`", i + 1));
             }
@@ -1034,7 +1037,8 @@ mod tests {
 
     #[test]
     fn flags_a_pointer_click_handler_with_no_excuse() {
-        let src = sources(&[("a.rs", "fn on_click(ev: On<PointerClick>, mut q: Query<&Node>) {}\n")]);
+        let src =
+            sources(&[("a.rs", "fn on_click(ev: On<PointerClick>, mut q: Query<&Node>) {}\n")]);
         assert_eq!(pointer_click_violations(&src), vec!["a.rs:1: `On<PointerClick>`".to_string()]);
         // Bevy 0.19's spelling, pasted in, is flagged the same way.
         let old = sources(&[("b.rs", "fn on_click(ev: On<Pointer<Click>>) {}\n")]);

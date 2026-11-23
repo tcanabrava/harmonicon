@@ -44,7 +44,10 @@ use bevy::text::{FontHinting, LineHeight};
 use bevy::ui::ComputedNode;
 
 mod pitch_picker;
-pub use pitch_picker::{PitchChoiceInk, spawn_pitch_choices, spawn_written_pitch_choices, spawn_written_pitch_choices_in_clef};
+pub use pitch_picker::{
+    PitchChoiceInk, spawn_pitch_choices, spawn_written_pitch_choices,
+    spawn_written_pitch_choices_in_clef,
+};
 
 mod note_glyphs;
 mod tie_material;
@@ -54,12 +57,14 @@ use tie_material::{TieMaterialHandle, TieMaterialPlugin};
 mod notation;
 use notation::glyph;
 pub use notation::*;
-mod projection;
-mod key_signature;
 pub mod full_score;
+mod key_signature;
+mod projection;
 mod staff_window;
+pub use projection::{
+    MusicScoreKeySignature, note_spelling, note_staff_step, project_notes, project_score,
+};
 use staff_window::spawn_staff_window;
-pub use projection::{MusicScoreKeySignature, project_notes, project_score, note_spelling, note_staff_step};
 
 mod meter_map;
 pub use meter_map::{BarPosition, MeterMap, MeterSegment};
@@ -340,7 +345,8 @@ impl MusicScoreBarMap {
             .into_iter()
             .enumerate()
             .map(|(index, (tick, _))| {
-                let note = NotationNote { spelling: None, 
+                let note = NotationNote {
+                    spelling: None,
                     start_beat: (previous as f64 + phase) / q,
                     duration_beats: (tick - previous) as f64 / q,
                     midi,
@@ -393,14 +399,16 @@ mod bar_map_tests {
     fn a_short_pause_widens_the_staff_until_its_rest_fits() {
         let bars = MusicScoreBarMap::default();
         let notes = vec![
-            NotationNote { spelling: None, 
+            NotationNote {
+                spelling: None,
                 start_beat: 0.0,
                 duration_beats: 1.0,
                 midi: 60,
                 tied_from_previous: false,
                 highlighted: false,
             },
-            NotationNote { spelling: None, 
+            NotationNote {
+                spelling: None,
                 start_beat: 1.25,
                 duration_beats: 1.0,
                 midi: 62,
@@ -599,7 +607,9 @@ pub fn instrument_clef(kind: harmonicon_core::instrument::InstrumentKind) -> Opt
     match kind {
         harmonicon_core::instrument::InstrumentKind::Bass => Some(Clef::Bass),
         harmonicon_core::instrument::InstrumentKind::Viola => Some(Clef::Alto),
-        harmonicon_core::instrument::InstrumentKind::Guitar | harmonicon_core::instrument::InstrumentKind::Clarinet | harmonicon_core::instrument::InstrumentKind::Violin => Some(Clef::Treble),
+        harmonicon_core::instrument::InstrumentKind::Guitar
+        | harmonicon_core::instrument::InstrumentKind::Clarinet
+        | harmonicon_core::instrument::InstrumentKind::Violin => Some(Clef::Treble),
         _ => None,
     }
 }
@@ -610,7 +620,20 @@ pub fn apply_instrument_clef(
     kind: harmonicon_core::instrument::InstrumentKind,
 ) {
     if let Some(clef) = instrument_clef(kind) {
-        parent.commands().entity(score).insert((InstrumentScoreClef(clef), InstrumentOctaveAnnotation(if matches!(kind, harmonicon_core::instrument::InstrumentKind::Guitar | harmonicon_core::instrument::InstrumentKind::Bass) { -1 } else { 0 })));
+        parent.commands().entity(score).insert((
+            InstrumentScoreClef(clef),
+            InstrumentOctaveAnnotation(
+                if matches!(
+                    kind,
+                    harmonicon_core::instrument::InstrumentKind::Guitar
+                        | harmonicon_core::instrument::InstrumentKind::Bass
+                ) {
+                    -1
+                } else {
+                    0
+                },
+            ),
+        ));
     }
 }
 #[derive(Component, Clone, Copy)]
@@ -741,7 +764,9 @@ impl ScoreAppearance {
     fn rule(self, alpha: f32) -> Color {
         match self {
             Self::Hud => Color::srgba(0.75, 0.75, 0.80, alpha),
-            Self::Light => harmonicon_platform::theme::Appearance::Light.palette().muted.with_alpha(alpha),
+            Self::Light => {
+                harmonicon_platform::theme::Appearance::Light.palette().muted.with_alpha(alpha)
+            }
         }
     }
 }
@@ -791,7 +816,12 @@ pub fn spawn_sectioned_score(
 pub fn spawn_piano_score(parent: &mut ChildSpawnerCommands, bravura: &BravuraFont) -> Entity {
     spawn_score(parent, bravura, true, ScoreAppearance::Hud)
 }
-fn spawn_score(parent: &mut ChildSpawnerCommands, bravura: &BravuraFont, grand: bool, appearance: ScoreAppearance) -> Entity {
+fn spawn_score(
+    parent: &mut ChildSpawnerCommands,
+    bravura: &BravuraFont,
+    grand: bool,
+    appearance: ScoreAppearance,
+) -> Entity {
     let mut root = parent.spawn((
         Node {
             width: Val::Percent(100.0),
@@ -809,7 +839,9 @@ fn spawn_score(parent: &mut ChildSpawnerCommands, bravura: &BravuraFont, grand: 
         BackgroundColor(appearance.paper()),
         BorderColor::all(match appearance {
             ScoreAppearance::Hud => harmonicon_platform::theme::HUD_DIVIDER_COLOR,
-            ScoreAppearance::Light => harmonicon_platform::theme::Appearance::Light.palette().border,
+            ScoreAppearance::Light => {
+                harmonicon_platform::theme::Appearance::Light.palette().border
+            }
         }),
         MusicScorePanel,
         appearance,
@@ -819,9 +851,21 @@ fn spawn_score(parent: &mut ChildSpawnerCommands, bravura: &BravuraFont, grand: 
     }
     let root_id = root.id();
     root.with_children(|panel| {
-        panel.spawn((Node { position_type: PositionType::Absolute, width: Val::Px(PLAYHEAD_X - 8.0), height: Val::Px(PANEL_HEIGHT * if grand { 2.0 } else { 1.0 }), ..default() }, BackgroundColor(appearance.paper()), ZIndex(1), bevy::picking::Pickable::IGNORE));
+        panel.spawn((
+            Node {
+                position_type: PositionType::Absolute,
+                width: Val::Px(PLAYHEAD_X - 8.0),
+                height: Val::Px(PANEL_HEIGHT * if grand { 2.0 } else { 1.0 }),
+                ..default()
+            },
+            BackgroundColor(appearance.paper()),
+            ZIndex(1),
+            bevy::picking::Pickable::IGNORE,
+        ));
         key_signature::spawn(panel, root_id, false);
-        if grand { key_signature::spawn(panel, root_id, true); }
+        if grand {
+            key_signature::spawn(panel, root_id, true);
+        }
         if grand {
             for line in 0..5 {
                 panel.spawn((
@@ -835,7 +879,16 @@ fn spawn_score(parent: &mut ChildSpawnerCommands, bravura: &BravuraFont, grand: 
                     BackgroundColor(appearance.rule(0.6)),
                 ));
             }
-            panel.spawn((glyph(bravura, Clef::Bass.glyph(), CLEF_X, PANEL_HEIGHT + y_for_step(Clef::Bass.anchor_step()), appearance.ink()), ZIndex(2)));
+            panel.spawn((
+                glyph(
+                    bravura,
+                    Clef::Bass.glyph(),
+                    CLEF_X,
+                    PANEL_HEIGHT + y_for_step(Clef::Bass.anchor_step()),
+                    appearance.ink(),
+                ),
+                ZIndex(2),
+            ));
             for (numerator, step, digit) in
                 [(true, TIME_SIG_NUMERATOR_STEP, 4), (false, TIME_SIG_DENOMINATOR_STEP, 4)]
             {
@@ -847,7 +900,8 @@ fn spawn_score(parent: &mut ChildSpawnerCommands, bravura: &BravuraFont, grand: 
                         PANEL_HEIGHT + y_for_step(step),
                         appearance.ink(),
                     ),
-                    MusicScoreTimeSig { numerator }, ZIndex(2),
+                    MusicScoreTimeSig { numerator },
+                    ZIndex(2),
                 ));
             }
         }
@@ -884,8 +938,15 @@ fn spawn_score(parent: &mut ChildSpawnerCommands, bravura: &BravuraFont, grand: 
             (false, TIME_SIG_DENOMINATOR_STEP, meter.denominator),
         ] {
             panel.spawn((
-                glyph(bravura, time_sig_glyphs(digit), TIME_SIG_X, y_for_step(step), appearance.ink()),
-                MusicScoreTimeSig { numerator }, ZIndex(2),
+                glyph(
+                    bravura,
+                    time_sig_glyphs(digit),
+                    TIME_SIG_X,
+                    y_for_step(step),
+                    appearance.ink(),
+                ),
+                MusicScoreTimeSig { numerator },
+                ZIndex(2),
             ));
         }
         // "Now" reference line — notes scroll toward/through this the same
@@ -900,7 +961,8 @@ fn spawn_score(parent: &mut ChildSpawnerCommands, bravura: &BravuraFont, grand: 
                 ..default()
             },
             BackgroundColor(Color::srgb(1.0, 0.15, 0.18)),
-            MusicScoreReference, ZIndex(3),
+            MusicScoreReference,
+            ZIndex(3),
         ));
         // Notes layer: its local x=0 is the beat the glyphs were last
         // spawned around, and `rebuild_score_notes` slides it so that beat
@@ -961,10 +1023,20 @@ fn rebuild_score_notes(
     selection: Res<MusicScoreSelection>,
     playhead: Res<MusicScorePlayhead>,
     panels: Query<
-        (Entity, &ComputedNode, Option<&PianoGrandStaff>, Option<Ref<InstrumentScoreClef>>, Option<&InstrumentOctaveAnnotation>, &ScoreAppearance),
+        (
+            Entity,
+            &ComputedNode,
+            Option<&PianoGrandStaff>,
+            Option<Ref<InstrumentScoreClef>>,
+            Option<&InstrumentOctaveAnnotation>,
+            &ScoreAppearance,
+        ),
         With<MusicScorePanel>,
     >,
-    mut layers: Query<(Entity, &mut Node, &ChildOf), (With<MusicScoreNotesLayer>, Without<MusicScoreClef>)>,
+    mut layers: Query<
+        (Entity, &mut Node, &ChildOf),
+        (With<MusicScoreNotesLayer>, Without<MusicScoreClef>),
+    >,
     existing: Query<(Entity, &ChildOf), With<MusicScoreNoteGlyph>>,
     meter: Res<MusicScoreMeter>,
     bar_map: Res<MusicScoreBarMap>,
@@ -1180,7 +1252,10 @@ fn spawn_window(
             clefs,
             time_sigs,
             Some(Clef::Treble),
-            true, 0, signature, appearance,
+            true,
+            0,
+            signature,
+            appearance,
         );
         let bass = commands
             .spawn((
@@ -1211,7 +1286,10 @@ fn spawn_window(
             clefs,
             time_sigs,
             Some(Clef::Bass),
-            false, 0, signature, appearance,
+            false,
+            0,
+            signature,
+            appearance,
         );
     } else {
         spawn_staff_window(
@@ -1230,7 +1308,10 @@ fn spawn_window(
             clefs,
             time_sigs,
             forced,
-            true, octave_annotation, signature, appearance,
+            true,
+            octave_annotation,
+            signature,
+            appearance,
         );
     }
 }

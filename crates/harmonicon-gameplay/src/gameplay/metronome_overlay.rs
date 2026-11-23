@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: MIT
 
-use harmonicon_platform::theme::{Appearance, LoadedTheme, ThemeSurface};
 use bevy::{
     audio::{AudioSource, Volume},
     input_focus::tab_navigation::TabIndex,
@@ -10,11 +9,12 @@ use bevy::{
     ui_widgets::Activate,
     ui_widgets::Button as WidgetButton,
 };
+use harmonicon_platform::theme::{Appearance, LoadedTheme, ThemeSurface};
 
 use harmonicon_app::app::{AppState, SelectedSong};
 use harmonicon_audio::AudioSettings;
-use harmonicon_platform::localization::{Localization, LocalizationExt};
 use harmonicon_core::chart::Feel;
+use harmonicon_platform::localization::{Localization, LocalizationExt};
 use harmonicon_song::song::SongManifest;
 pub use harmonicon_ui::dialogs::metronome::{
     MetronomeFeel, click_for_tick, is_downbeat, tick_index,
@@ -161,48 +161,46 @@ pub fn spawn_metronome(
 
             // Click on/off toggle. Authored with bsn!; click + hover ride along
             // inline as on(...).
-            row.spawn_empty()
-                .apply_scene(bsn! {
-                    WidgetButton
-                    TabIndex(0)
-                    Node {
-                        padding: {UiRect::axes(Val::Px(6.0), Val::Px(2.0))},
-                    }
-                    ~{ThemeSurface::Control}
-                    MetronomeMuteButton
-                    on(toggle_mute)
-                    on(pill_over)
-                    on(pill_out)
-                    Children [
-                        Text({String::from(loc.msg("metronome-click-on"))})
-                        TextFont { font_size: {FontSize::Px(15.0)} }
-                        TextColor({Color::srgb(0.65, 0.65, 0.70)})
-                        MetronomeMuteLabel
-                        Pickable { should_block_lower: {false}, is_hoverable: {false} }
-                    ]
-                });
+            row.spawn_empty().apply_scene(bsn! {
+                WidgetButton
+                TabIndex(0)
+                Node {
+                    padding: {UiRect::axes(Val::Px(6.0), Val::Px(2.0))},
+                }
+                ~{ThemeSurface::Control}
+                MetronomeMuteButton
+                on(toggle_mute)
+                on(pill_over)
+                on(pill_out)
+                Children [
+                    Text({String::from(loc.msg("metronome-click-on"))})
+                    TextFont { font_size: {FontSize::Px(15.0)} }
+                    TextColor({Color::srgb(0.65, 0.65, 0.70)})
+                    MetronomeMuteLabel
+                    Pickable { should_block_lower: {false}, is_hoverable: {false} }
+                ]
+            });
 
             // Straight ↔ shuffle feel toggle.
-            row.spawn_empty()
-                .apply_scene(bsn! {
-                    WidgetButton
-                    TabIndex(0)
-                    Node {
-                        padding: {UiRect::axes(Val::Px(6.0), Val::Px(2.0))},
-                    }
-                    ~{ThemeSurface::Control}
-                    MetronomeFeelButton
-                    on(toggle_feel)
-                    on(pill_over)
-                    on(pill_out)
-                    Children [
-                        Text({String::from(loc.msg(feel_label_key(MetronomeFeel::default())))})
-                        TextFont { font_size: {FontSize::Px(15.0)} }
-                        TextColor({Color::srgb(0.65, 0.65, 0.70)})
-                        MetronomeFeelLabel
-                        Pickable { should_block_lower: {false}, is_hoverable: {false} }
-                    ]
-                });
+            row.spawn_empty().apply_scene(bsn! {
+                WidgetButton
+                TabIndex(0)
+                Node {
+                    padding: {UiRect::axes(Val::Px(6.0), Val::Px(2.0))},
+                }
+                ~{ThemeSurface::Control}
+                MetronomeFeelButton
+                on(toggle_feel)
+                on(pill_over)
+                on(pill_out)
+                Children [
+                    Text({String::from(loc.msg(feel_label_key(MetronomeFeel::default())))})
+                    TextFont { font_size: {FontSize::Px(15.0)} }
+                    TextColor({Color::srgb(0.65, 0.65, 0.70)})
+                    MetronomeFeelLabel
+                    Pickable { should_block_lower: {false}, is_hoverable: {false} }
+                ]
+            });
         });
 
     parent
@@ -275,9 +273,14 @@ pub fn update_metronome(
             base + brightness * if is_downbeat { 0.1 } else { 0.9 },
             0.9,
         );
-        let color = if let Some(theme) = theme.as_ref().filter(|theme| theme.0 == Appearance::Light) {
+        let color = if let Some(theme) = theme.as_ref().filter(|theme| theme.0 == Appearance::Light)
+        {
             let palette = theme.palette();
-            palette.control.to_srgba().mix(&palette.accent.to_srgba(), brightness.clamp(0.0, 1.0)).into()
+            palette
+                .control
+                .to_srgba()
+                .mix(&palette.accent.to_srgba(), brightness.clamp(0.0, 1.0))
+                .into()
         } else {
             color
         };
