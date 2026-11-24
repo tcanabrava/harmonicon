@@ -16,5 +16,7 @@
 	<string>%%VERSION%%</string>
 	<key>NSHighResolutionCapable</key>
 	<true/>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Harmonicon listens to your instrument through the microphone to recognize notes and give you feedback.</string>
 </dict>
 </plist>
