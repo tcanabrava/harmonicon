@@ -48,6 +48,7 @@
   </recommends>
 
   <releases>
+    <release version="0.0.17" date="2026-11-24" />
     <release version="0.0.16" date="2026-11-23" />
     <release version="0.0.15" date="2026-10-29" />
     <release version="0.0.14" date="2026-10-09" />

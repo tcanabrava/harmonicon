@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.0.17 — 2026-11-24
+
+- Declare microphone use in macOS app bundles
+
 ## v0.0.16 — 2026-11-23
 
 - Fix Clippy, dependency audit, Wasm and formatting checks
