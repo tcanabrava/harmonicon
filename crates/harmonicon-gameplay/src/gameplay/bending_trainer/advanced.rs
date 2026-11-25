@@ -208,7 +208,7 @@ pub(super) fn spawn_advanced_drawer(
         // gameplay root's own background carries `GlobalZIndex(1)` and would
         // otherwise paint straight over this (the trap
         // `spawn_gameplay_music_score` documents).
-        BackgroundColor(Color::srgb(0.09, 0.09, 0.13)),
+        harmonicon_platform::theme::ThemeSurface::Panel,
         GlobalZIndex(2),
         Drawer { open: settings.advanced_open },
         AdvancedDrawer,

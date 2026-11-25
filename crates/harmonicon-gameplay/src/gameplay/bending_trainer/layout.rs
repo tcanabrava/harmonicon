@@ -6,6 +6,7 @@
 
 use bevy::input_focus::tab_navigation::TabIndex;
 use bevy::window::PrimaryWindow;
+use harmonicon_platform::theme::{Palette, ThemeSurface};
 use harmonicon_ui::dialogs::drawer::Drawer;
 
 use super::*;
@@ -61,8 +62,6 @@ pub struct DrillIntroSlot;
 #[derive(Component)]
 pub struct TargetProgressLabel;
 
-const CARD_BG: Color = Color::srgba(0.10, 0.10, 0.14, 0.85);
-const DRAWER_BG: Color = Color::srgb(0.09, 0.09, 0.13);
 const MUTED: Color = Color::srgb(0.70, 0.70, 0.80);
 
 fn label(text: String, size: f32, color: Color) -> impl Bundle {
@@ -193,6 +192,7 @@ pub(super) fn spawn_body(
     audio: &AudioSettings,
     settings: &BendingTrainerSettings,
     orientation: TrainerOrientation,
+    palette: Palette,
 ) {
     let body = commands
         .spawn((
@@ -225,8 +225,8 @@ pub(super) fn spawn_body(
         .with_children(|centre| {
             let area = harmonicon_ui::dialogs::scroll_area::spawn_scroll_area(
                 centre,
-                Color::srgb(0.4, 0.55, 0.7),
-                Color::srgb(0.1, 0.12, 0.16),
+                palette.border,
+                palette.inset,
             );
             centre.commands().entity(area).with_children(|content| {
                 spawn_target_card(content, loc, key, target);
@@ -256,7 +256,7 @@ pub(super) fn spawn_body(
             });
             side.spawn((
                 Node { width: Val::Px(320.0), padding: UiRect::all(Val::Px(8.0)), ..default() },
-                BackgroundColor(CARD_BG),
+                ThemeSurface::Panel,
             ))
             .with_children(|card| {
                 card.spawn((
@@ -288,7 +288,7 @@ pub(super) fn spawn_body(
                 display: Display::None,
                 ..default()
             },
-            BackgroundColor(DRAWER_BG),
+            ThemeSurface::Panel,
             // Above the rest of the screen: the gameplay root's own background
             // is `GlobalZIndex(1)`, so `0` would paint underneath it.
             GlobalZIndex(2),
@@ -337,7 +337,7 @@ fn spawn_target_card(
                 padding: UiRect::all(Val::Px(18.0)),
                 ..default()
             },
-            BackgroundColor(CARD_BG),
+            ThemeSurface::Panel,
         ))
         .with_children(|card| {
             card.spawn(Node {

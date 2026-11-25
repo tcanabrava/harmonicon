@@ -376,6 +376,7 @@ pub fn setup(
     settings: Res<BendingTrainerSettings>,
     windows: Query<&Window, With<bevy::window::PrimaryWindow>>,
     loc: Res<Localization>,
+    theme: Res<harmonicon_platform::theme::LoadedTheme>,
 ) {
     use harmonicon_ui::music_score::{
         MusicScoreBarMap, MusicScoreMeter, MusicScorePlayhead, MusicScoreSections,
@@ -452,6 +453,7 @@ pub fn setup(
         &audio,
         &settings,
         orientation,
+        theme.palette(),
     );
     commands.entity(root_id).with_children(|root| {
         root.spawn_empty().apply_scene(bsn! {

@@ -210,7 +210,7 @@ pub(super) fn spawn_bend_rail(card: &mut ChildSpawnerCommands, loc: &Localizatio
                 width: {Val::Percent(100.0)},
                 height: {Val::Px(RAIL_HEIGHT)},
             }
-            BackgroundColor({Color::srgba(0.06, 0.07, 0.10, 0.90)})
+            ~{harmonicon_platform::theme::ThemeSurface::Inset}
         })
         .with_children(|rail| {
             rail.spawn_empty().apply_scene(bsn! {
@@ -221,7 +221,7 @@ pub(super) fn spawn_bend_rail(card: &mut ChildSpawnerCommands, loc: &Localizatio
                     width: {Val::Percent(RAIL_END_PERCENT - RAIL_START_PERCENT)},
                     height: {Val::Px(2.0)},
                 }
-                BackgroundColor({Color::srgb(0.35, 0.38, 0.44)})
+                ~{harmonicon_platform::theme::ThemeSurface::Divider}
             });
             rail.spawn_empty().apply_scene(bsn! {
                 Node {
@@ -267,7 +267,7 @@ pub(super) fn spawn_bend_rail(card: &mut ChildSpawnerCommands, loc: &Localizatio
                     height: {Val::Px(MARKER_SIZE)},
                     border_radius: {BorderRadius::all(Val::Percent(50.0))},
                 }
-                BackgroundColor({Color::srgb(0.92, 0.94, 1.0)})
+                ~{harmonicon_platform::theme::ThemeSurface::HitLine}
                 ~{Visibility::Hidden}
                 BendLiveMarker
             });
