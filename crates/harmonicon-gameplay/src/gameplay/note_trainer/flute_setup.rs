@@ -88,6 +88,7 @@ mod tests {
         app.insert_resource(NoteTrainer::for_instrument(Flute::default().into()))
             .init_resource::<PitchRange>()
             .init_resource::<Localization>()
+            .init_resource::<harmonicon_platform::theme::LoadedTheme>()
             .init_resource::<MyInstruments>()
             .insert_resource(BravuraFont(Handle::default()))
             .add_systems(Startup, layout::setup);

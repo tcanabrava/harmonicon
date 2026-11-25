@@ -6,6 +6,7 @@ pub(crate) fn setup(
     mut pitch_range: ResMut<PitchRange>,
     loc: Res<Localization>,
     font: Option<Res<harmonicon_ui::music_score::BravuraFont>>,
+    theme: Res<harmonicon_platform::theme::LoadedTheme>,
 ) {
     use harmonicon_ui::music_score::{
         MusicScoreBarMap, MusicScoreMeter, MusicScorePlayhead, MusicScoreSelection,
@@ -163,8 +164,8 @@ pub(crate) fn setup(
     commands.entity(root).with_children(|parent| {
         content = harmonicon_ui::dialogs::scroll_area::spawn_scroll_area(
             parent,
-            Color::srgb(0.4, 0.55, 0.7),
-            Color::srgb(0.1, 0.12, 0.16),
+            theme.palette().border,
+            theme.palette().inset,
         );
     });
     commands.entity(content).insert(Node {
@@ -240,7 +241,7 @@ pub(crate) fn setup(
                             height: Val::Px(10.0),
                             ..default()
                         },
-                        BackgroundColor(Color::srgb(0.12, 0.13, 0.18)),
+                        harmonicon_platform::theme::ThemeSurface::Inset,
                     ))
                     .with_children(|track| {
                         track.spawn((
