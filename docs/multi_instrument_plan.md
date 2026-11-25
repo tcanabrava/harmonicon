@@ -274,10 +274,12 @@ sounding pitch; hurdy-gurdy support needs voice roles and rhythmic events.
   converting to pitch. For a guitar part those are the author's own
   fingering and beat anything the solver guesses. `convert` should take a
   target `Instrument` rather than always a `Harmonica`.
-- The `HarmonicaKind` picker becomes an instrument picker that includes the
-  tuning (standard, drop D, DADGAD or capo for guitar; C or B foot for
-  flute). **Open**, with "My instruments": today Details has "Use guitar"
-  and "Use flute" for a standard guitar and a C-foot flute.
+- The instrument is not picked in the editor: a new document is for the
+  instrument chosen on Select Instrument (`MyInstruments::active`). Details
+  names it and keeps each family's setup rows (harmonica kind, guitar
+  tuning and capo, clarinet key). **Open**: seeding a new document's
+  setup from "My instruments" (the guitar's tuning, the flute's foot)
+  rather than the family default.
 
 ## Note Trainer (replaces the Bending Trainer)
 

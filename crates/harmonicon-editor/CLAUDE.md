@@ -920,6 +920,15 @@ load-bearing about *this* crate.
   not undo. Rows above 16 share 16 rows' height (`mod::row_h`), so the
   flute's 37–38 rows fit. A flute's voice rule (one note at a time) is
   `note_edit::fits`, shared by all families.
+- **A new document is for `MyInstruments::active`**, the instrument chosen
+  on the menu's Select Instrument screen; the editor never asks which.
+  `ui::init_state` opens a fresh one unless the last visit left content,
+  and if that content is for another instrument it goes through
+  `document_picker::request_new`, which asks before replacing it (No keeps
+  the draft). **New** goes through the same function. Load still opens a
+  chart with its own instrument. Details only *names* the instrument
+  (`instrument_ui::DocumentInstrumentLabel`); its setup rows (harmonica
+  kind, guitar tuning, clarinet key) configure it within its family.
 - **Instrument transitions are queued** as `DocumentCommand`s and applied
   after the editor pass. Undo can change the instrument, so observers and
   keyboard handlers must queue undo/redo too. Either way in or out of a

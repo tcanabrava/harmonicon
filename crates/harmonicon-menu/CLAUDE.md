@@ -13,6 +13,23 @@ load-bearing about *this* crate.
 
 ## Architecture (load-bearing facts)
 
+- **The instrument is chosen once, on `MenuPage::InstrumentSelect`**
+  (`pages/instrument_select.rs`), and read everywhere else as
+  `MyInstruments::active()`. Don't add an instrument picker to another
+  screen; read the active one. Three routing facts follow:
+  - `route_menu_entry` sends every entry to it until
+    `harmonicon_app::app::InstrumentConfirmed` is set, ahead of `FirstRun`,
+    which it leaves for the choice to consume (`after_choice`): a first
+    launch goes on to Welcome, any other to Main.
+  - Escape on it does nothing before that first choice, and its Back button
+    only exists after it: there is no menu behind it yet.
+  - `LessonInstrument` is a loading gate, not a chooser. The tree's Back
+    and Escape go to Play (or Welcome), never back to the gate, which would
+    just reopen the tree.
+  The cards' pictures are white silhouettes from
+  `scripts/gen_instrument_icons.py`, tinted with `palette.text`, so one
+  PNG serves both themes; re-run the script rather than editing the PNGs.
+
 - **Every menu page's content area auto-scrolls once it overflows.**
   `menu::scene::spawn_menu_root` doesn't return the outer root's own
   entity for callers to add buttons/rows to — it spawns a

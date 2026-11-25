@@ -117,10 +117,30 @@ matters.
 `MenuPage` (`harmonicon-menu`'s `menu/routing.rs`) is a Bevy `SubStates`, declared with
 `#[source(AppState = AppState::Menu)]` — it only exists, and only
 resets to its default (`Main`), while `AppState` is `Menu`. Every menu
-screen (`Play`, `ArtistList`, `SongList`, `ModeSelect`, `Options`,
-`Theme`, `Lessons`, `LessonReader`, `JamSessionMenu`, `JamGenerate`,
-`HelpAbout`, `About`) is one `MenuPage` value, with its own
-`OnEnter`/`OnExit` pair spawning and despawning that page's UI.
+screen (`InstrumentSelect`, `Welcome`, `Play`, `ArtistList`, `HarpCheck`,
+`Options`, `Theme`, `ContentSources`, `LessonInstrument`, `LessonTree`,
+`LessonReader`, `JamSessionMenu`, `JamGenerate`, `Tuner`, `HelpAbout`) is
+one `MenuPage` value, with its own `OnEnter`/`OnExit` pair spawning and
+despawning that page's UI.
+
+## One instrument, chosen first
+
+`InstrumentSelect` is where every session starts. Its choice is
+`MyInstruments::active` (`harmonicon-platform`'s `settings.rs`), persisted
+with the rest of "My instruments", and it is the *only* place the game's
+instrument changes: the song list filters to it, Play's Note Trainer
+button opens the Bending Trainer or `AppState::NoteTrainer` from it,
+`LessonInstrument` copies it into `SelectedLessonInstrument` and only
+waits for that curriculum to load, and the Song Editor creates new
+documents for it. A screen that needs "the player's instrument" reads
+`MyInstruments::active()` rather than offering a picker of its own.
+
+Whether the player has confirmed it this session is
+`harmonicon_app::app::InstrumentConfirmed`. Until it is set,
+`route_menu_entry` sends every entry to `InstrumentSelect` (behind only a
+running tour), and Escape there goes nowhere, since there is no menu behind
+it yet. `FirstRun` is deliberately left for the choice to consume: on a
+first launch, choosing leads to `Welcome`, and on any other to `Main`.
 
 ## The routing-flag pattern
 
@@ -149,8 +169,9 @@ generated Jam Session with no real song behind it) follow the same
 end-of-run routing, and the guided tutorial tour
 (`menu::tutorial::TutorialTour`) takes priority over all of them while
 it's actively driving the screen — see that module for the full
-priority order `route_menu_entry` resolves between a running tour, a
-lesson context, a generated jam, and the four `ReturnTo*` flags.
+priority order `route_menu_entry` resolves between a running tour, the
+first instrument choice, the first-run welcome, a lesson context, a
+generated jam, and the four `ReturnTo*` flags.
 
 ```plantuml
 @startuml

@@ -31,13 +31,13 @@ highway layout decisions toward presentation rather than physical identity.
 
 Each independently reviewable part receives a commit and relevant validation.
 
-### 0. Song catalog instrument filter
+### 0. One chosen instrument
 
-- Add a keyboard-accessible combobox with All instruments and only instrument
-  identities represented by available songs, deduplicated across tunings/parts.
-- Compose with search, sorting and practice-history filters.
-- Update choices after catalog changes; recover when a selected instrument
-  disappears. Respect the harmonica-only Jam Session catalog.
+- Superseded the song catalog's instrument combobox: every launch opens on
+  Select Instrument, and `MyInstruments::active` filters the catalog (Play
+  and Jam Session), chooses the trainer, loads the curriculum and sets new
+  editor documents. Search, sorting and practice-history filters compose
+  with it.
 
 ### 1. Extract shared fretted-string mechanics
 
