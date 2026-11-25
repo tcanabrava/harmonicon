@@ -1001,7 +1001,7 @@ pub(super) fn sync_editor_score(
         })
         .with_children(|parent| {
             let score =
-                harmonicon_ui::music_score::spawn_editor_score(parent, &bravura, piano, light);
+                harmonicon_ui::music_score::spawn_themed_score(parent, &bravura, piano, light);
             if !piano {
                 harmonicon_ui::music_score::apply_instrument_clef(parent, score, kind);
             }

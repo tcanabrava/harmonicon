@@ -771,7 +771,10 @@ impl ScoreAppearance {
     }
 }
 
-pub fn spawn_editor_score(
+/// A staff on a page that follows the theme: light paper and dark ink in
+/// the light theme, the HUD look otherwise. The Song Editor and the Note
+/// Trainer use it; Play keeps the HUD look over its highway.
+pub fn spawn_themed_score(
     parent: &mut ChildSpawnerCommands,
     bravura: &BravuraFont,
     grand: bool,

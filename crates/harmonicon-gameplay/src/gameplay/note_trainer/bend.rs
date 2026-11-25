@@ -13,7 +13,11 @@ pub(crate) enum Visual {
     Band,
 }
 
-pub(super) fn spawn(parent: &mut ChildSpawnerCommands, loc: &Localization) {
+pub(super) fn spawn(
+    parent: &mut ChildSpawnerCommands,
+    loc: &Localization,
+    palette: harmonicon_platform::theme::Palette,
+) {
     parent
         .spawn((
             Panel,
@@ -45,7 +49,7 @@ pub(super) fn spawn(parent: &mut ChildSpawnerCommands, loc: &Localization) {
                     flex_shrink: 0.0,
                     ..default()
                 },
-                BackgroundColor(Color::srgb(0.06, 0.08, 0.12)),
+                harmonicon_platform::theme::ThemeSurface::Inset,
             ))
             .with_children(|plot| {
                 plot.spawn((
@@ -66,7 +70,7 @@ pub(super) fn spawn(parent: &mut ChildSpawnerCommands, loc: &Localization) {
                             height: Val::Px(1.0),
                             ..default()
                         },
-                        BackgroundColor(Color::srgba(0.6, 0.7, 0.8, 0.6)),
+                        BackgroundColor(palette.border),
                     ));
                 }
                 for index in 0..80 {
@@ -80,7 +84,7 @@ pub(super) fn spawn(parent: &mut ChildSpawnerCommands, loc: &Localization) {
                             height: Val::Px(3.0),
                             ..default()
                         },
-                        BackgroundColor(Color::srgb(0.5, 0.8, 1.0)),
+                        BackgroundColor(palette.accent),
                     ));
                 }
             });

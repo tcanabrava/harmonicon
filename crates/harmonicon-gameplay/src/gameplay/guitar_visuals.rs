@@ -669,8 +669,9 @@ pub(super) fn spawn_trainer_neck(
     parent: &mut ChildSpawnerCommands,
     guitar: &Guitar,
     loc: &harmonicon_platform::localization::Localization,
+    appearance: Appearance,
 ) -> Entity {
-    spawn_neck(parent, guitar, loc, 180.0, true, Appearance::Dark)
+    spawn_neck(parent, guitar, loc, 180.0, true, appearance)
 }
 
 fn spawn_neck(
@@ -1109,6 +1110,7 @@ mod trainer_guide_tests {
                 p,
                 &guitar,
                 &harmonicon_platform::localization::Localization::default(),
+                Appearance::Dark,
             );
         });
         app.update();

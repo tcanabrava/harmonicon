@@ -38,6 +38,7 @@ pub(crate) fn sync_teaching_score(
     target: Res<TrainerTarget>,
     loc: Res<Localization>,
     font: Option<Res<BravuraFont>>,
+    theme: Res<harmonicon_platform::theme::LoadedTheme>,
     slots: Query<(Entity, Option<&Children>), With<ScoreSlot>>,
     mut notes: ResMut<MusicScoreNotes>,
     signature: Option<ResMut<MusicScoreKeySignature>>,
@@ -54,7 +55,14 @@ pub(crate) fn sync_teaching_score(
         for (slot, children) in &slots {
             if children.is_none() {
                 commands.entity(slot).with_children(|p| {
-                    super::super::note_trainer::teaching::spawn_staff(p, &font, false, None, &loc);
+                    super::super::note_trainer::teaching::spawn_staff(
+                        p,
+                        &font,
+                        false,
+                        None,
+                        &loc,
+                        theme.0 == harmonicon_platform::theme::Appearance::Light,
+                    );
                 });
             }
         }

@@ -33,6 +33,7 @@ pub(crate) fn spawn_staff(
     piano: bool,
     kind: Option<harmonicon_core::instrument::InstrumentKind>,
     loc: &Localization,
+    light: bool,
 ) {
     parent
         .spawn(Node {
@@ -60,9 +61,11 @@ pub(crate) fn spawn_staff(
                 })
                 .with_children(|staff| {
                     if piano {
-                        harmonicon_ui::music_score::spawn_piano_score(staff, font);
+                        harmonicon_ui::music_score::spawn_themed_score(staff, font, true, light);
                     } else {
-                        let score = harmonicon_ui::music_score::spawn_music_score(staff, font);
+                        let score = harmonicon_ui::music_score::spawn_themed_score(
+                            staff, font, false, light,
+                        );
                         if let Some(kind) = kind {
                             harmonicon_ui::music_score::apply_instrument_clef(staff, score, kind);
                         }

@@ -45,6 +45,7 @@ pub(super) fn spawn_for_instrument(
     font: &BravuraFont,
     instrument: &Instrument,
     loc: &Localization,
+    palette: harmonicon_platform::theme::Palette,
 ) {
     let targets = harmonicon_core::note_trainer::drills(
         instrument,
@@ -77,8 +78,8 @@ pub(super) fn spawn_for_instrument(
             ));
             let area = harmonicon_ui::dialogs::scroll_area::spawn_scroll_area_xy(
                 panel,
-                Color::srgb(0.4, 0.55, 0.7),
-                Color::srgb(0.1, 0.12, 0.16),
+                palette.border,
+                palette.inset,
             );
             panel
                 .commands()
@@ -122,10 +123,27 @@ pub(super) fn spawn_for_instrument(
 #[derive(Component)]
 pub(crate) struct AutoLabel;
 
+/// The picker's colours in the current theme: (ink, unavailable ink,
+/// unavailable fill, target ink).
+fn picker_colors(theme: &harmonicon_platform::theme::LoadedTheme) -> (Color, Color, Color, Color) {
+    let palette = theme.palette();
+    if theme.0 == harmonicon_platform::theme::Appearance::Light {
+        (palette.text, palette.border, palette.inset.with_alpha(0.8), Color::srgb_u8(143, 99, 12))
+    } else {
+        (
+            Color::WHITE,
+            Color::srgb(0.32, 0.34, 0.40),
+            Color::srgba(0.04, 0.04, 0.06, 0.8),
+            Color::srgb(0.98, 0.82, 0.35),
+        )
+    }
+}
+
 pub(crate) fn update(
     mut commands: Commands,
     trainer: Res<NoteTrainer>,
     loc: Res<Localization>,
+    theme: Res<harmonicon_platform::theme::LoadedTheme>,
     mut choices: Query<(
         Entity,
         &PitchChoice,
@@ -137,6 +155,7 @@ pub(crate) fn update(
     buttons: Query<&Children, With<AutoLabel>>,
     mut texts: Query<&mut Text>,
 ) {
+    let (ink, unavailable_ink, unavailable_fill, target_ink) = picker_colors(&theme);
     let target = trainer.practice.drill().map(|d| d.target.round() as u8);
     let start = trainer.practice.drill().and_then(|d| d.start).map(|midi| midi.round() as u8);
     for (entity, pitch, mut fill, mut border, disabled) in &mut choices {
@@ -147,16 +166,16 @@ pub(crate) fn update(
             commands.entity(entity).insert(InteractionDisabled);
         }
         fill.0 = if !available {
-            Color::srgba(0.04, 0.04, 0.06, 0.8)
+            unavailable_fill
         } else if target == Some(pitch.0) {
             Color::srgba(0.95, 0.75, 0.24, 0.22)
         } else {
             Color::NONE
         };
         *border = BorderColor::all(if available && target == Some(pitch.0) {
-            Color::srgb(0.98, 0.82, 0.35)
+            target_ink
         } else if start == Some(pitch.0) {
-            Color::WHITE
+            ink
         } else {
             Color::NONE
         });
@@ -164,13 +183,13 @@ pub(crate) fn update(
     for (pitch, text, background) in &mut inks {
         let available = trainer.practice.drills.iter().any(|d| d.target.round() as u8 == pitch.0);
         let color = if start == Some(pitch.0) {
-            Color::WHITE
+            ink
         } else if !available {
-            Color::srgb(0.32, 0.34, 0.40)
+            unavailable_ink
         } else if target == Some(pitch.0) {
-            Color::srgb(0.98, 0.82, 0.35)
+            target_ink
         } else {
-            Color::WHITE
+            ink
         };
         if let Some(mut text) = text {
             text.0 = color;

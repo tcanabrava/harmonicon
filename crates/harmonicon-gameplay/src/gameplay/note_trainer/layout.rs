@@ -231,7 +231,7 @@ pub(crate) fn setup(
                         TextColor(Color::srgb(0.75, 0.85, 1.0)),
                     ));
                     if trainer.guitar().is_some() {
-                        bend::spawn(card, &loc);
+                        bend::spawn(card, &loc, theme.palette());
                         chords::spawn(card, &loc);
                     }
                     card.spawn((
@@ -323,6 +323,7 @@ pub(crate) fn setup(
                                         font,
                                         &trainer.instrument,
                                         &loc,
+                                        theme.palette(),
                                     );
                                 } else {
                                     teaching::spawn_staff(
@@ -331,6 +332,7 @@ pub(crate) fn setup(
                                         trainer.piano().is_some(),
                                         Some(trainer.instrument.kind()),
                                         &loc,
+                                        theme.0 == harmonicon_platform::theme::Appearance::Light,
                                     );
                                 }
                             });
@@ -357,7 +359,7 @@ pub(crate) fn setup(
         .with_children(|strip| {
             match (trainer.guitar(), trainer.flute(), trainer.piano()) {
                 (Some(guitar), _, _) => {
-                    let board = spawn_trainer_neck(strip, guitar, &loc);
+                    let board = spawn_trainer_neck(strip, guitar, &loc, theme.0);
                     selection::make_board_selectable(&mut strip.commands(), board);
                     strip.spawn((
                         chords::BoardHelp,
