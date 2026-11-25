@@ -4442,3 +4442,53 @@ fn switching_loading_and_undoing_back_to_flute_clear_piano_pitch_offsets() {
     history.undo(&mut flute);
     assert!(flute.row_visible(flute.notes[0].row()));
 }
+
+/// New runs as an observer, and Bevy only validates an observer's
+/// parameters when it first runs — so a parameter clash is invisible until a
+/// player clicks New. Trigger the real handler with a guitar chosen.
+#[test]
+fn new_starts_a_document_for_the_chosen_instrument() {
+    use bevy::asset::AssetPlugin;
+    use bevy::audio::AudioSource;
+    use bevy::prelude::*;
+    use bevy::ui_widgets::Activate;
+    use harmonicon_core::instrument::InstrumentKind;
+
+    #[derive(Resource, Default)]
+    struct Requested(Vec<super::state::InstrumentSelection>);
+
+    let mut app = App::new();
+    app.add_plugins((MinimalPlugins, AssetPlugin::default()))
+        .init_asset::<AudioSource>()
+        .add_message::<super::state::DocumentCommand>()
+        .add_message::<harmonicon_ui::dialogs::confirm_dialog::OpenConfirmDialog>()
+        .init_resource::<EditorState>()
+        .init_resource::<super::practice::PracticeState>()
+        .init_resource::<super::record::RecordState>()
+        .init_resource::<Playhead>()
+        .init_resource::<super::metronome::CountIn>()
+        .init_resource::<harmonicon_audio::pitch_detect::PitchRange>()
+        .init_resource::<harmonicon_audio::AudioSettings>()
+        .init_resource::<harmonicon_platform::localization::Localization>()
+        .init_resource::<super::document_picker::DocumentPicker>()
+        .init_resource::<Requested>()
+        .insert_resource(harmonicon_platform::settings::MyInstruments {
+            active: Some(InstrumentKind::Guitar),
+            ..default()
+        })
+        .add_systems(
+            Update,
+            |mut commands: MessageReader<super::state::DocumentCommand>,
+             mut requested: ResMut<Requested>| {
+                for command in commands.read() {
+                    if let super::state::DocumentCommand::New(selection) = command {
+                        requested.0.push(selection.clone());
+                    }
+                }
+            },
+        );
+    let button = app.world_mut().spawn_empty().observe(super::transport::new_document).id();
+    app.world_mut().trigger(Activate { entity: button });
+    app.update();
+    assert_eq!(app.world().resource::<Requested>().0, [InstrumentKind::Guitar.selection()]);
+}

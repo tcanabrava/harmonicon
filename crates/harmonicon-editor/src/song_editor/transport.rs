@@ -35,6 +35,30 @@ fn drop_folder(kind: &str) -> Option<std::path::PathBuf> {
     Some(if folder.is_dir() { folder } else { home })
 }
 
+/// New: stop whatever is running, then start a document for the chosen
+/// instrument. The document is read through `Transport`, which already
+/// holds `EditorState` mutably; a separate `Res<EditorState>` here would be
+/// a B0002 conflict the moment the observer runs.
+pub(super) fn new_document(
+    _: On<Activate>,
+    mut transport: Transport,
+    mine: Res<harmonicon_platform::settings::MyInstruments>,
+    mut picker: ResMut<super::document_picker::DocumentPicker>,
+    loc: Res<Localization>,
+    mut confirm: MessageWriter<OpenConfirmDialog>,
+    mut commands: Commands,
+) {
+    transport.stop_all();
+    super::document_picker::request_new(
+        mine.active(),
+        &transport.state,
+        &mut picker,
+        &loc,
+        &mut confirm,
+        &mut commands,
+    );
+}
+
 /// Chart file I/O — always visible, in both Edit and Perform mode. Save/Load
 /// both branch on `state.content_kind` for the dialog's title/extension/
 /// default name/start dir (`.harpchart` under `~/Harmonicon/songs`, vs.
@@ -55,24 +79,7 @@ pub(super) fn spawn_file_buttons(
         "+",
         style,
         colors.transport_load,
-        |_: On<Activate>,
-         mut transport: Transport,
-         state: Res<EditorState>,
-         mine: Res<harmonicon_platform::settings::MyInstruments>,
-         mut picker: ResMut<super::document_picker::DocumentPicker>,
-         loc: Res<Localization>,
-         mut confirm: MessageWriter<OpenConfirmDialog>,
-         mut commands: Commands| {
-            transport.stop_all();
-            super::document_picker::request_new(
-                mine.active(),
-                &state,
-                &mut picker,
-                &loc,
-                &mut confirm,
-                &mut commands,
-            );
-        },
+        new_document,
     );
     transport_button(
         panel,
