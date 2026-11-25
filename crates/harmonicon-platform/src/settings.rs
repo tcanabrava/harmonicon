@@ -175,6 +175,10 @@ impl BendingTrainerSettings {
 #[derive(Resource, Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct MyInstruments {
+    /// The instrument the player chose on the Select Instrument screen. Play,
+    /// Lessons, the Note Trainer and the Song Editor all use it; changing it
+    /// means going back to that screen. `None` until the first choice.
+    pub active: Option<harmonicon_core::instrument::InstrumentKind>,
     pub clarinet_key: Option<harmonicon_core::instrument::clarinet::ClarinetKey>,
     /// The guitar's tuning, by `harmonicon_core::instrument::guitar::Tuning`
     /// id (`"drop-d"`). An id no tuning has any more reads as `None`.
@@ -193,6 +197,11 @@ pub struct MyInstruments {
 }
 
 impl MyInstruments {
+    /// The chosen instrument, harmonica until the player has chosen one.
+    pub fn active(&self) -> harmonicon_core::instrument::InstrumentKind {
+        self.active.unwrap_or_default()
+    }
+
     /// Apply saved family settings at the inventory boundary, shared by trainer
     /// entry points. Unconfigured families retain their registered defaults.
     pub fn trainer_instrument(
@@ -688,11 +697,13 @@ mod tests {
         assert_eq!(older.my_instruments.guitar_tuning, None);
         assert_eq!(older.my_instruments.flute_foot, None);
         assert_eq!(older.my_instruments.flute_view, FluteView::Fingering);
+        assert_eq!(older.my_instruments.active(), harmonicon_core::instrument::InstrumentKind::Harmonica);
     }
 
     #[test]
     fn my_instruments_round_trip_through_the_settings_file() {
         let mine = MyInstruments {
+            active: Some(harmonicon_core::instrument::InstrumentKind::Flute),
             clarinet_key: Some(harmonicon_core::instrument::clarinet::ClarinetKey::A),
             cavaquinho_tuning: Some("cavaquinho-natural".into()),
             cavaquinho_capo: Some(0),
@@ -707,6 +718,7 @@ mod tests {
             serde_json::to_string(&Settings { my_instruments: mine.clone(), ..default() }).unwrap();
         assert!(json.contains(r#""flute_foot":"b""#), "{json}");
         assert!(json.contains(r#""flute_view":"notes""#), "{json}");
+        assert!(json.contains(r#""active":"flute""#), "{json}");
         let back: Settings = serde_json::from_str(&json).unwrap();
         assert_eq!(back.my_instruments, mine);
     }

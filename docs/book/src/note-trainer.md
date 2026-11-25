@@ -1,8 +1,9 @@
 # Note Trainer
 
-**Play → Note Trainer** asks which instrument you're practising.
-**Harmonica** opens the [Bending Trainer](bending-trainer.md); **Guitar**,
-**Bass**, **Flute**, and **Piano** open the Note Trainer described here. Like the Bending Trainer
+**Play → Note Trainer** opens on the instrument chosen on
+[Select Instrument](select-instrument.md). A harmonica gets the
+[Bending Trainer](bending-trainer.md); every other instrument gets the Note
+Trainer described here. Like the Bending Trainer
 it is practice, not a lesson: there is no song and nothing to fail.
 
 ![Note Trainer for the guitar](images/note-trainer-guitar.png)

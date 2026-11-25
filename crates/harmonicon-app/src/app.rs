@@ -302,6 +302,12 @@ impl WelcomeFlow {
     }
 }
 
+/// Whether the player has confirmed an instrument on the Select Instrument
+/// screen this session. Every launch opens on that screen (focused on the
+/// saved choice), and the rest of the menu is reached through it.
+#[derive(Resource, Default, Debug, Clone, Copy, PartialEq, Eq)]
+pub struct InstrumentConfirmed(pub bool);
+
 /// Set to `true` by the Credits screen (`AppState::Credits`) on every exit
 /// path so that returning to `AppState::Menu` lands on the Help/About page
 /// (where "Credits" lives) rather than the substate's own default of Main.

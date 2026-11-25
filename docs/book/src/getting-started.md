@@ -38,8 +38,11 @@ and songs** until they arrive. This needs an internet connection once; if it
 fails, the screen says why and offers **Retry**. After that the game starts
 straight away, and never updates them without asking you.
 
-The first time Harmonicon starts — before it has saved a profile — it opens
-on a welcome page instead of the main menu, with the three things worth
+Every launch starts on [Select Instrument](select-instrument.md): choose
+what you play, and the rest of the game follows that choice.
+
+The first time Harmonicon starts — before it has saved a profile — choosing
+an instrument leads to a welcome page instead of the main menu, with the three things worth
 doing before anything else: **Set up your microphone** (the Options page,
 with the device picker and the "no microphone" warning), **Take the guided
 tour**, and **Start with a lesson**. Each one brings you back here when

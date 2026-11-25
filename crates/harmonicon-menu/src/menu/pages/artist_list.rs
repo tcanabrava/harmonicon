@@ -31,9 +31,7 @@ use harmonicon_ui::dialogs::button::BaseButtonColor;
 use harmonicon_ui::dialogs::confirm_dialog::{ConfirmChosen, DialogId, OpenConfirmDialog};
 use harmonicon_ui::dialogs::text_input::spawn_text_input;
 
-mod instrument_filter;
 mod personal;
-pub(crate) use instrument_filter::refresh_instrument_filter;
 
 use personal::{
     PersonalRating, PersonalStat, mastery_label, personal_stat_cell, preferences, rating_cell,
@@ -191,11 +189,16 @@ pub(crate) fn setup_artist_list(
     theme: Res<LoadedTheme>,
     loc: Res<Localization>,
     mine: Res<harmonicon_platform::settings::MyInstruments>,
-    state: Res<SongPickerState>,
+    mut state: ResMut<SongPickerState>,
 ) {
     let palette = theme.palette();
+    // The list holds the instrument chosen on Select Instrument, and only it.
+    let active = Some(mine.active().slug().to_string());
+    if state.instrument_filter != active {
+        state.instrument_filter = active;
+    }
     let state = &*state;
-    let (content, header, root) =
+    let (content, header, _root) =
         spawn_menu_root_plain(&mut commands, &loc.msg("select-song"), None, &theme);
     commands.entity(content).insert(Node {
         width: Val::Percent(90.0),
@@ -218,31 +221,6 @@ pub(crate) fn setup_artist_list(
                 row_gap: {Val::Px(8.0)},
             }
         })
-        .id();
-    // Own the combobox's sibling backdrop separately so rebuilding its options
-    // also removes an open click catcher. Sized against the full page root.
-    let filter_overlay = commands
-        .spawn((
-            Node {
-                position_type: PositionType::Absolute,
-                width: Val::Percent(100.0),
-                height: Val::Percent(100.0),
-                left: Val::Px(0.0),
-                top: Val::Px(0.0),
-                ..default()
-            },
-            bevy::picking::Pickable::IGNORE,
-        ))
-        .id();
-    commands.entity(root).add_child(filter_overlay);
-    let instrument_filter = commands
-        .spawn((
-            instrument_filter::InstrumentFilterHost {
-                backdrop: filter_overlay,
-                choices: Vec::new(),
-            },
-            Node { width: Val::Percent(100.0), flex_shrink: 0.0, ..default() },
-        ))
         .id();
     let search_row = spawn_search_row(&mut commands, &loc, &state.query, palette);
     let empty = commands
@@ -316,7 +294,6 @@ pub(crate) fn setup_artist_list(
         .id();
     commands.entity(content).add_children(&[
         updates,
-        instrument_filter,
         search_row,
         empty,
         sort_row,
@@ -1099,22 +1076,11 @@ pub(crate) fn navigate_song_picker(
     mut focus_visible: ResMut<InputFocusVisible>,
     rows: Query<(Entity, &SongRow, &ComputedNode)>,
     inputs: Query<(), With<EditableText>>,
-    parents: Query<&ChildOf>,
-    instrument_controls: Query<(), With<instrument_filter::InstrumentFilterHost>>,
     mut areas: Query<(&ComputedNode, &mut ScrollPosition), With<SongPickerRows>>,
     mut state: ResMut<SongPickerState>,
 ) {
     if focus.get().is_some_and(|entity| inputs.contains(entity)) {
         return;
-    }
-    // A dropdown owns its navigation keys; keep the list shortcuts available
-    // after rating a song or using the other catalog controls.
-    let mut ancestor = focus.get();
-    while let Some(entity) = ancestor {
-        if instrument_controls.contains(entity) {
-            return;
-        }
-        ancestor = parents.get(entity).ok().map(ChildOf::parent);
     }
     let navigating = [KeyCode::ArrowDown, KeyCode::ArrowUp, KeyCode::Home, KeyCode::End]
         .iter()
@@ -1210,6 +1176,34 @@ pub(crate) fn update_picker_feedback(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_list_holds_only_the_chosen_instrument_and_still_searches() {
+        let mut songs = AvailableSongs::default();
+        songs.0.insert(
+            "artist".into(),
+            ["piano", "guitar", "guitar", "harmonica"]
+                .into_iter()
+                .enumerate()
+                .map(|(i, kind)| SongEntry {
+                    instrument: kind.into(),
+                    part: None,
+                    artist: "Artist".into(),
+                    name: format!("Song {i}"),
+                    genre: "Rock".into(),
+                    difficulty: "easy".into(),
+                    source_name: String::new(),
+                    retained: false,
+                    asset_path: format!("song-{i}"),
+                })
+                .collect(),
+        );
+        let profile = PlayerProfile::default();
+        let mut state = SongPickerState { instrument_filter: Some("guitar".into()), ..default() };
+        assert_eq!(collect_songs(&songs, &state, &profile).len(), 2);
+        state.query = "Song 2".into();
+        assert_eq!(collect_songs(&songs, &state, &profile)[0].asset_path, "song-2");
+    }
 
     #[test]
     fn row_click_selects_without_playing_and_hover_keeps_selection() {
@@ -1841,23 +1835,6 @@ mod tests {
         app.world_mut().resource_mut::<ButtonInput<KeyCode>>().press(KeyCode::ArrowUp);
         app.update();
         assert_eq!(app.world().resource::<InputFocus>().get(), Some(rows[1]));
-    }
-
-    #[test]
-    fn picker_navigation_does_not_steal_focus_from_the_instrument_control() {
-        let (mut app, _) = navigation_app();
-        let control = app.world_mut().spawn(WidgetButton).id();
-        let backdrop = app.world_mut().spawn_empty().id();
-        let host = app
-            .world_mut()
-            .spawn(instrument_filter::InstrumentFilterHost { backdrop, choices: vec![] })
-            .id();
-        app.world_mut().entity_mut(host).add_child(control);
-        app.world_mut().resource_mut::<InputFocus>().set(control, FocusCause::Navigated);
-        app.world_mut().resource_mut::<ButtonInput<KeyCode>>().press(KeyCode::ArrowDown);
-        app.update();
-        assert_eq!(app.world().resource::<InputFocus>().get(), Some(control));
-        assert!(app.world().resource::<SongPickerState>().selected.is_none());
     }
 
     #[test]

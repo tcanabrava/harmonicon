@@ -2,7 +2,8 @@
 
 **Play → Play Song** starts the scored song flow:
 
-1. **Select Song** — browse all downloaded songs and anything you've added to
+1. **Select Song** — browse the songs for the instrument chosen on
+   [Select Instrument](select-instrument.md): all downloaded songs and anything you've added to
    `~/Harmonicon/songs/` (see
    [Getting Started](getting-started.md#adding-your-own-content)). Click a column
    header to sort by song name, band, instrument, genre, difficulty, your

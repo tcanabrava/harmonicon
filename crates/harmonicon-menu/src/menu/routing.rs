@@ -22,6 +22,10 @@ use super::pages::tutorial;
 pub enum MenuPage {
     #[default]
     Main,
+    /// The grid of instruments, opened first on every launch and from the
+    /// main menu's instrument button. The choice is
+    /// `MyInstruments::active`, and every other page uses it.
+    InstrumentSelect,
     /// First-launch greeting: point the player at microphone setup, the
     /// guided tour, and a first lesson, instead of dropping them on `Main`
     /// with no indication that this game needs a working mic. Reached only
@@ -42,7 +46,7 @@ pub enum MenuPage {
     /// each unit's own lessons hanging below it, prerequisite edges drawn
     /// inside a unit (see `harmonicon-lessons`).
     LessonTree,
-    /// Choose an instrument before loading the lesson curriculum.
+    /// Loads the active instrument's curriculum, then opens the tree.
     LessonInstrument,
     /// One lesson's instructional page (+ Start for chart-backed lessons).
     LessonReader,
@@ -50,9 +54,6 @@ pub enum MenuPage {
     /// real song (`ArtistList`) or synthesize one (`JamGenerate`) — see
     /// `pages::jam_session::setup_jam_session_menu`.
     JamSessionMenu,
-    /// The "Note Trainer" choice on the Play menu: which instrument to
-    /// practise (`pages::note_trainer`).
-    NoteTrainerMenu,
     Tuner,
     /// Key/tempo picker for a synthesized Jam Session backing (see
     /// `harmonicon_jam::jam::backing`) — the no-existing-song alternative to
@@ -70,6 +71,7 @@ pub(crate) fn handle_menu_escape(
     keyboard: Res<ButtonInput<KeyCode>>,
     page: Res<State<MenuPage>>,
     mode: Res<GameplayMode>,
+    confirmed: Res<harmonicon_app::app::InstrumentConfirmed>,
     mut welcome: ResMut<harmonicon_app::app::WelcomeFlow>,
     mut next_page: ResMut<NextState<MenuPage>>,
 ) {
@@ -78,6 +80,9 @@ pub(crate) fn handle_menu_escape(
     }
     let target = match page.get() {
         MenuPage::Main => return,
+        // Before the first choice there is no menu behind this page.
+        MenuPage::InstrumentSelect if !confirmed.0 => return,
+        MenuPage::InstrumentSelect => MenuPage::Main,
         // Escape is the keyboard equivalent of the page's own "Skip for now".
         MenuPage::Welcome => MenuPage::Main,
         // Options and the lesson tree are two of the welcome flow's steps:
@@ -88,9 +93,11 @@ pub(crate) fn handle_menu_escape(
         MenuPage::LessonInstrument => {
             welcome.back_target(MenuPage::Play, MenuPage::Welcome, |w| w.lesson_done = true)
         }
-        MenuPage::LessonTree => MenuPage::LessonInstrument,
+        MenuPage::LessonTree => {
+            welcome.back_target(MenuPage::Play, MenuPage::Welcome, |w| w.lesson_done = true)
+        }
         MenuPage::Play | MenuPage::HelpAbout => MenuPage::Main,
-        MenuPage::JamSessionMenu | MenuPage::NoteTrainerMenu | MenuPage::Tuner => MenuPage::Play,
+        MenuPage::JamSessionMenu | MenuPage::Tuner => MenuPage::Play,
         MenuPage::ArtistList => match *mode {
             GameplayMode::JamSession => MenuPage::JamSessionMenu,
             GameplayMode::Play2D => MenuPage::Play,
@@ -126,6 +133,7 @@ pub(crate) fn route_menu_entry(
     lesson: Option<Res<harmonicon_song::lessons::LessonContext>>,
     generated_jam: Option<Res<harmonicon_app::app::GeneratedJamSession>>,
     mut first_run: ResMut<harmonicon_app::profile::FirstRun>,
+    confirmed: Res<harmonicon_app::app::InstrumentConfirmed>,
     mut ret_song: ResMut<ReturnToSongList>,
     mut ret_opts: ResMut<ReturnToOptions>,
     mut ret_play: ResMut<ReturnToPlay>,
@@ -158,6 +166,12 @@ pub(crate) fn route_menu_entry(
     // which would otherwise bounce straight back to Welcome and strand the
     // player. Consumed on the first pass, so returning to the menu later in
     // the same session lands on `Main` like any other visit.
+    // Every launch starts by choosing the instrument. `FirstRun` is left
+    // for the choice to consume, so a first launch still meets Welcome next.
+    if !confirmed.0 {
+        next_page.set(MenuPage::InstrumentSelect);
+        return;
+    }
     if first_run.0 {
         first_run.0 = false;
         next_page.set(MenuPage::Welcome);
@@ -207,6 +221,10 @@ mod tests {
     /// An app with every resource `route_menu_entry` reads, in `Menu` with
     /// the sub-state active, and the system wired to run once per `update`.
     fn routing_app(first_run: bool) -> App {
+        routing_app_with(first_run, true)
+    }
+
+    fn routing_app_with(first_run: bool, confirmed: bool) -> App {
         let mut app = App::new();
         app.add_plugins(StatesPlugin)
             .init_state::<AppState>()
@@ -217,6 +235,7 @@ mod tests {
             .init_resource::<ReturnToPlay>()
             .init_resource::<ReturnToHelpAbout>()
             .init_resource::<harmonicon_app::app::WelcomeFlow>()
+            .insert_resource(harmonicon_app::app::InstrumentConfirmed(confirmed))
             .add_systems(Update, route_menu_entry);
         app.world_mut().resource_mut::<NextState<AppState>>().set(AppState::Menu);
         app.update();
@@ -319,5 +338,35 @@ mod tests {
         assert!(!flow.mic_done);
         let (page, _) = escape_from(MenuPage::LessonInstrument, Default::default());
         assert_eq!(page, MenuPage::Play);
+        // The tree's Back skips the loading gate, which would reopen it.
+        let (page, _) = escape_from(MenuPage::LessonTree, Default::default());
+        assert_eq!(page, MenuPage::Play);
+    }
+
+    #[test]
+    fn every_launch_opens_on_the_instrument_screen_before_welcome() {
+        let mut app = routing_app_with(true, false);
+        app.update();
+        assert_eq!(current_page(&app), MenuPage::InstrumentSelect);
+        assert!(app.world().resource::<FirstRun>().0, "Welcome still follows the choice");
+    }
+
+    #[test]
+    fn escape_cannot_skip_the_first_instrument_choice() {
+        let flow_app = |confirmed| {
+            let mut app = routing_app_with(false, confirmed);
+            app.add_systems(Update, handle_menu_escape)
+                .init_resource::<ButtonInput<KeyCode>>()
+                .init_resource::<GameplayMode>();
+            app.world_mut().resource_mut::<NextState<MenuPage>>().set(MenuPage::InstrumentSelect);
+            app.update();
+            app.update();
+            app.world_mut().resource_mut::<ButtonInput<KeyCode>>().press(KeyCode::Escape);
+            app.update();
+            app.update();
+            current_page(&app)
+        };
+        assert_eq!(flow_app(false), MenuPage::InstrumentSelect);
+        assert_eq!(flow_app(true), MenuPage::Main);
     }
 }

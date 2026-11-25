@@ -51,6 +51,7 @@ impl Plugin for MenuPlugin {
             .init_resource::<ReturnToPlay>()
             .init_resource::<ReturnToHelpAbout>()
             .init_resource::<harmonicon_app::app::WelcomeFlow>()
+            .init_resource::<harmonicon_app::app::InstrumentConfirmed>()
             .init_resource::<TourActive>()
             // The Options, Calibration, Credits, and Theme pages own their own lifecycles.
             .add_plugins(pages::options::OptionsPlugin)
@@ -71,6 +72,11 @@ impl Plugin for MenuPlugin {
                 (scene::cleanup_menu, pages::welcome::persist_profile_on_welcome_exit),
             )
             .add_systems(OnExit(MenuPage::Main), scene::cleanup_menu)
+            .add_systems(
+                OnEnter(MenuPage::InstrumentSelect),
+                pages::instrument_select::setup_instrument_select,
+            )
+            .add_systems(OnExit(MenuPage::InstrumentSelect), scene::cleanup_menu)
             .add_systems(OnEnter(MenuPage::Play), pages::play::setup_play_menu)
             .add_systems(OnExit(MenuPage::Play), scene::cleanup_menu)
             .add_systems(OnEnter(MenuPage::ArtistList), pages::artist_list::setup_artist_list)
@@ -81,7 +87,6 @@ impl Plugin for MenuPlugin {
                     pages::artist_list::handle_song_delete,
                     pages::artist_list::refresh_song_updates,
                     pages::artist_list::focus_picker_search,
-                    pages::artist_list::refresh_instrument_filter,
                     pages::artist_list::refresh_song_picker,
                     pages::artist_list::navigate_song_picker,
                     pages::artist_list::update_picker_feedback,
@@ -113,11 +118,6 @@ impl Plugin for MenuPlugin {
                 pages::jam_session::setup_jam_session_menu,
             )
             .add_systems(OnExit(MenuPage::JamSessionMenu), scene::cleanup_menu)
-            .add_systems(
-                OnEnter(MenuPage::NoteTrainerMenu),
-                pages::note_trainer::setup_note_trainer_menu,
-            )
-            .add_systems(OnExit(MenuPage::NoteTrainerMenu), scene::cleanup_menu)
             .add_systems(
                 OnEnter(MenuPage::JamGenerate),
                 pages::jam_generate::setup_jam_generate_menu,

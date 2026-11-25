@@ -8,6 +8,10 @@ app-title = Harmonicon
 
 # Main menu
 menu-play = Play
+menu-instrument = Instrument: {$instrument}
+instrument-select-title = Select Instrument
+instrument-select-help = Choose what you play. Songs, lessons, the Note Trainer and the Song Editor all use it; come back here to change it.
+lesson-instrument-loading = Loading lessons…
 menu-options = Options
 menu-help = Help
 menu-credits = Credits
@@ -20,7 +24,6 @@ menu-create-song = Create Song
 jam-session = Jam Session
 bending-trainer = Bending Trainer
 note-trainer = Note Trainer
-note-trainer-harmonica = Harmonica — Bending Trainer
 note-trainer-guitar = Guitar
 note-trainer-guitar-title = Note Trainer — Guitar
 note-trainer-flute = Flute
@@ -781,7 +784,7 @@ options-input-lag-tooltip = Shift detected notes earlier/later to match your set
 tutorial-step = Step {$n} of {$total}
 tutorial-skip = Skip Tutorial
 tutorial-title-main = Main Menu
-tutorial-body-main = Your home base — head into Play, open Options, or find Help from here.
+tutorial-body-main = Your home base — change your instrument, head into Play, open Options, or find Help from here.
 tutorial-title-play = Play
 tutorial-body-play = Pick a real song, create one, start a jam, practice bends, or work through lessons — choose how you want to play.
 tutorial-title-mode-select = Song picker
@@ -799,7 +802,7 @@ tutorial-body-options = Volume, note style, and microphone calibration all live 
 tutorial-title-theme = Theme
 tutorial-body-theme = Pick a visual theme for the menus — swaps backgrounds and button style.
 tutorial-title-lessons = Lessons
-tutorial-body-lessons = Choose your instrument, then follow its lesson paths with explanations and short exercises.
+tutorial-body-lessons = Follow your instrument's lesson paths, with explanations and short exercises.
 tutorial-title-jam-generate = Generate Jam
 tutorial-body-jam-generate = Spin up an instant backing track in any key and tempo — no song required.
 tutorial-title-song-editor = Song Editor
@@ -1025,9 +1028,7 @@ editor-new = New
 
 editor-new-tooltip = Create a new musical document
 
-editor-new-title = New document
 
-editor-new-instrument-question = Which instrument is this document for?
 
 editor-new-replace-warning = Create a new document and discard the current notes and metadata? Save your work first if you want to keep it.
 editor-load-replace-warning = Open another file and discard the current notes and metadata? Save your work first if you want to keep it.
@@ -1101,12 +1102,10 @@ trainer-reference-playing = Reference playing — your input is not being assess
 
 trainer-pitch-pick-help = Choose a note on the score to repeat it · Tab and Enter work too · Dimmed notes are unavailable for this exercise. Gold: target · White outline: starting note.
 
-lesson-instrument-title = Lessons · Choose your instrument
-lesson-instrument-help = Choose what you play. Only that instrument’s lesson paths will be loaded.
-lesson-instrument-empty = No lessons are installed for this instrument yet. Choose another instrument, or add a lesson pack in Options → Lessons & songs.
+lesson-instrument-title = Lessons
+lesson-instrument-empty = No lessons are installed for this instrument yet. Choose another instrument on the main menu, or add a lesson pack in Options → Lessons & songs.
 lesson-tree-instrument-title = {$instrument} · Lesson paths
 
-song-instrument-all = All instruments
 
 song-instrument-bass = Bass
 editor-instrument-bass = Bass

@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: MIT
-//! Pick an instrument before reading its lesson manifests or translations.
+//! Load the chosen instrument's curriculum before opening the tree. The
+//! instrument is `MyInstruments::active`, picked on Select Instrument; this
+//! page only waits until its manifests and translations are read.
 use crate::{lesson_reader::SelectedLesson, lesson_tree};
 use bevy::ecs::system::SystemParam;
 use bevy::prelude::*;
@@ -8,6 +10,7 @@ use harmonicon_core::instrument::InstrumentKind;
 use harmonicon_menu::menu::{MenuPage, scene};
 use harmonicon_platform::lesson_selection::SelectedLessonInstrument;
 use harmonicon_platform::localization::{Localization, LocalizationExt};
+use harmonicon_platform::settings::MyInstruments;
 use harmonicon_platform::theme::LoadedTheme;
 use harmonicon_song::lessons::{AvailableLessons, LoadedLessonInstrument};
 
@@ -21,8 +24,9 @@ pub(crate) fn setup(
     mut lessons: ResMut<AvailableLessons>,
     theme: Res<LoadedTheme>,
     loc: Res<Localization>,
+    mine: Res<MyInstruments>,
 ) {
-    selection.0 = None;
+    selection.0 = Some(mine.active());
     lessons.0.clear();
     commands.insert_resource(SelectedLesson::default());
     commands.insert_resource(lesson_tree::CollapsedUnits::default());
@@ -37,21 +41,10 @@ pub(crate) fn setup(
         scene::spawn_menu_root(&mut commands, &loc.msg("lesson-instrument-title"), None, &theme);
     commands.entity(root).with_children(|parent| {
         parent.spawn((
-            Text::new(loc.msg("lesson-instrument-help").to_string()),
+            Text::new(loc.msg("lesson-instrument-loading").to_string()),
             TextFont { font_size: FontSize::Px(18.0), ..default() },
-            Node { max_width: Val::Px(620.0), margin: UiRect::bottom(Val::Px(16.0)), ..default() },
         ));
     });
-    for kind in InstrumentKind::ALL {
-        scene::spawn_button(
-            &mut commands,
-            root,
-            &loc.msg(&instrument_key(kind)),
-            move |_: On<Activate>, mut selection: ResMut<SelectedLessonInstrument>| {
-                selection.0 = Some(kind);
-            },
-        );
-    }
     scene::spawn_back_button(
         &mut commands,
         header,

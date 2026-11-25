@@ -437,10 +437,12 @@ checks chart/lesson/directory agreement and rejects prerequisites that cross
 instrument curricula; graph and unit-gate validation run per instrument.
 
 `SelectedLessonInstrument(None)` means no manifests or lesson translations
-are read. The chooser clears the previous catalog and tree navigation state.
-Selecting an instrument triggers catalog discovery and scoped translation
+are read. The instrument is the player's `MyInstruments::active`, chosen on
+the Select Instrument screen; `MenuPage::LessonInstrument` is only a loading
+gate. Entering it clears the previous catalog and tree navigation state and
+sets the selection, which triggers catalog discovery and scoped translation
 loading. The tree opens only after `LessonCatalogSet` and `LocalizationSet`
 have run for that selection. Returning from a lesson retains the selection;
-Back from the tree returns to the chooser. Pack updates reload the active
+Back from the tree returns to Play, past the gate, which would reopen it. Pack updates reload the active
 curriculum only. An installed pack’s metadata can still be inspected before
 selection, independently of loading its lessons.

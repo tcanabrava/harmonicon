@@ -2,8 +2,10 @@
 
 ![Harmonicon main menu](images/main-menu.png)
 
-The Main Menu is Harmonicon's home screen, with four buttons:
+The Main Menu is Harmonicon's home screen:
 
+- **Instrument: …** — names the instrument you chose and reopens
+  [Select Instrument](select-instrument.md) to change it.
 - **Play** — opens the [Play menu](play-menu.md): play a real song, create
   one, jam freely, practice bends, or work through the lessons.
 - **Options** — audio, note style, and microphone settings. See [Options](options.md).

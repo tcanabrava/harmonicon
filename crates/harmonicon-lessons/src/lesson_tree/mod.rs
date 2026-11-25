@@ -255,6 +255,7 @@ pub(crate) fn setup_lesson_tree(
 ) {
     let Some(kind) = curriculum.selection.0.filter(|kind| Some(*kind) == curriculum.loaded.0)
     else {
+        // Not loaded yet: the gate loads the chosen instrument and comes back.
         curriculum.page.set(MenuPage::LessonInstrument);
         return;
     };
@@ -469,8 +470,12 @@ fn next_available_lesson(nodes: &[PlacedNode]) -> Option<&PlacedNode> {
 
 /// Back to Play — or to Welcome when the tree was opened as the first-run
 /// "start with a lesson" step, so the player can take the next one.
-fn back_to_play(_: On<Activate>, mut page: ResMut<NextState<MenuPage>>) {
-    page.set(MenuPage::LessonInstrument);
+fn back_to_play(
+    _: On<Activate>,
+    mut page: ResMut<NextState<MenuPage>>,
+    mut welcome: ResMut<harmonicon_app::app::WelcomeFlow>,
+) {
+    page.set(welcome.back_target(MenuPage::Play, MenuPage::Welcome, |w| w.lesson_done = true));
 }
 
 /// A lesson dropped into `~/Harmonicon/lessons` while this page is open

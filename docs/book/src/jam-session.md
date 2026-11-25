@@ -5,10 +5,10 @@ the same way as [Playing a Song](playing-a-song.md), but instead of scored
 falling notes, you get an open 12-bar backing to improvise over, for as
 long as the chosen backing and Loop setting allow. Nothing is scored.
 
-You can jam on any instrument a song has a part for: the picker lists
-each part separately — *Ode to Joy — chart* for the harmonica, *Ode to
-Joy — guitar*, *Ode to Joy — flute* — and the screen draws the
-instrument you picked.
+You jam on the instrument chosen on
+[Select Instrument](select-instrument.md): the picker lists the songs with a
+part for it — *Ode to Joy — guitar* when the guitar is chosen — and the
+screen draws that instrument.
 
 By default the screen is a calm stage with one visual centre: the song
 title (and, on a harmonica, which harp to grab), the **Loop** toggle

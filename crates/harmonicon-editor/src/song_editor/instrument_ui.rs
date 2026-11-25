@@ -1,13 +1,11 @@
 // SPDX-License-Identifier: MIT
 //! Editor document capabilities and instrument-specific form adapters.
 //! Shared metadata, timing and file controls must not assume holes or breath.
-use super::state::{DocumentCommand, EditorState, HarmonicaKind, InstrumentSelection, Mode};
+use super::state::{EditorState, HarmonicaKind, InstrumentSelection};
 use bevy::prelude::*;
-use bevy::ui_widgets::Activate;
 use harmonicon_core::instrument::Instrument;
 use harmonicon_platform::localization::{Localization, LocalizationExt};
 use harmonicon_platform::theme::SongEditorColors;
-use harmonicon_ui::dialogs::button;
 
 pub(super) use harmonicon_core::instrument::InstrumentKind;
 pub(super) trait EditorInstrumentKind: Sized {
@@ -66,6 +64,24 @@ pub(super) fn sync_scopes(
     }
 }
 
+/// Names the document's instrument. It is fixed by Select Instrument, so
+/// the form shows it rather than offering a choice.
+#[derive(Component)]
+pub(super) struct DocumentInstrumentLabel;
+
+pub(super) fn sync_instrument_label(
+    state: Res<EditorState>,
+    loc: Res<Localization>,
+    mut labels: Query<&mut Text, With<DocumentInstrumentLabel>>,
+) {
+    let name = loc.msg(&InstrumentKind::of(&state.effective_instrument()).label()).to_string();
+    for mut text in &mut labels {
+        if text.0 != name {
+            text.0 = name.clone();
+        }
+    }
+}
+
 pub(super) fn spawn_selector(
     parent: &mut ChildSpawnerCommands,
     loc: &Localization,
@@ -77,9 +93,10 @@ pub(super) fn spawn_selector(
         TextColor(colors.label),
     ));
     parent.spawn((
-        Text::new(loc.msg("editor-instrument-select-empty").to_string()),
-        TextFont { font_size: FontSize::Px(13.0), ..default() },
+        Text::new(String::new()),
+        TextFont { font_size: FontSize::Px(16.0), ..default() },
         TextColor(colors.label),
+        DocumentInstrumentLabel,
     ));
     parent
         .spawn(Node {
@@ -95,35 +112,6 @@ pub(super) fn spawn_selector(
                 colors,
                 harmonicon_platform::settings::ActionButtonStyle::TextOnly,
             );
-        });
-    parent
-        .spawn(Node {
-            flex_direction: FlexDirection::Row,
-            flex_wrap: FlexWrap::Wrap,
-            column_gap: Val::Px(4.0),
-            row_gap: Val::Px(4.0),
-            ..default()
-        })
-        .with_children(|p| {
-            for kind in InstrumentKind::ALL {
-                p.spawn_empty().apply_scene(button::small(
-                    &loc.msg(&kind.label()),
-                    move |_: On<Activate>,
-                          state: Res<EditorState>,
-                          loc: Res<Localization>,
-                          mut feedback: ResMut<super::save_feedback::SaveFeedback>,
-                          mut commands: Commands| {
-                        if InstrumentKind::of(&state.effective_instrument()) == kind {
-                            return;
-                        }
-                        if !state.notes.is_empty() || state.mode != Mode::Edit {
-                            feedback.set(loc.msg("editor-instrument-select-empty"));
-                            return;
-                        }
-                        commands.write_message(DocumentCommand::SelectInstrument(kind.selection()));
-                    },
-                ));
-            }
         });
     parent.spawn((super::guitar_setup::GuitarSetup, Node::default()));
     parent.spawn((

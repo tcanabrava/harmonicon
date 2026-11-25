@@ -57,10 +57,21 @@ pub(super) fn spawn_file_buttons(
         colors.transport_load,
         |_: On<Activate>,
          mut transport: Transport,
-         mut picker: ResMut<super::document_picker::DocumentPicker>| {
+         state: Res<EditorState>,
+         mine: Res<harmonicon_platform::settings::MyInstruments>,
+         mut picker: ResMut<super::document_picker::DocumentPicker>,
+         loc: Res<Localization>,
+         mut confirm: MessageWriter<OpenConfirmDialog>,
+         mut commands: Commands| {
             transport.stop_all();
-            picker.open = true;
-            picker.initial = false;
+            super::document_picker::request_new(
+                mine.active(),
+                &state,
+                &mut picker,
+                &loc,
+                &mut confirm,
+                &mut commands,
+            );
         },
     );
     transport_button(

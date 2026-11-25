@@ -250,8 +250,10 @@ phases; `PLAN.md` has them in order.
   rows with a fingering chart under it for the note to play now and the
   next; a note view and a fingering view in the Song Editor; a C or B
   foot joint, asked for before each song.
-- **Your instrument before play**: the song list names each part's
-  instrument, and the page before a song asks for the harmonica's key and
+- **Your instrument before play**: every launch opens on Select
+  Instrument, and that one choice decides the songs listed, the lessons
+  loaded, the trainer opened and the editor's new documents. The page
+  before a song asks for the harmonica's key and
   type, the guitar's tuning or the flute's foot joint, and plays the chart
   on that answer, pitches kept.
 - **A Note Trainer** (in for the guitar and the flute; the harmonica keeps

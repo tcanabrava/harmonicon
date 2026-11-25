@@ -103,7 +103,10 @@ gates 1.0. In order:
   them, hidden from the pause menu), the Song Editor (note and
   fingering views) and the Note Trainer's flute tabs are in. Next:
   - a recorded corpus aimed at octave errors, before any detection tuning.
-- **Content and progress** (phase 5). In: "My instruments"
+- **Content and progress** (phase 5). In: one chosen instrument for the
+  whole game (`MyInstruments::active`, picked on the Select Instrument
+  screen every launch opens on; songs, lessons, the trainer and new editor
+  documents all follow it), "My instruments"
   (`settings::MyInstruments`: tuning, capo, foot joint and flute view, set
   in Options or on the pre-song page and remembered), song select showing
   each guitar or flute part's reach on that setup, and per-instrument

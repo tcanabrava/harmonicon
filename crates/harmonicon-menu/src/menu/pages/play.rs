@@ -1,12 +1,16 @@
 // SPDX-License-Identifier: MIT
 
 //! The Play menu: choose Play Song, Create Song, Jam Session, Note
-//! Trainer, or Lessons.
+//! Trainer, or Lessons — all on the instrument chosen on Select Instrument.
+//! The Note Trainer for a harmonica is the Bending Trainer.
 
 use bevy::prelude::*;
 use bevy::ui_widgets::Activate;
 
 use harmonicon_app::app::AppState;
+use harmonicon_core::instrument::InstrumentKind;
+use harmonicon_gameplay::gameplay::note_trainer::NoteTrainer;
+use harmonicon_platform::settings::MyInstruments;
 use harmonicon_platform::localization::{Localization, LocalizationExt};
 use harmonicon_platform::theme::LoadedTheme;
 
@@ -20,6 +24,22 @@ pub(super) fn open_song_picker(
 ) {
     *mode = harmonicon_app::app::GameplayMode::Play2D;
     page.set(MenuPage::ArtistList);
+}
+
+/// The trainer for the chosen instrument, with its saved setup.
+fn open_trainer(
+    _: On<Activate>,
+    mine: Res<MyInstruments>,
+    mut trainer: ResMut<NoteTrainer>,
+    mut state: ResMut<NextState<AppState>>,
+) {
+    let kind = mine.active();
+    if kind == InstrumentKind::Harmonica {
+        state.set(AppState::BendingTrainer);
+    } else {
+        trainer.choose(mine.trainer_instrument(kind));
+        state.set(AppState::NoteTrainer);
+    }
 }
 
 pub(crate) fn setup_play_menu(
@@ -42,14 +62,7 @@ pub(crate) fn setup_play_menu(
         &loc.msg("jam-session"),
         |_: On<Activate>, mut page: ResMut<NextState<MenuPage>>| page.set(MenuPage::JamSessionMenu),
     );
-    spawn_button(
-        &mut commands,
-        root,
-        &loc.msg("note-trainer"),
-        |_: On<Activate>, mut page: ResMut<NextState<MenuPage>>| {
-            page.set(MenuPage::NoteTrainerMenu)
-        },
-    );
+    spawn_button(&mut commands, root, &loc.msg("note-trainer"), open_trainer);
     spawn_button(
         &mut commands,
         root,

@@ -350,23 +350,34 @@ pub(super) struct TimeSignatureComboboxSlot;
 
 // ── Lifecycle systems ─────────────────────────────────────────────────────────
 
+/// Opens on the document left from the last visit when it has content;
+/// otherwise on a new one for the instrument chosen on Select Instrument.
+/// Leftover content for another instrument is offered for replacement, so
+/// the player's choice applies without discarding unsaved work unasked.
 pub(super) fn init_state(
     mut commands: Commands,
     existing: Option<Res<EditorState>>,
+    mine: Res<harmonicon_platform::settings::MyInstruments>,
     mut picker: ResMut<super::document_picker::DocumentPicker>,
+    loc: Res<Localization>,
+    mut confirm: MessageWriter<harmonicon_ui::dialogs::confirm_dialog::OpenConfirmDialog>,
 ) {
-    let fresh = existing.is_none()
-        || (!picker.chosen
-            && existing.as_ref().is_some_and(|state| !super::document_picker::has_content(state)));
-    if fresh {
-        picker.open = true;
-        picker.initial = true;
-    } else {
-        picker.chosen = true;
-        picker.open = false;
-    }
-    if existing.is_none() {
-        commands.insert_resource(EditorState::default());
+    use super::instrument_ui::EditorInstrumentKind;
+    let active = mine.active();
+    match existing {
+        Some(state) if super::document_picker::has_content(&state) => {
+            if super::instrument_ui::InstrumentKind::of(&state.effective_instrument()) != active {
+                super::document_picker::request_new(
+                    active,
+                    &state,
+                    &mut picker,
+                    &loc,
+                    &mut confirm,
+                    &mut commands,
+                );
+            }
+        }
+        _ => commands.insert_resource(super::document_picker::fresh(active.selection())),
     }
     commands.insert_resource(Playhead::default());
     commands.insert_resource(Scroll::default());

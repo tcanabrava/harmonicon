@@ -3,6 +3,7 @@
 [Introduction](introduction.md)
 
 - [Getting Started](getting-started.md)
+- [Select Instrument](select-instrument.md)
 - [The Main Menu](main-menu.md)
 - [The Play Menu](play-menu.md)
 - [Playing a Song](playing-a-song.md)

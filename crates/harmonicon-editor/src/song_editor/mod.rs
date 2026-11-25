@@ -176,7 +176,6 @@ impl Plugin for SongEditor2Plugin {
             Update,
             (
                 document_picker::handle_confirmation,
-                document_picker::sync_picker,
                 transport::load_after_confirmation,
             )
                 .chain()
@@ -300,6 +299,7 @@ impl Plugin for SongEditor2Plugin {
                         .run_if(resource_exists_and_changed::<state::EditorState>),
                     (
                         instrument_ui::sync_scopes,
+                        instrument_ui::sync_instrument_label,
                         legend::update_legend_visibility
                             .run_if(resource_exists_and_changed::<state::EditorState>),
                     )

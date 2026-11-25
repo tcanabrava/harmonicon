@@ -6,6 +6,10 @@ app-title = Harmonicon
 
 # Menú principal
 menu-play = Jugar
+menu-instrument = Instrumento: {$instrument}
+instrument-select-title = Elige el instrumento
+instrument-select-help = Elige lo que tocas. Las canciones, las lecciones, el Entrenador de Notas y el Editor de Canciones lo usan; vuelve aquí para cambiarlo.
+lesson-instrument-loading = Cargando lecciones…
 menu-options = Opciones
 menu-help = Ayuda
 menu-credits = Créditos
@@ -18,7 +22,6 @@ menu-create-song = Crear Canción
 jam-session = Sesión Jam
 bending-trainer = Entrenador de Bends
 note-trainer = Entrenador de Notas
-note-trainer-harmonica = Armónica — Entrenador de Bends
 note-trainer-guitar = Guitarra
 note-trainer-guitar-title = Entrenador de Notas — Guitarra
 note-trainer-flute = Flauta
@@ -779,7 +782,7 @@ options-input-lag-tooltip = Adelanta/retrasa las notas detectadas para ajustarse
 tutorial-step = Paso {$n} de {$total}
 tutorial-skip = Saltar Tutorial
 tutorial-title-main = Menú Principal
-tutorial-body-main = Tu base — ve a Jugar, abre Opciones o encuentra Ayuda desde aquí.
+tutorial-body-main = Tu base — cambia de instrumento, ve a Jugar, abre Opciones o encuentra Ayuda desde aquí.
 tutorial-title-play = Jugar
 tutorial-body-play = Elige una canción real, crea una, empieza una jam, practica bends o sigue las lecciones — elige cómo quieres jugar.
 tutorial-title-mode-select = Selector de canciones
@@ -797,7 +800,7 @@ tutorial-body-options = El volumen, el estilo de las notas y la calibración del
 tutorial-title-theme = Tema
 tutorial-body-theme = Elige un tema visual para los menús — cambia los fondos y el estilo de los botones.
 tutorial-title-lessons = Lecciones
-tutorial-body-lessons = Elige tu instrumento y sigue sus rutas de aprendizaje con explicaciones y ejercicios cortos.
+tutorial-body-lessons = Sigue las rutas de aprendizaje de tu instrumento, con explicaciones y ejercicios cortos.
 tutorial-title-jam-generate = Generar Jam
 tutorial-body-jam-generate = Genera una base instantánea en cualquier tono y tempo — sin necesidad de una canción.
 tutorial-title-song-editor = Editor de Canciones
@@ -1024,9 +1027,7 @@ editor-new = Nuevo
 
 editor-new-tooltip = Crear un documento musical nuevo
 
-editor-new-title = Nuevo documento
 
-editor-new-instrument-question = ¿Para qué instrumento es este documento?
 
 editor-new-replace-warning = ¿Crear un documento nuevo y descartar las notas y metadatos actuales? Guarda primero si deseas conservarlos.
 editor-load-replace-warning = ¿Abrir otro archivo y descartar las notas y metadatos actuales? Guarda primero si deseas conservarlos.
@@ -1100,12 +1101,10 @@ trainer-reference-playing = Sonando la referencia — tu entrada no se está eva
 
 trainer-pitch-pick-help = Elige una nota en la partitura para repetirla · También puedes usar Tab y Intro · Las notas atenuadas no están disponibles para este ejercicio. Dorado: objetivo · Contorno blanco: nota inicial.
 
-lesson-instrument-title = Lecciones · Elige tu instrumento
-lesson-instrument-help = Elige el instrumento que tocas. Solo se cargarán sus rutas de aprendizaje.
-lesson-instrument-empty = Todavía no hay lecciones instaladas para este instrumento. Elige otro o añade un paquete en Opciones → Lecciones y canciones.
+lesson-instrument-title = Lecciones
+lesson-instrument-empty = Todavía no hay lecciones instaladas para este instrumento. Elige otro en el menú principal o añade un paquete en Opciones → Lecciones y canciones.
 lesson-tree-instrument-title = {$instrument} · Rutas de aprendizaje
 
-song-instrument-all = Todos los instrumentos
 
 song-instrument-bass = Bajo
 editor-instrument-bass = Bajo

@@ -1,9 +1,9 @@
 # Lessons
 
-**Play → Lessons** first asks which instrument you play: harmonica, guitar,
-piano or flute. The game then loads only that instrument’s lessons and text.
-Use Back from the tree to choose another instrument. If no course is installed
-for your choice, the page says so and points to Options → Lessons & songs.
+**Play → Lessons** loads the lessons for the instrument chosen on
+[Select Instrument](select-instrument.md), and only those. To study another
+instrument, change it there. If no course is installed for it, the page says
+so and points to Options → Lessons & songs.
 
 The selected curriculum is drawn as a skill tree. Along the
 top runs a row of **unit** nodes — Unit 1, Unit 2, and so on — and each
