@@ -72,6 +72,12 @@ pub use meter_map::{BarPosition, MeterMap, MeterSegment};
 mod rests;
 pub use rests::{NotationRest, rests_between_notes};
 
+mod bar_map;
+pub use bar_map::MusicScoreBarMap;
+
+mod meter;
+pub use meter::{MusicScoreMeter, TIME_SIGNATURES, parse_time_signature};
+
 // ── Layout constants ──────────────────────────────────────────────────────
 
 /// Total height (px) of the score panel. `pub` so callers reserve this
@@ -293,137 +299,6 @@ pub struct MusicScoreSections(pub Vec<ScoreSection>);
 #[derive(Resource, Default)]
 pub struct MusicScoreSelection(pub Option<(f64, f64)>);
 
-/// Bar grid for the same score as [`MusicScoreNotes`]. Both callers provide
-/// their chart's meter map; gameplay uses the expanded performance chart.
-#[derive(Resource, Clone, Debug, PartialEq, Eq)]
-pub struct MusicScoreBarMap {
-    pub meter: MeterMap,
-    pub quarter_ticks: u32,
-}
-
-impl Default for MusicScoreBarMap {
-    fn default() -> Self {
-        Self { meter: MeterMap::constant("4/4", 12), quarter_ticks: 12 }
-    }
-}
-
-impl MusicScoreBarMap {
-    /// The bar boundaries in staff quarter-note beats. The first segment's
-    /// phase puts a pickup at the end of its otherwise silent first bar.
-    pub fn beats(&self, from: f64, to: f64) -> Vec<f64> {
-        if self.quarter_ticks == 0 || to < from {
-            return Vec::new();
-        }
-        let phase = self.meter.segments()[0].phase_ticks as f64;
-        let q = self.quarter_ticks as f64;
-        let start = ((from * q - phase).ceil().max(0.0)) as u64;
-        let end = ((to * q - phase).floor().max(0.0)) as u64;
-        self.meter
-            .bar_starts(start, end.saturating_add(1))
-            .into_iter()
-            .filter(|&(tick, _)| tick > 0)
-            .map(|(tick, _)| (tick as f64 + phase) / q)
-            .collect()
-    }
-
-    /// Turns a tick-based note into staff segments, tying it at every bar
-    /// boundary, including a meter change or a repeated passage boundary.
-    pub fn split_note(
-        &self,
-        start: u64,
-        end: u64,
-        midi: u8,
-        highlighted: bool,
-    ) -> Vec<NotationNote> {
-        let end = end.max(start.saturating_add(1));
-        let phase = self.meter.segments()[0].phase_ticks as f64;
-        let q = self.quarter_ticks.max(1) as f64;
-        let mut boundaries = self.meter.bar_starts(start.saturating_add(1), end);
-        boundaries.push((end, 0));
-        let mut previous = start;
-        boundaries
-            .into_iter()
-            .enumerate()
-            .map(|(index, (tick, _))| {
-                let note = NotationNote {
-                    spelling: None,
-                    start_beat: (previous as f64 + phase) / q,
-                    duration_beats: (tick - previous) as f64 / q,
-                    midi,
-                    tied_from_previous: index > 0,
-                    highlighted,
-                };
-                previous = tick;
-                note
-            })
-            .collect()
-    }
-}
-
-#[cfg(test)]
-mod bar_map_tests {
-    use super::*;
-
-    #[test]
-    fn bar_lines_follow_meter_changes_and_do_not_duplicate_the_opening() {
-        let bars = MusicScoreBarMap {
-            meter: MeterMap::new([(0, "4/4"), (48, "3/4")], 12),
-            quarter_ticks: 12,
-        };
-        assert_eq!(bars.beats(0.0, 11.0), vec![4.0, 7.0, 10.0]);
-    }
-
-    #[test]
-    fn pickup_and_window_edges_keep_the_bar_line_at_the_right_beat() {
-        let bars = MusicScoreBarMap {
-            meter: MeterMap::with_pickup([(0, "4/4")], 12, 12),
-            quarter_ticks: 12,
-        };
-        assert_eq!(bars.beats(0.0, 8.0), vec![4.0, 8.0]);
-        assert_eq!(bars.beats(4.0, 4.0), vec![4.0]);
-    }
-
-    #[test]
-    fn a_mid_bar_meter_change_is_a_line_and_a_tie_boundary() {
-        let bars = MusicScoreBarMap {
-            meter: MeterMap::new([(0, "4/4"), (42, "3/4")], 12),
-            quarter_ticks: 12,
-        };
-        assert_eq!(bars.beats(0.0, 7.0), vec![3.5, 6.5]);
-        let parts = bars.split_note(36, 54, 60, false);
-        assert_eq!(parts.iter().map(|n| n.start_beat).collect::<Vec<_>>(), vec![3.0, 3.5]);
-        assert!(parts[1].tied_from_previous);
-    }
-
-    #[test]
-    fn a_short_pause_widens_the_staff_until_its_rest_fits() {
-        let bars = MusicScoreBarMap::default();
-        let notes = vec![
-            NotationNote {
-                spelling: None,
-                start_beat: 0.0,
-                duration_beats: 1.0,
-                midi: 60,
-                tied_from_previous: false,
-                highlighted: false,
-            },
-            NotationNote {
-                spelling: None,
-                start_beat: 1.25,
-                duration_beats: 1.0,
-                midi: 62,
-                tied_from_previous: false,
-                highlighted: true,
-            },
-        ];
-        let rests = rests_between_notes(&notes, &bars);
-        assert_eq!(rests.len(), 1);
-        let scale = score_pixels_per_beat(&notes, &bars);
-        assert!(scale > 68.0);
-        assert!(rests[0].fits_slot(scale, STAFF_LINE_SPACING));
-    }
-}
-
 /// How wide one beat is drawn, for the song currently loaded.
 ///
 /// Derived once per song from its note density and rests rather than fixed,
@@ -465,112 +340,6 @@ fn score_pixels_per_beat(notes: &[NotationNote], bar_map: &MusicScoreBarMap) -> 
         .map(|rest| rest.required_pixels_per_beat(STAFF_LINE_SPACING))
         .fold(PIXELS_PER_BEAT, f32::max);
     note_scale.max(rest_scale.ceil()).min(MAX_PIXELS_PER_BEAT)
-}
-
-/// The staff's meter: what the time signature at the head reads. Bar lines
-/// come from [`MusicScoreBarMap`]. Written by whichever bridge is driving the
-/// staff; [`Default`] is 4/4, matching what every caller assumed back when
-/// the module had no meter at all.
-#[derive(Resource, Clone, Copy, PartialEq, Eq, Debug)]
-pub struct MusicScoreMeter {
-    pub numerator: u8,
-    pub denominator: u8,
-}
-
-impl Default for MusicScoreMeter {
-    fn default() -> Self {
-        Self { numerator: 4, denominator: 4 }
-    }
-}
-
-impl MusicScoreMeter {
-    /// Quarter-note beats per bar — the unit [`NotationNote::start_beat`]
-    /// counts in, so a 6/8 bar is 3 quarter-note beats, not 6.
-    pub fn beats_per_bar(self) -> f64 {
-        self.numerator as f64 * 4.0 / self.denominator.max(1) as f64
-    }
-
-    /// Ticks spanned by one beat *of this meter* — the unit its upper
-    /// number counts, so an eighth in 7/8 and a quarter in 4/4 — given
-    /// `quarter_ticks` ticks to a quarter note.
-    ///
-    /// Exact or nothing, unlike [`beats_per_bar`](Self::beats_per_bar),
-    /// whose `f64` the Song Editor had to round to a whole number of
-    /// quarters: a 7/8 bar is 3.5 of them, so rounding put its bar line
-    /// half a beat out. `None` when the meter's beat isn't a whole number
-    /// of ticks (a 32nd-note beat at 12 ticks to the quarter would be 1.5),
-    /// which is why [`TIME_SIGNATURES`] stops at /16.
-    pub fn ticks_per_beat(self, quarter_ticks: u32) -> Option<u32> {
-        let whole_note = quarter_ticks.checked_mul(4)?;
-        let denominator = u32::from(self.denominator);
-        (denominator > 0 && whole_note.is_multiple_of(denominator))
-            .then(|| whole_note / denominator)
-    }
-
-    /// Ticks spanned by one bar. `None` under the same conditions as
-    /// [`ticks_per_beat`](Self::ticks_per_beat).
-    pub fn ticks_per_bar(self, quarter_ticks: u32) -> Option<u32> {
-        self.ticks_per_beat(quarter_ticks)?.checked_mul(u32::from(self.numerator))
-    }
-
-    /// Seconds spanned by one beat *of this meter* at `bpm` quarter notes a
-    /// minute — an eighth's worth in 7/8, a quarter's in 4/4, a half's in
-    /// 2/2.
-    ///
-    /// `bpm` counts quarter notes because that's what a chart's `tempo_bpm`
-    /// means everywhere else (`harmonicon_core::chart::tick_to_seconds`
-    /// converts `ticks / resolution` quarters at `60 / bpm` seconds each).
-    /// This is the one place a metronome should get its beat length from:
-    /// a click driven by `60 / bpm` directly clicks quarters whatever the
-    /// meter, and a 3/8 bar is one and a half of those — its downbeat
-    /// never lands on a click at all.
-    pub fn beat_secs(self, bpm: f64) -> f64 {
-        60.0 / bpm.max(f64::EPSILON) * 4.0 / f64::from(self.denominator.max(1))
-    }
-
-    /// Seconds spanned by one bar at `bpm` quarter notes a minute.
-    pub fn bar_secs(self, bpm: f64) -> f64 {
-        self.beat_secs(bpm) * f64::from(self.numerator)
-    }
-}
-
-/// The meters the Song Editor offers, commonest first.
-///
-/// A fixed list rather than a free-text field because a time signature is
-/// not two arbitrary numbers: the lower one names a *note value*, and note
-/// values come from halving a whole note (1, 2, 4, 8, 16, …), so only a
-/// power of two can appear there. Typing `4/3` asks for four thirds of a
-/// whole note, which standard notation has no symbol for — and since
-/// [`parse_time_signature`] only rejects what won't parse at all, such a
-/// string would be silently rounded into a bar length that matches nothing.
-/// Offering the real ones makes that unrepresentable.
-///
-/// Not exhaustive, and not meant to be — an exhaustive list is every
-/// numerator crossed with five denominators, far too many to pick from.
-/// `meters_are_all_well_formed` is what keeps this honest.
-pub const TIME_SIGNATURES: [&str; 10] =
-    ["4/4", "3/4", "2/4", "2/2", "6/8", "9/8", "12/8", "5/4", "7/8", "5/8"];
-
-/// Parses `"6/8"` into its two halves — **the only place in the tree that
-/// reads a time-signature string.** Everything that needs a bar length,
-/// beat count or beat duration asks the returned [`MusicScoreMeter`]
-/// rather than parsing the string itself: `gameplay::bars::chart_meter`
-/// for a chart, `EditorState::meter` for the editor. Taking the numerator
-/// alone as a beat count would give six for a 6/8 bar that is three
-/// quarters long.
-///
-/// Anything unparseable falls back to 4/4 rather than failing — a chart
-/// already on disk with a malformed signature should still open, costing
-/// a wrong staff head rather than a crash. What a *user* can enter is
-/// constrained upstream by [`TIME_SIGNATURES`].
-pub fn parse_time_signature(s: &str) -> MusicScoreMeter {
-    let mut parts = s.split('/');
-    let numerator = parts.next().and_then(|n| n.trim().parse().ok());
-    let denominator = parts.next().and_then(|d| d.trim().parse().ok());
-    match (numerator, denominator) {
-        (Some(n), Some(d)) if n > 0 && d > 0 => MusicScoreMeter { numerator: n, denominator: d },
-        _ => MusicScoreMeter::default(),
-    }
 }
 
 /// The current "now" position, in the same beat units as

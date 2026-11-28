@@ -104,6 +104,7 @@ Open work: `PLAN.md` (ordered), `TODO.md`, `ROADMAP.md`. Designs: `docs/*_plan.m
 - `crates/harmonicon-core/src/instrument/adapters/harmonica.rs` (24) — (no `//!` header)
 - `crates/harmonicon-core/src/instrument/adapters/mod.rs` (75) — Family registration and presentation metadata.
 - `crates/harmonicon-core/src/instrument/adapters/piano.rs` (24) — (no `//!` header)
+- `crates/harmonicon-core/src/instrument/adapters/voice.rs` (35) — (no `//!` header)
 - `crates/harmonicon-core/src/instrument/adapters/wind_family.rs` (46) — (no `//!` header)
 - `crates/harmonicon-core/src/instrument/bass.rs` (116) — Fretted electric bass presets, highest string first.
 - `crates/harmonicon-core/src/instrument/bowed_strings.rs` (338) — Bowed, fretless strings.
@@ -115,6 +116,7 @@ Open work: `PLAN.md` (ordered), `TODO.md`, `ROADMAP.md`. Designs: `docs/*_plan.m
 - `crates/harmonicon-core/src/instrument/guitar/fingering.rs` (165) — Choosing where a whole part is played on the neck.
 - `crates/harmonicon-core/src/instrument/piano.rs` (79) — A piano: a keyboard of so many keys, every key one pitch.
 - `crates/harmonicon-core/src/instrument/substitute.rs` (398) — A chart played on the instrument the player holds rather than the one it was written for: a guitar in another tuning, a flute with the other foot joi…
+- `crates/harmonicon-core/src/instrument/voice.rs` (137) — A singing voice.
 - `crates/harmonicon-core/src/instrument/wind.rs` (195) — Shared wind fingering vocabulary.
 - `crates/harmonicon-core/src/lib.rs` (40) — Harmonicon's pure-logic core: no Bevy, no ECS, no I/O beyond a couple of plain file writes.
 - `crates/harmonicon-core/src/lyrics.rs` (300) — A chart's lyrics as karaoke lines: which syllables make up each line, and how far through them the singer is at a given moment.
@@ -203,6 +205,7 @@ Open work: `PLAN.md` (ordered), `TODO.md`, `ROADMAP.md`. Designs: `docs/*_plan.m
 - `crates/harmonicon-editor/src/song_editor/ui.rs` (1095) — (no `//!` header)
 - `crates/harmonicon-editor/src/song_editor/undo.rs` (435) — Undo/redo for the note grid — `Ctrl+Z`/`Ctrl+Y` (see `interaction::handle_undo_redo`) step through a history of the editor's *content*: notes, timing…
 - `crates/harmonicon-editor/src/song_editor/view_scroll.rs` (598) — Everything that moves the Song Editor's *view* rather than its content: the grid's horizontal pan (keys, wheel, the scrollbar and its markers), the t…
+- `crates/harmonicon-editor/src/song_editor/voice_note.rs` (171) — Adapter for sung notes on the shared grid, the counterpart of `piano_note.rs`.
 - `crates/harmonicon-editor/src/song_editor/waveform.rs` (229) — Displays the chart's referenced music file (`EditorState::music`) as a peak-amplitude waveform in the grid header, aiding alignment of notes and temp…
 
 ### harmonicon-gameplay
@@ -429,7 +432,7 @@ Open work: `PLAN.md` (ordered), `TODO.md`, `ROADMAP.md`. Designs: `docs/*_plan.m
 - `crates/harmonicon-ui/src/music_score/full_score.rs` (202) — The paused full score: the whole song's notation laid out at once, which unlike the live staff never follows the playhead (its parent viewport scroll…
 - `crates/harmonicon-ui/src/music_score/key_signature.rs` (102) — A fixed key-signature strip, shared by live scores and the paused full score.
 - `crates/harmonicon-ui/src/music_score/meter_map.rs` (421) — Where the bars fall when the meter changes mid-piece.
-- `crates/harmonicon-ui/src/music_score/mod.rs` (1521) — A scrolling music-notation staff, rendered with the Bravura SMuFL font — shared by the Song Editor and Play 2D, both of which spawn `spawn_music_scor…
+- `crates/harmonicon-ui/src/music_score/mod.rs` (1290) — A scrolling music-notation staff, rendered with the Bravura SMuFL font — shared by the Song Editor and Play 2D, both of which spawn `spawn_music_scor…
 - `crates/harmonicon-ui/src/music_score/notation.rs` (1633) — The staff's decisions, with no Bevy in them: which clef the music wants, where a pitch sits on that clef, which notehead a duration takes, where bar…
 - `crates/harmonicon-ui/src/music_score/note_glyphs.rs` (213) — Rendering for a single notation note and its marks.
 - `crates/harmonicon-ui/src/music_score/pitch_picker.rs` (257) — Static pitch choices reuse the score's engraving without its song resources.
