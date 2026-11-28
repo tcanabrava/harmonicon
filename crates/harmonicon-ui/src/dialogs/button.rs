@@ -47,14 +47,25 @@ struct ButtonInteractionState {
 /// [`brighten`]/[`darken`] rather than a flat per-channel add/subtract, so
 /// the hover/press tint stays proportionally consistent regardless of how
 /// bright or dark a given button's own base color is.
+///
+/// Keeps `c`'s alpha, so a translucent button stays translucent.
 fn mix_toward(c: Color, target: Color, t: f32) -> Color {
     let a = c.to_srgba();
     let b = target.to_srgba();
-    Color::srgb(
+    Color::srgba(
         a.red + (b.red - a.red) * t,
         a.green + (b.green - a.green) * t,
         a.blue + (b.blue - a.blue) * t,
+        a.alpha,
     )
+}
+
+/// The hover or press tint for a button with no resting fill (a note on a
+/// staff, a link-like row): a veil of the theme's text colour, which is
+/// dark on the light theme and light on the dark one, over whatever the
+/// button sits on.
+fn veil(text: Color, pressed: bool) -> Color {
+    text.with_alpha(if pressed { 0.22 } else { 0.12 })
 }
 
 /// Hover tint: a base color mixed toward white.
@@ -138,10 +149,11 @@ fn apply_button_visuals(
             continue;
         }
         let base = if base.0 == color_default() { palette.control } else { base.0 };
+        let clear = base.alpha() == 0.0;
         let color = if interaction.pressed {
-            darken(base)
+            if clear { veil(palette.text, true) } else { darken(base) }
         } else if interaction.hovered {
-            brighten(base)
+            if clear { veil(palette.text, false) } else { brighten(base) }
         } else {
             base
         };
@@ -336,5 +348,29 @@ mod tests {
         world.get_mut::<BaseButtonColor>(button).unwrap().0 = CHOICE_SELECTED;
         schedule.run(&mut world);
         assert_eq!(background(&world, button), brighten(CHOICE_SELECTED));
+    }
+
+    /// A transparent button hovers as a faint veil of the theme's text,
+    /// never an opaque block, and a translucent one keeps its alpha.
+    #[test]
+    fn a_button_without_a_fill_hovers_as_a_veil() {
+        let mut world = World::new();
+        let mut schedule = Schedule::default();
+        schedule.add_systems(apply_button_visuals);
+        let button = world
+            .spawn((
+                BaseButtonColor(Color::NONE),
+                ButtonInteractionState { hovered: true, pressed: false },
+                BackgroundColor(Color::NONE),
+            ))
+            .id();
+        schedule.run(&mut world);
+        let hovered = background(&world, button);
+        assert!(hovered.alpha() > 0.0 && hovered.alpha() < 0.3, "{hovered:?}");
+        let text = harmonicon_platform::theme::Appearance::Dark.palette().text;
+        assert_eq!(hovered, text.with_alpha(hovered.alpha()));
+
+        let translucent = Color::srgba(0.2, 0.4, 0.6, 0.5);
+        assert_eq!(brighten(translucent).alpha(), 0.5);
     }
 }

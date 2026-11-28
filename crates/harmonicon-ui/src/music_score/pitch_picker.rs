@@ -5,6 +5,10 @@ use bevy::input_focus::tab_navigation::TabIndex;
 use bevy::ui_widgets::Button;
 use harmonicon_core::midi::midi_to_note;
 
+/// A drawn mark of one pitch choice (notehead, accidental, stem, ledger,
+/// name) for the caller to ink. Only on marks: a caller paints a marked
+/// node's `BackgroundColor`, and an invisible container painted that way
+/// still reads as the glyphs' background to the theme's contrast pass.
 #[derive(Component)]
 pub struct PitchChoiceInk(pub u8);
 
@@ -90,7 +94,6 @@ pub fn spawn_written_pitch_choices_in_clef(
                                 ..default()
                             },
                             bevy::picking::Pickable::IGNORE,
-                            PitchChoiceInk(midi),
                         ))
                         .with_children(|marks| {
                             let step = staff_step(written, clef);
@@ -224,5 +227,31 @@ mod tests {
             .unwrap();
         assert_eq!(head.0, glyph::NOTEHEAD_BLACK);
         assert_eq!(node.top, Val::Px(y_for_step(4) - GLYPH_BASELINE_CORRECTION));
+    }
+
+    /// Every inked entity is a glyph or a visible rule, never the
+    /// zero-width container the glyphs hang from.
+    #[test]
+    fn only_drawn_marks_take_ink() {
+        let mut app = App::new();
+        app.world_mut().commands().spawn(Node::default()).with_children(|parent| {
+            spawn_written_pitch_choices_in_clef(
+                parent,
+                &BravuraFont(Handle::default()),
+                &[(48, 48), (49, 49)],
+                Clef::Bass,
+            );
+        });
+        app.world_mut().flush();
+        let world = app.world_mut();
+        let inked: Vec<_> = world
+            .query_filtered::<(Has<Text>, &Node), With<PitchChoiceInk>>()
+            .iter(world)
+            .map(|(text, node)| (text, node.width))
+            .collect();
+        assert!(!inked.is_empty());
+        for (text, width) in inked {
+            assert!(text || width != Val::Px(0.0), "an inked container");
+        }
     }
 }
