@@ -350,6 +350,16 @@
             "type": { "type": "string", "enum": ["piano"] },
             "keys": { "type": "integer", "enum": [88, 76, 61, 49] }
           }
+        },
+        {
+          "type": "object",
+          "description": "A singing voice (format 1.17.0). range is its choral classification, deciding the comfortable notes: soprano C4–A5, mezzo A3–F5, alto F3–D5, tenor C3–A4 (the default), baritone A2–F4, bass E2–E4. Its events name only their note, with optional vibrato.",
+          "required": ["type"],
+          "additionalProperties": false,
+          "properties": {
+            "type": { "type": "string", "enum": ["voice"] },
+            "range": { "type": "string", "enum": ["soprano", "mezzo", "alto", "tenor", "baritone", "bass"] }
+          }
         }
       ]
     },

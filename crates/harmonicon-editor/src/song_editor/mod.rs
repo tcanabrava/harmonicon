@@ -86,6 +86,7 @@ mod transpose;
 mod ui;
 mod undo;
 mod view_scroll;
+mod voice_note;
 mod waveform;
 
 // ── Dialog purposes ───────────────────────────────────────────────────────────

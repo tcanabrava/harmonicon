@@ -104,6 +104,7 @@ pub fn instrument_problems(chart: &HarpChart) -> Vec<String> {
                     .err()
                     .map(|_| "invalid bowed-string placement or technique".to_string()),
                 Instrument::Piano(piano) => piano_event_problem(piano, event),
+                Instrument::Voice(voice) => voice_event_problem(voice, event),
             };
             problems.extend(problem.map(|p| format!("{at}: {p}")));
         }
@@ -265,6 +266,30 @@ fn wind_event_problem(chart: &dyn FingeringChart, name: &str, event: &NoteEvent)
         }
         None => Some(format!("{note} has no fingering {alternate}")),
     }
+}
+
+fn voice_event_problem(
+    voice: &crate::instrument::voice::SingingVoice,
+    event: &NoteEvent,
+) -> Option<String> {
+    if event.hole.is_some()
+        || event.action.is_some()
+        || event.position.is_some()
+        || event.fingering.is_some()
+    {
+        return Some("a sung event names only its note".to_string());
+    }
+    let Some(note) = event.note.as_deref() else {
+        return Some("a sung event needs its note".to_string());
+    };
+    if let Some(other) = modifiers(event).iter().find(|m| !matches!(m, Modifier::Vibrato { .. })) {
+        return Some(format!("a voice has no {other:?}"));
+    }
+    let Some(midi) = note_to_midi(note).and_then(|m| u8::try_from(m).ok()) else {
+        return Some(format!("{note} is not a note"));
+    };
+    (!voice.has(midi))
+        .then(|| format!("{note} is outside a {} range", voice.voice_type.slug()))
 }
 
 fn piano_event_problem(

@@ -243,6 +243,10 @@ pub fn to_chart(
             let (items, report) = piano_items(&notes, piano);
             (items, report, likely_key(&notes))
         }
+        Instrument::Voice(voice) => {
+            let (items, report) = voice_items(&notes, voice);
+            (items, report, likely_key(&notes))
+        }
     };
     let mut chart = chart_shell(score, artist, key, items);
     if let Instrument::Harmonica(harp) = instrument {
@@ -477,6 +481,45 @@ fn piano_items(
         }
         report.natural += 1;
         items.push(item(note, NoteEvent::keyed(midi_to_note(i32::from(note.midi)))));
+    }
+    (items, report)
+}
+
+/// A track sung by `voice`: one note at a time, so of notes starting
+/// together only the highest (the melody, in a chord) is kept, and the
+/// whole part moves by the whole octaves that put the most of it inside the
+/// voice's range, as a singer would take a line written for another voice.
+fn voice_items(
+    notes: &[ScoreNote],
+    voice: &harmonicon_core::instrument::voice::SingingVoice,
+) -> (Vec<TrackItem>, ConversionReport) {
+    let mut melody: Vec<&ScoreNote> = Vec::new();
+    for note in notes {
+        match melody.last_mut() {
+            Some(last) if (last.start_secs - note.start_secs).abs() < 1e-6 => {
+                if note.midi > last.midi {
+                    *last = note;
+                }
+            }
+            _ => melody.push(note),
+        }
+    }
+    let shifted = |midi: u8, octaves: i32| u8::try_from(i32::from(midi) + 12 * octaves).ok();
+    let reached = |octaves: i32| {
+        melody.iter().filter(|n| shifted(n.midi, octaves).is_some_and(|m| voice.has(m))).count()
+    };
+    let octaves = (-3..=3).max_by_key(|&k: &i32| (reached(k), -k.abs())).unwrap_or(0);
+    let mut report = ConversionReport { total: notes.len(), ..Default::default() };
+    report.unreachable = notes.len() - melody.len();
+    let mut items = Vec::new();
+    for note in melody {
+        match shifted(note.midi, octaves).filter(|&m| voice.has(m)) {
+            Some(midi) => {
+                report.natural += 1;
+                items.push(item(note, NoteEvent::keyed(midi_to_note(i32::from(midi)))));
+            }
+            None => report.unreachable += 1,
+        }
     }
     (items, report)
 }

@@ -1,15 +1,17 @@
 // SPDX-License-Identifier: MIT
 
-//! `port-part`: writes a guitar, flute or piano part from a harmonica
+//! `port-part`: writes a guitar, flute, piano or voice part from a harmonica
 //! chart, for a song folder that has only the harmonica's.
 //!
 //! ```text
 //! cargo run --bin port-part -- guitar path/to/song/chart.harpchart
 //! cargo run --bin port-part -- flute  path/to/song/chart.harpchart
 //! cargo run --bin port-part -- piano  path/to/song/chart.harpchart
+//! cargo run --bin port-part -- voice  path/to/song/chart.harpchart
 //! ```
 //!
-//! It writes `guitar.harpchart`, `flute.harpchart` or `piano.harpchart`
+//! It writes `guitar.harpchart`, `flute.harpchart`, `piano.harpchart` or
+//! `voice.harpchart`
 //! beside the source, so
 //! the game lists it as another part of the same song (sharing the folder's
 //! backing audio). The timing, lyrics and phrases are the source's, and the
@@ -27,6 +29,9 @@
 //!   its top note, the melody. Fingerings are the standard ones.
 //! - **A piano** is the full 88 keys and plays every note, chords
 //!   included, the melody centred around C5, where a right hand plays it.
+//! - **A voice** is a tenor, singing one note at a time around B3, the
+//!   middle of its range; the game moves it by octaves again for a singer
+//!   of another voice type. Vibrato survives.
 //! - **What can't be played is dropped**, and harmonica techniques (bends,
 //!   overblows) become the plain note they sounded. Vibrato survives on a
 //!   flute.
@@ -51,6 +56,7 @@ enum Target {
     Flute,
     Clarinet,
     Piano,
+    Voice,
 }
 
 impl Target {
@@ -60,6 +66,7 @@ impl Target {
             "flute" => Some(Self::Flute),
             "clarinet" => Some(Self::Clarinet),
             "piano" => Some(Self::Piano),
+            "voice" => Some(Self::Voice),
             _ => None,
         }
     }
@@ -70,6 +77,7 @@ impl Target {
             Self::Flute => "flute",
             Self::Clarinet => "clarinet",
             Self::Piano => "piano",
+            Self::Voice => "voice",
         }
     }
 
@@ -79,6 +87,7 @@ impl Target {
             Self::Flute => Flute::new(FootJoint::C).into(),
             Self::Clarinet => harmonicon_core::instrument::clarinet::Clarinet::default().into(),
             Self::Piano => harmonicon_core::instrument::piano::Piano::grand().into(),
+            Self::Voice => harmonicon_core::instrument::voice::SingingVoice::default().into(),
         }
     }
 
@@ -89,6 +98,7 @@ impl Target {
             Self::Flute => 74,
             Self::Clarinet => 65,
             Self::Piano => 72,
+            Self::Voice => 59,
         }
     }
 }
@@ -128,7 +138,7 @@ fn item_pitches(chart: &HarpChart, item: usize) -> Vec<u8> {
 
 /// Whether a harmonica chart's modifier means anything on `target`.
 fn keeps_modifier(target: Target, modifier: &Value) -> bool {
-    matches!(target, Target::Flute | Target::Clarinet)
+    matches!(target, Target::Flute | Target::Clarinet | Target::Voice)
         && modifier.get("type").and_then(Value::as_str) == Some("vibrato")
 }
 
@@ -151,7 +161,9 @@ fn port(source: &Path, target: Target) -> Result<(PathBuf, usize, usize, i32), S
             let pitches: Vec<u8> =
                 item_pitches(&chart, i).into_iter().filter_map(|p| shifted(p, shift)).collect();
             match target {
-                Target::Flute | Target::Clarinet => pitches.into_iter().take(1).collect(),
+                Target::Flute | Target::Clarinet | Target::Voice => {
+                    pitches.into_iter().take(1).collect()
+                }
                 Target::Guitar | Target::Piano => pitches,
             }
         })
@@ -240,9 +252,10 @@ fn port(source: &Path, target: Target) -> Result<(PathBuf, usize, usize, i32), S
         Target::Flute => "a C-foot flute",
         Target::Clarinet => "a B-flat Boehm soprano clarinet",
         Target::Piano => "an 88-key piano",
+        Target::Voice => "a tenor voice",
     };
     let review = match target {
-        Target::Piano => "Generated part",
+        Target::Piano | Target::Voice => "Generated part",
         Target::Guitar | Target::Flute | Target::Clarinet => "Generated fingering",
     };
     let metadata = &mut out["metadata"];
@@ -264,11 +277,11 @@ fn main() -> ExitCode {
     let (Some(target), sources) =
         (args.first().and_then(|a| Target::parse(a)), &args[1.min(args.len())..])
     else {
-        eprintln!("usage: port-part <guitar|flute> <chart.harpchart>...");
+        eprintln!("usage: port-part <guitar|flute|clarinet|piano|voice> <chart.harpchart>...");
         return ExitCode::FAILURE;
     };
     if sources.is_empty() {
-        eprintln!("usage: port-part <guitar|flute> <chart.harpchart>...");
+        eprintln!("usage: port-part <guitar|flute|clarinet|piano|voice> <chart.harpchart>...");
         return ExitCode::FAILURE;
     }
     let mut failed = false;
@@ -297,6 +310,7 @@ mod tests {
         let melody = [84, 86, 88, 89, 91, 88, 84];
         assert_eq!(best_shift(&melody, &Target::Guitar.instrument(), Target::Guitar.middle()), -24);
         assert_eq!(best_shift(&melody, &Target::Flute.instrument(), Target::Flute.middle()), -12);
+        assert_eq!(best_shift(&melody, &Target::Voice.instrument(), Target::Voice.middle()), -24);
     }
 
     /// Reach outranks comfort: a shift that loses notes never wins.
@@ -315,5 +329,6 @@ mod tests {
         assert!(keeps_modifier(Target::Flute, &vibrato));
         assert!(!keeps_modifier(Target::Flute, &bend));
         assert!(!keeps_modifier(Target::Guitar, &vibrato));
+        assert!(keeps_modifier(Target::Voice, &vibrato));
     }
 }

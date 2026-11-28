@@ -97,8 +97,15 @@ pub(super) fn spawn_for_instrument(
                             score,
                             font,
                             pitches,
-                            harmonicon_ui::music_score::instrument_clef(instrument.kind())
-                                .unwrap_or(harmonicon_ui::music_score::Clef::Treble),
+                            match instrument {
+                                Instrument::Voice(voice) => {
+                                    harmonicon_ui::music_score::voice_clef(
+                                        voice.voice_type,
+                                    )
+                                }
+                                _ => harmonicon_ui::music_score::instrument_clef(instrument.kind())
+                                    .unwrap_or(harmonicon_ui::music_score::Clef::Treble),
+                            },
                         ) {
                             score.commands().entity(entity).insert(PitchChoice(midi)).observe(
                                 move |_: On<Activate>, mut trainer: ResMut<NoteTrainer>| {

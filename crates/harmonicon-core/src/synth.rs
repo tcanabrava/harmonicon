@@ -35,6 +35,9 @@ pub enum Voice {
     /// A struck piano string: inharmonic partials decaying from the
     /// hammer, damped when the key lifts. Expression isn't modelled.
     Piano,
+    /// A sung "ah": a fundamental with a few soft partials, a reference to
+    /// sing along to rather than an imitation of a singer.
+    Sung,
 }
 
 /// CD-quality mono output used by every consumer of this synth.
@@ -378,6 +381,12 @@ pub fn render_pcm_with(notes: &[PhraseNote], secs_per_tick: f32, voice: Voice) -
                     let second = 2.0 * sin_x * cos_x;
                     let third = 3.0 * sin_x - 4.0 * sin_x.powi(3);
                     ((sin_x + 0.45 * second + 0.3 * third) / 1.75, sin_x)
+                }
+                Voice::Sung => {
+                    let second = 2.0 * sin_x * cos_x;
+                    let third = 3.0 * sin_x - 4.0 * sin_x.powi(3);
+                    let fourth = 2.0 * second * (1.0 - 2.0 * sin_x * sin_x);
+                    ((sin_x + 0.5 * second + 0.3 * third + 0.12 * fourth) / 1.92, sin_x)
                 }
                 Voice::Clarinet => {
                     let third = 3.0 * sin_x - 4.0 * sin_x.powi(3);

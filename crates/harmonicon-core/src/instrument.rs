@@ -10,8 +10,8 @@
 //! three questions, so gameplay, the Song Editor and the detection filter
 //! can ask them without naming a harmonica.
 //!
-//! Fretted strings (guitar and bass), piano, flute and harmonica each supply
-//! their physical guidance.
+//! Fretted strings (guitar and bass), piano, flute, the singing voice and
+//! harmonica each supply their physical guidance.
 //! The harmonica adapter delegates to [`crate::pitch_map`] and
 //! [`crate::harmonica`], which remain the source of its reed layout.
 //!
@@ -28,6 +28,7 @@ pub mod fretted_strings;
 pub mod guitar;
 pub mod piano;
 pub mod substitute;
+pub mod voice;
 pub mod wind;
 
 use crate::chart::Action;
@@ -38,6 +39,7 @@ use flute::{FingeringAssignment, Flute};
 use fretted_strings::FrettedInstrument;
 use guitar::{FretAssignment, StringTechnique};
 use piano::Piano;
+use voice::SingingVoice;
 
 /// Instrument identity used to select curricula independently of tuning or setup.
 #[derive(
@@ -65,10 +67,11 @@ pub enum InstrumentKind {
     Clarinet,
     Violin,
     Viola,
+    Voice,
 }
 
 impl InstrumentKind {
-    pub const ALL: [Self; 9] = [
+    pub const ALL: [Self; 10] = [
         Self::Harmonica,
         Self::Guitar,
         Self::Bass,
@@ -78,6 +81,7 @@ impl InstrumentKind {
         Self::Clarinet,
         Self::Violin,
         Self::Viola,
+        Self::Voice,
     ];
     pub const fn slug(self) -> &'static str {
         match self {
@@ -90,6 +94,7 @@ impl InstrumentKind {
             Self::Clarinet => "clarinet",
             Self::Violin => "violin",
             Self::Viola => "viola",
+            Self::Voice => "voice",
         }
     }
     /// Default configuration registered with the identity, shared by document
@@ -105,6 +110,7 @@ impl InstrumentKind {
             Self::Clarinet => Clarinet::default().into(),
             Self::Violin => bowed_strings::BowedKind::Violin.standard().into(),
             Self::Viola => bowed_strings::BowedKind::Viola.standard().into(),
+            Self::Voice => SingingVoice::default().into(),
         }
     }
     pub fn from_slug(value: &str) -> Option<Self> {
@@ -125,6 +131,7 @@ pub enum Instrument {
     Clarinet(Clarinet),
     Bowed(bowed_strings::BowedStrings),
     Piano(Piano),
+    Voice(SingingVoice),
 }
 
 impl From<Harmonica> for Instrument {
@@ -146,6 +153,7 @@ impl Instrument {
             Self::Clarinet(model) => model,
             Self::Bowed(model) => model,
             Self::Piano(model) => model,
+            Self::Voice(model) => model,
         }
     }
     pub fn fingering_chart(&self) -> Option<&dyn wind::FingeringChart> {
@@ -171,6 +179,12 @@ impl From<bowed_strings::BowedStrings> for Instrument {
 impl From<Clarinet> for Instrument {
     fn from(clarinet: Clarinet) -> Self {
         Self::Clarinet(clarinet)
+    }
+}
+
+impl From<SingingVoice> for Instrument {
+    fn from(voice: SingingVoice) -> Self {
+        Self::Voice(voice)
     }
 }
 
@@ -205,6 +219,8 @@ pub enum PlayPosition {
     Key(u8),
     /// A sounding target on a continuous, fretless string.
     Fingerboard(bowed_strings::FingerboardPosition),
+    /// A sung note, by its pitch: a voice has nothing else to place.
+    Sung(u8),
 }
 
 impl PlayPosition {
@@ -313,7 +329,9 @@ impl LaneLayout {
             PlayPosition::Fingering(a) => {
                 self.lanes.iter().position(|l| l.pitch == Some(a.note))?
             }
-            PlayPosition::Key(note) => self.lanes.iter().position(|l| l.pitch == Some(*note))?,
+            PlayPosition::Key(note) | PlayPosition::Sung(note) => {
+                self.lanes.iter().position(|l| l.pitch == Some(*note))?
+            }
             PlayPosition::Fingerboard(at) => usize::from(at.string.checked_sub(1)?),
         };
         (lane < self.lanes.len()).then_some(lane)
@@ -328,7 +346,9 @@ impl LaneLayout {
             PlayPosition::Hole(a) => usize::from(a.hole.saturating_sub(1)).min(last),
             PlayPosition::Fret(a) => usize::from(a.string.saturating_sub(1)).min(last),
             PlayPosition::Fingerboard(a) => usize::from(a.string.saturating_sub(1)).min(last),
-            PlayPosition::Fingering(FingeringAssignment { note, .. }) | PlayPosition::Key(note) => {
+            PlayPosition::Fingering(FingeringAssignment { note, .. })
+            | PlayPosition::Key(note)
+            | PlayPosition::Sung(note) => {
                 self.lanes
                     .iter()
                     .enumerate()
@@ -627,7 +647,8 @@ impl InstrumentModel for FrettedInstrument {
                 PlayPosition::Hole(_)
                 | PlayPosition::Fingering(_)
                 | PlayPosition::Key(_)
-                | PlayPosition::Fingerboard(_) => None,
+                | PlayPosition::Fingerboard(_)
+                | PlayPosition::Sung(_) => None,
             })
             .collect();
         FrettedInstrument::reconcile(self, anchor, &mut frets);
@@ -784,6 +805,54 @@ impl InstrumentModel for Piano {
     /// song's own range ([`LaneLayout::keyboard_rows`]).
     fn lane_layout(&self) -> LaneLayout {
         LaneLayout::keyboard_rows(self.lowest(), self.highest())
+    }
+}
+
+impl InstrumentModel for SingingVoice {
+    fn range(&self) -> Option<(u8, u8)> {
+        Some((self.lowest(), self.highest()))
+    }
+
+    fn positions_for(&self, midi: u8) -> Vec<PlayPosition> {
+        if self.has(midi) { vec![PlayPosition::Sung(midi)] } else { Vec::new() }
+    }
+
+    fn valid_pitches(&self) -> std::collections::HashSet<u8> {
+        (self.lowest()..=self.highest()).collect()
+    }
+
+    fn pitch_of(&self, position: &PlayPosition) -> Option<u8> {
+        match position {
+            PlayPosition::Sung(note) if self.has(*note) => Some(*note),
+            _ => None,
+        }
+    }
+
+    /// One throat, one note.
+    fn can_sound_together(&self, _: &PlayPosition, _: &PlayPosition) -> bool {
+        false
+    }
+
+    fn reconcile(&self, _: &PlayPosition, _: &mut [PlayPosition]) {}
+
+    /// Hold a pitch, and slide between two.
+    fn techniques(&self) -> &'static [TechniqueKind] {
+        &[TechniqueKind::Target, TechniqueKind::Glide]
+    }
+
+    fn expression_scope(&self) -> ExpressionScope {
+        ExpressionScope::WholeInstrument
+    }
+
+    /// A breath holds its pitch for as long as the singer sings.
+    fn envelope(&self) -> Envelope {
+        Envelope::Sustained
+    }
+
+    /// One row per note of the comfortable range, highest at the top. Play
+    /// 2D narrows it to the song's own notes ([`LaneLayout::pitch_rows`]).
+    fn lane_layout(&self) -> LaneLayout {
+        LaneLayout::pitch_rows(&(self.lowest()..=self.highest()).collect())
     }
 }
 

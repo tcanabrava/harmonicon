@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: MIT
 
 //! The Options page's "My instruments" section: the guitar's tuning and
-//! capo, the flute's foot joint and how a flute part is drawn, all persisted in
+//! capo, the flute's foot joint and how a flute part is drawn, the singer's
+//! voice type, all persisted in
 //! `settings::MyInstruments`. The pre-song page reads and writes the same
 //! resource, so the answer given in either place is the one the other shows.
 //!
@@ -13,6 +14,7 @@ use bevy::prelude::*;
 
 use harmonicon_core::instrument::flute::FootJoint;
 use harmonicon_core::instrument::guitar::TUNINGS;
+use harmonicon_core::instrument::voice::VoiceType;
 use harmonicon_platform::localization::{Localization, LocalizationExt};
 use harmonicon_platform::settings::{FluteView, MyInstruments};
 use harmonicon_ui::dialogs::combobox;
@@ -198,6 +200,19 @@ pub(super) fn spawn_my_instruments(
         },
     );
 
+    let voices = voice_options(loc);
+    combobox::spawn_combobox(
+        commands,
+        parent,
+        page_root,
+        &loc.msg("options-voice-type"),
+        &voices,
+        &voices[voice_index(mine.voice_type)],
+        |ev: On<combobox::ComboboxSelect>, mut mine: ResMut<MyInstruments>| {
+            mine.voice_type = voice_from_index(ev.index);
+        },
+    );
+
     let views = view_options(loc);
     let current = VIEWS.iter().position(|v| *v == mine.flute_view).unwrap_or(0);
     combobox::spawn_combobox(
@@ -215,9 +230,43 @@ pub(super) fn spawn_my_instruments(
     );
 }
 
+/// "As each song is written", then each voice type with its range.
+pub(super) fn voice_options(loc: &Localization) -> Vec<String> {
+    std::iter::once(follow_chart(loc))
+        .chain(VoiceType::ALL.iter().map(|v| voice_type_label(*v, loc)))
+        .collect()
+}
+
+/// A voice type's name and comfortable range: "Tenor · C3–A4".
+pub(crate) fn voice_type_label(voice: VoiceType, loc: &Localization) -> String {
+    let (low, high) = voice.range();
+    let note = |midi: u8| harmonicon_core::midi::midi_to_note(i32::from(midi));
+    String::from(loc.msg_args(
+        &format!("voice-type-{}", voice.slug()),
+        &[("low", note(low)), ("high", note(high))],
+    ))
+}
+
+fn voice_from_index(index: usize) -> Option<VoiceType> {
+    index.checked_sub(1).and_then(|i| VoiceType::ALL.get(i)).copied()
+}
+
+fn voice_index(voice: Option<VoiceType>) -> usize {
+    voice.and_then(|v| VoiceType::ALL.iter().position(|x| *x == v)).map_or(0, |i| i + 1)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn every_voice_option_reads_back_as_the_voice_it_names() {
+        assert_eq!(voice_from_index(0), None, "the first follows each song");
+        for voice in VoiceType::ALL {
+            assert_eq!(voice_from_index(voice_index(Some(voice))), Some(voice));
+        }
+        assert_eq!(voice_index(None), 0);
+    }
 
     #[test]
     fn every_tuning_option_reads_back_as_the_tuning_it_names() {

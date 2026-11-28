@@ -52,6 +52,11 @@ What you play on, so you only say it once:
   below your foot are shown but not counted.
 - **Flute fingering chart** — shown or hidden under a flute part's
   highway; the same setting as the pause menu's **Fingering chart**.
+- **Voice type** — soprano, mezzo-soprano, alto, tenor, baritone or bass,
+  each listed with its range, or as each song is written. The Note
+  Trainer drills that range, and a song written for another voice is sung
+  whole octaves away to fit it, the way a tenor sings a soprano's melody
+  an octave down.
 
 The page before each guitar or flute song opens on these, and an answer
 given there is saved here too.

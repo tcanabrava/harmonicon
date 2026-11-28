@@ -15,6 +15,11 @@
 //!   the whole part. A bend keeps its depth, sounding the same pitch from
 //!   the fret below; a harmonic depends on its open string's pitch, so on
 //!   a retuned string it becomes the plain fretted note it sounded.
+//! - **Voice**: the exception to keeping the pitch. A part written for
+//!   another voice type is sung whole octaves away, as a tenor sings a
+//!   soprano's melody an octave down: the whole part moves by the octave
+//!   shift that leaves the fewest notes outside the singer's range, so the
+//!   melody keeps its shape, and a note still outside has no place.
 
 use super::flute::{FingeringAssignment, Flute};
 use super::guitar::fingering::{Onset, fingering};
@@ -91,9 +96,43 @@ pub fn substitute_chart(chart: &HarpChart, played: &Instrument) -> Vec<Vec<Optio
                     .collect()
             })
             .collect(),
+        (Instrument::Voice(_), Instrument::Voice(voice)) => onto_voice(voice, decoded),
         // Nothing substitutes across instruments.
         _ => decoded.iter().map(|item| vec![None; item.len()]).collect(),
     }
+}
+
+fn onto_voice(
+    voice: &super::voice::SingingVoice,
+    decoded: Vec<Vec<Option<PlayPosition>>>,
+) -> Vec<Vec<Option<PlayPosition>>> {
+    let notes: Vec<u8> = decoded
+        .iter()
+        .flatten()
+        .filter_map(|p| match p {
+            Some(PlayPosition::Sung(note)) => Some(*note),
+            _ => None,
+        })
+        .collect();
+    let shifted = |note: u8, octaves: i32| u8::try_from(i32::from(note) + 12 * octaves).ok();
+    let outside = |octaves: i32| {
+        notes.iter().filter(|&&n| !shifted(n, octaves).is_some_and(|n| voice.has(n))).count()
+    };
+    // Fewest notes outside; among ties, the smallest move.
+    let octaves = (-3..=3).min_by_key(|&k: &i32| (outside(k), k.abs())).unwrap_or(0);
+    decoded
+        .into_iter()
+        .map(|item| {
+            item.into_iter()
+                .map(|p| match p? {
+                    PlayPosition::Sung(note) => {
+                        shifted(note, octaves).filter(|&n| voice.has(n)).map(PlayPosition::Sung)
+                    }
+                    _ => None,
+                })
+                .collect()
+        })
+        .collect()
 }
 
 fn onto_flute(flute: &Flute, position: PlayPosition) -> Option<PlayPosition> {
@@ -303,7 +342,31 @@ mod tests {
     /// A smaller keyboard keeps the keys it has and loses the rest: a C7
     /// is on a 61-key keyboard (C2 to C7) but not a 49-key one (C2 to C6).
     #[test]
-    fn a_smaller_keyboard_drops_only_the_keys_it_lacks() {
+    fn another_voice_sings_the_part_whole_octaves_away() {
+        use super::super::voice::{SingingVoice, VoiceType};
+        let chart =
+            chart(include_str!("../../../harmonicon-song/tests/fixtures/voice-scale.harpchart"));
+        let sung = |kind| {
+            let played: Instrument = SingingVoice::new(kind).into();
+            substitute_chart(&chart, &played)
+                .into_iter()
+                .flatten()
+                .map(|p| match p {
+                    Some(PlayPosition::Sung(note)) => Some(note),
+                    _ => None,
+                })
+                .collect::<Vec<_>>()
+        };
+        let soprano = sung(VoiceType::Soprano);
+        assert_eq!(soprano[0], Some(60), "its own voice keeps every note");
+        let tenor = sung(VoiceType::Tenor);
+        assert!(tenor.iter().all(Option::is_some));
+        assert_eq!(tenor[0], Some(48), "a tenor sings it an octave down");
+        assert_eq!(tenor[7], Some(60));
+    }
+
+    #[test]
+        fn a_smaller_keyboard_drops_only_the_keys_it_lacks() {
         use super::super::piano::Piano;
         let mut chart =
             chart(include_str!("../../../harmonicon-song/tests/fixtures/piano-chords.harpchart"));

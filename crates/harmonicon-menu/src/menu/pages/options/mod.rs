@@ -33,7 +33,7 @@ use harmonicon_ui::dialogs::checkbox;
 use harmonicon_ui::dialogs::combobox;
 use harmonicon_ui::dialogs::tooltip::Tooltip;
 
-mod instruments;
+pub(crate) mod instruments;
 mod microphone;
 mod sliders;
 #[cfg(test)]

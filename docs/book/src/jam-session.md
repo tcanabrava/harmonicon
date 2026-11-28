@@ -35,7 +35,7 @@ Click **Guides** to open the rest, remembered between jams:
   - **Guitar, bass, cavaquinho**: the **fretboard**, each string from
     open to the 12th fret, in your tuning.
   - **Piano**: a three-octave **keyboard**, C3 to C6.
-  - **Flute, clarinet, violin, viola**: the instrument's **range** as a grid
+  - **Flute, clarinet, violin, viola, voice**: the instrument's **range** as a grid
     of notes, one octave per row with the highest on top.
 
 ![Jam Session screen](images/jam-session.png)

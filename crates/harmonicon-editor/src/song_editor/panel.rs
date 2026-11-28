@@ -356,6 +356,7 @@ pub(super) enum NoteButtons {
     Bowed,
     Flute,
     Piano,
+    Voice,
 }
 
 /// Whether `kind` belongs in the note column for `set`. The two harmonicas
@@ -368,6 +369,19 @@ pub(super) enum NoteButtons {
 pub(super) fn note_button_visible(kind: ModButton, set: NoteButtons) -> bool {
     let guitar = set == NoteButtons::Guitar;
     let harmonica = matches!(set, NoteButtons::Diatonic | NoteButtons::Chromatic);
+    if set == NoteButtons::Voice {
+        return matches!(
+            kind,
+            ModButton::TransposeUp
+                | ModButton::TransposeDown
+                | ModButton::Vibrato
+                | ModButton::Depth
+                | ModButton::Call
+                | ModButton::Split
+                | ModButton::Phrase
+                | ModButton::Delete
+        );
+    }
     if set == NoteButtons::Piano {
         return matches!(
             kind,

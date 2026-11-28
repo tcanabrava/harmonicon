@@ -433,6 +433,29 @@ mod tests {
         }
     }
 
+    #[test]
+    fn voice_charts_name_only_notes_inside_their_range() {
+        let original: serde_json::Value =
+            serde_json::from_str(include_str!("../../tests/fixtures/voice-scale.harpchart"))
+                .unwrap();
+        let mut value = original.clone();
+        let (_, chart) = validate_and_parse_chart(&mut value).unwrap();
+        assert_eq!(
+            chart.instrument().unwrap().kind(),
+            harmonicon_core::instrument::InstrumentKind::Voice
+        );
+        assert_eq!(chart.event_pitch(&chart.track[0].events[0]), Some(60));
+        value = original.clone();
+        value["track"][0]["events"][0]["note"] = serde_json::json!("C3");
+        assert!(validate_and_parse_chart(&mut value).is_err(), "below a soprano's range");
+        value = original.clone();
+        value["track"][0]["events"][0]["hole"] = serde_json::json!(4);
+        assert!(validate_and_parse_chart(&mut value).is_err());
+        value = original;
+        value["instrument"]["range"] = serde_json::json!("countertenor");
+        assert!(validate_and_parse_chart(&mut value).is_err());
+    }
+
     fn flute_chart() -> serde_json::Value {
         serde_json::from_str(include_str!("../../tests/fixtures/flute-scale.harpchart")).unwrap()
     }

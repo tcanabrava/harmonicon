@@ -382,7 +382,8 @@ impl HoleTab {
             PlayPosition::Fret(_)
             | PlayPosition::Fingering(_)
             | PlayPosition::Key(_)
-            | PlayPosition::Fingerboard(_) => None,
+            | PlayPosition::Fingerboard(_)
+            | PlayPosition::Sung(_) => None,
         }
     }
 }

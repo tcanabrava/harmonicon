@@ -126,7 +126,7 @@ pub(super) fn reset_window(state: &mut EditorState) {
         Instrument::Clarinet(clarinet) => {
             super::note_model::FLUTE_TOP_NOTE - *clarinet.range().end()
         }
-        _ => 0,
+        other => super::voice_note::window_offset(&other).unwrap_or(0),
     };
     if is_piano(state) {
         centre_on_notes(state);

@@ -95,6 +95,12 @@ pub enum ChartInstrument {
         #[serde(default = "grand_keys")]
         keys: u8,
     },
+    /// A singing voice, from format 1.17.0, by its choral range (a tenor
+    /// when not given); see `instrument::voice::VoiceType`.
+    Voice {
+        #[serde(default)]
+        range: crate::instrument::voice::VoiceType,
+    },
 }
 
 fn violin_strings() -> Vec<String> {
@@ -124,6 +130,7 @@ impl ChartInstrument {
             Instrument::Piano(model) => Self::from_piano(model),
             Instrument::Flute(model) => Self::from_flute(model),
             Instrument::Clarinet(model) => Self::Clarinet { key: model.key },
+            Instrument::Voice(model) => Self::Voice { range: model.voice_type },
             Instrument::Bowed(model) => {
                 let strings = model
                     .strings
@@ -245,6 +252,9 @@ impl ChartInstrument {
             Self::Piano { keys } => {
                 crate::instrument::piano::Piano::with_keys(*keys).map(Into::into)
             }
+            Self::Voice { range } => {
+                Some(crate::instrument::voice::SingingVoice::new(*range).into())
+            }
             Self::Guitar { strings, frets, capo, body } => {
                 let strings = strings
                     .iter()
@@ -305,7 +315,7 @@ impl HarpChart {
 /// spec than this build supports up front, with a clear error, instead of
 /// failing on some confusing downstream `additionalProperties` schema
 /// rejection or (worse) silently misreading a field whose meaning changed.
-pub const CURRENT_FORMAT_VERSION: &str = "1.16.0";
+pub const CURRENT_FORMAT_VERSION: &str = "1.17.0";
 
 /// Parses a `"MAJOR.MINOR.PATCH"` version string into a comparable tuple.
 /// `None` for anything that isn't exactly three dot-separated integers.

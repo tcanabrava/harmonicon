@@ -84,6 +84,28 @@ not required hand assignments: pitch detection cannot tell which hand played.
 The drills cover C3–C6. **Listen** uses the piano voice. On short screens,
 scroll to reach the keyboard.
 
+## Voice
+
+The voice's trainer teaches singing in tune. Its range follows the **Voice
+type** in [Options → My instruments](options.md#my-instruments): soprano
+C4–A5, mezzo-soprano A3–F5, alto F3–D5, tenor C3–A4 (the default),
+baritone A2–F4 or bass E2–E4. These are comfortable choral ranges to
+train in, not the limits of a voice. If you don't know your type, start
+with the one whose lowest note you can sing without straining.
+
+The tabs are:
+
+- **Notes**: a pitch on the staff. Press **Listen** to hear it, sing it
+  back on any vowel and hold it steady until the bar fills.
+- **Slides**: sing the starting note, then glide smoothly up a third or a
+  fifth to the target without breaking the sound. The status line follows
+  you on the way up, and the target counts only once you've started on the
+  first note.
+
+The line under the target says how many cents sharp or flat you are, so
+you can hear and see the correction. Choose a note directly on the score,
+as on the flute. **Listen** plays a soft sung "ah" to match.
+
 ## Choosing and repeating a guitar target
 
 Use **Choose note** to pick a pitch, then **String / fret** to choose one

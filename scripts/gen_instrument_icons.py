@@ -231,6 +231,30 @@ def viola():
     return bowed(0.95, with_bow=False)
 
 
+def voice():
+    """A stage microphone: a grilled capsule on a handle, in its stand's
+    cradle, with two arcs of sound beside it."""
+    image, d = canvas()
+    cx = S // 2
+    # Capsule, with its grille as rows of gaps.
+    d.rounded_rectangle((cx - 120, 120, cx + 120, 470), radius=120, fill=INK)
+    for y in range(190, 430, 48):
+        d.rectangle((cx - 92, y, cx + 92, y + 14), fill=CLEAR)
+    d.rectangle((cx - 120, 300, cx + 120, 316), fill=CLEAR)
+    # Collar and tapering handle.
+    d.rounded_rectangle((cx - 80, 470, cx + 80, 520), radius=12, fill=INK)
+    d.polygon([(cx - 62, 520), (cx + 62, 520), (cx + 36, 840), (cx - 36, 840)], fill=INK)
+    d.rounded_rectangle((cx - 40, 830, cx + 40, 880), radius=16, fill=INK)
+    # The cradle's U around the capsule, and the stand below.
+    d.arc((cx - 190, 150, cx + 190, 560), start=20, end=160, fill=INK, width=30)
+    d.rectangle((cx - 15, 555, cx + 15, 600), fill=INK)
+    # Sound: two arcs on each side.
+    for r in (260, 340):
+        d.arc((cx - r, 300 - r, cx + r, 300 + r), start=-35, end=35, fill=INK, width=26)
+        d.arc((cx - r, 300 - r, cx + r, 300 + r), start=145, end=215, fill=INK, width=26)
+    return finish(image)
+
+
 DRAWINGS = {
     "harmonica": harmonica,
     "guitar": guitar,
@@ -241,6 +265,7 @@ DRAWINGS = {
     "clarinet": clarinet,
     "violin": violin,
     "viola": viola,
+    "voice": voice,
 }
 
 

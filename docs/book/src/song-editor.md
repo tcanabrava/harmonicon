@@ -120,6 +120,15 @@ window remain in the document. The Play screen's full keyboard is independent
 of this editing window. Preview uses the piano voice. The score uses a grand staff with treble and
 bass clefs, showing the upper and lower registers together.
 
+## Voice charts
+
+With **Voice** chosen, a new document is a sung part. Each row is a
+pitch, and the grid shows only the comfortable range of the voice type
+(tenor unless **My instruments** names another). A voice sings one note
+at a time, so a note can't overlap another; **Vibrato** is its one
+expression. Preview uses a soft sung "ah". Lyrics are typed in the phrase
+editor, as for any chart, and are shown karaoke-style while playing.
+
 ## Layout
 
 The screen has three parts:

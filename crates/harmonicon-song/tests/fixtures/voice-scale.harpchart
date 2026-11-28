@@ -1,0 +1,151 @@
+{
+ "metadata": {
+  "format_version": "1.17.0",
+  "description": "Test chart for the voice: a soprano's C major scale up and an arpeggio down, with vibrato on the top note."
+ },
+ "song": {
+  "title": "Voice Scale",
+  "artist": "Zz Test (Claude)",
+  "genre": "Test",
+  "tempo_bpm": 60.0,
+  "key": "C",
+  "difficulty": "easy",
+  "time_signature": "4/4"
+ },
+ "timing": {
+  "resolution": 12,
+  "tempo_map": [
+   {
+    "tick": 0,
+    "bpm": 60.0
+   }
+  ]
+ },
+ "instrument": {
+  "type": "voice",
+  "range": "soprano"
+ },
+ "track": [
+  {
+   "time": 1.0,
+   "duration": 0.9,
+   "play_mode": "single",
+   "events": [
+    {
+     "note": "C4"
+    }
+   ]
+  },
+  {
+   "time": 2.0,
+   "duration": 0.9,
+   "play_mode": "single",
+   "events": [
+    {
+     "note": "D4"
+    }
+   ]
+  },
+  {
+   "time": 3.0,
+   "duration": 0.9,
+   "play_mode": "single",
+   "events": [
+    {
+     "note": "E4"
+    }
+   ]
+  },
+  {
+   "time": 4.0,
+   "duration": 0.9,
+   "play_mode": "single",
+   "events": [
+    {
+     "note": "F4"
+    }
+   ]
+  },
+  {
+   "time": 5.0,
+   "duration": 0.9,
+   "play_mode": "single",
+   "events": [
+    {
+     "note": "G4"
+    }
+   ]
+  },
+  {
+   "time": 6.0,
+   "duration": 0.9,
+   "play_mode": "single",
+   "events": [
+    {
+     "note": "A4"
+    }
+   ]
+  },
+  {
+   "time": 7.0,
+   "duration": 0.9,
+   "play_mode": "single",
+   "events": [
+    {
+     "note": "B4"
+    }
+   ]
+  },
+  {
+   "time": 8.0,
+   "duration": 1.8,
+   "play_mode": "single",
+   "events": [
+    {
+     "note": "C5",
+     "modifiers": [
+      {
+       "type": "vibrato",
+       "oscillation_hz": 5.5
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "time": 10.0,
+   "duration": 0.9,
+   "play_mode": "single",
+   "events": [
+    {
+     "note": "G4"
+    }
+   ]
+  },
+  {
+   "time": 11.0,
+   "duration": 0.9,
+   "play_mode": "single",
+   "events": [
+    {
+     "note": "E4"
+    }
+   ]
+  },
+  {
+   "time": 12.0,
+   "duration": 0.9,
+   "play_mode": "single",
+   "events": [
+    {
+     "note": "C4"
+    }
+   ]
+  }
+ ],
+ "scoring": {
+  "perfect_window_ms": 50,
+  "good_window_ms": 100,
+  "miss_window_ms": 130
+ }
+}

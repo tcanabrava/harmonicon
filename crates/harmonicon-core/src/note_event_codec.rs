@@ -139,6 +139,19 @@ pub fn decode_for(
             NoteTarget::Sounding { midi: f32::from(midi), placement: None }
                 .with_placement(instrument, PlayPosition::Key(midi))
         }
+        Instrument::Voice(_) => {
+            if event.hole.is_some()
+                || event.action.is_some()
+                || event.position.is_some()
+                || event.fingering.is_some()
+                || modifiers.iter().any(|m| !matches!(m, Modifier::Vibrato { .. }))
+            {
+                return Err(PlacementError::Unplayable);
+            }
+            let midi = declared_pitch()?;
+            NoteTarget::Sounding { midi: f32::from(midi), placement: None }
+                .with_placement(instrument, PlayPosition::Sung(midi))
+        }
     }
 }
 
@@ -247,6 +260,14 @@ pub fn encode(
             result.position = None;
             // A piano key has no expression to keep.
             modifiers.clear();
+            result.note = Some(crate::midi::midi_to_note(i32::from(note)));
+        }
+        PlayPosition::Sung(note) => {
+            result.hole = None;
+            result.action = None;
+            result.position = None;
+            // Vibrato is all a voice keeps of the original's expression.
+            modifiers.retain(|m| matches!(m, Modifier::Vibrato { .. }));
             result.note = Some(crate::midi::midi_to_note(i32::from(note)));
         }
     }

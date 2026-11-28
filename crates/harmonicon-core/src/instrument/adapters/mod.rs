@@ -35,6 +35,7 @@ mod bowed;
 mod fretted;
 mod harmonica;
 mod piano;
+mod voice;
 mod wind_family;
 
 #[cfg(test)]

@@ -1257,3 +1257,20 @@ editor-finger-ring = 3 · Anelar
 editor-finger-little = 4 · Mínimo
 editor-barre = Pestana
 editor-no-barre = Sem pestana
+
+## Voz
+song-instrument-voice = Voz
+voice-kind-slide = Glissandos
+voice-target-instruction = Ouça, depois cante {$note} e sustente firme
+voice-slide-instruction = Cante {$start} e deslize suavemente até {$note}
+editor-voice-invalid = Uma voz canta uma nota por vez, e só dentro da sua extensão.
+options-voice-type = Tipo de voz
+voice-type-soprano = Soprano · {$low}–{$high}
+voice-type-mezzo = Mezzo-soprano · {$low}–{$high}
+voice-type-alto = Contralto · {$low}–{$high}
+voice-type-tenor = Tenor · {$low}–{$high}
+voice-type-baritone = Barítono · {$low}–{$high}
+voice-type-bass = Baixo · {$low}–{$high}
+instrument-check-title-voice = Sua voz
+instrument-check-intro-voice = Uma parte cantada é movida por oitavas inteiras para caber no seu tipo de voz, definido em Opções → Meus instrumentos. Notas ainda fora da sua extensão aparecem, mas não contam.
+instrument-check-chart-voice = Escrito para {$voice}.

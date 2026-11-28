@@ -1263,3 +1263,20 @@ editor-no-barre = No barre
 theme-light = Light
 theme-dark = Dark
 theme-subtitle = Choose the appearance used throughout Harmonicon.
+
+## Voice
+song-instrument-voice = Voice
+voice-kind-slide = Slides
+voice-target-instruction = Listen, then sing {$note} and hold it steady
+voice-slide-instruction = Sing {$start}, then slide smoothly up to {$note}
+editor-voice-invalid = A voice sings one note at a time, and only inside its range.
+options-voice-type = Voice type
+voice-type-soprano = Soprano · {$low}–{$high}
+voice-type-mezzo = Mezzo-soprano · {$low}–{$high}
+voice-type-alto = Alto · {$low}–{$high}
+voice-type-tenor = Tenor · {$low}–{$high}
+voice-type-baritone = Baritone · {$low}–{$high}
+voice-type-bass = Bass · {$low}–{$high}
+instrument-check-title-voice = Your voice
+instrument-check-intro-voice = A sung part is moved by whole octaves to fit your voice type, set in Options → My instruments. Notes still outside your range are shown but don't count.
+instrument-check-chart-voice = Written for {$voice}.

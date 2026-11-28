@@ -418,6 +418,7 @@ fn kind_key(instrument: &Instrument, kind: TechniqueKind) -> &'static str {
     let flute = matches!(instrument, Instrument::Flute(_));
     match kind {
         TechniqueKind::Target => "note-trainer-kind-target",
+        TechniqueKind::Glide if matches!(instrument, Instrument::Voice(_)) => "voice-kind-slide",
         TechniqueKind::Glide => "note-trainer-kind-glide",
         TechniqueKind::Register if matches!(instrument, Instrument::Clarinet(_)) => {
             "clarinet-register-tab"
@@ -489,6 +490,17 @@ fn instruction(loc: &Localization, instrument: &Instrument, drill: &Drill) -> St
         Instrument::Piano(_) => String::from(
             loc.msg_args("note-trainer-flute-target", &[("note", note_name(drill.target))]),
         ),
+        Instrument::Voice(_) => match drill.start {
+            Some(start) => loc
+                .msg_args(
+                    "voice-slide-instruction",
+                    &[("start", note_name(start)), ("note", note_name(drill.target))],
+                )
+                .to_string(),
+            None => loc
+                .msg_args("voice-target-instruction", &[("note", note_name(drill.target))])
+                .to_string(),
+        },
         Instrument::Harmonica(_) => String::new(),
     }
 }

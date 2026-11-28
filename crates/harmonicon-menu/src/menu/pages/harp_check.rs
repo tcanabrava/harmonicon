@@ -128,6 +128,8 @@ pub(crate) enum ControlsFor {
     Bowed,
     /// Nothing to choose yet: a part's keyboard is the one it is played on.
     Piano,
+    /// The voice type comes from Options → My instruments.
+    Voice,
 }
 
 fn controls_for(chart: &HarpChart) -> ControlsFor {
@@ -137,6 +139,7 @@ fn controls_for(chart: &HarpChart) -> ControlsFor {
         Some(Instrument::Clarinet(_)) => ControlsFor::Clarinet,
         Some(Instrument::Bowed(_)) => ControlsFor::Bowed,
         Some(Instrument::Piano(_)) => ControlsFor::Piano,
+        Some(Instrument::Voice(_)) => ControlsFor::Voice,
         _ => ControlsFor::Harmonica,
     }
 }
@@ -181,6 +184,12 @@ pub(crate) fn played_for(own: Option<Instrument>, mine: &MyInstruments) -> Optio
         ),
         Instrument::Bowed(strings) => Some(strings.into()),
         Instrument::Piano(piano) => Some(piano.into()),
+        Instrument::Voice(voice) => Some(
+            harmonicon_core::instrument::voice::SingingVoice::new(
+                mine.voice_type.unwrap_or(voice.voice_type),
+            )
+            .into(),
+        ),
         Instrument::Harmonica(_) => None,
     }
 }
@@ -423,6 +432,7 @@ pub(crate) fn setup_harp_check(
             ControlsFor::Clarinet => "instrument-clarinet",
             ControlsFor::Bowed => unreachable!("bowed title is resolved above"),
             ControlsFor::Piano => "instrument-check-title-piano",
+            ControlsFor::Voice => "instrument-check-title-voice",
         }
         .to_owned()
     };
@@ -791,6 +801,7 @@ pub(crate) fn refresh_harp_cost(
         ControlsFor::Clarinet => "clarinet-play-help",
         ControlsFor::Bowed => "bowed-play-help",
         ControlsFor::Piano => "instrument-check-intro-piano",
+        ControlsFor::Voice => "instrument-check-intro-voice",
     }));
     for mut label in &mut intros {
         if label.0 != intro {
@@ -835,6 +846,13 @@ pub(crate) fn refresh_harp_cost(
         Some(Instrument::Piano(piano)) => String::from(
             loc.msg_args("instrument-check-chart-piano", &[("keys", piano.keys.to_string())]),
         ),
+        Some(Instrument::Voice(voice)) => String::from(loc.msg_args(
+            "instrument-check-chart-voice",
+            &[(
+                "voice",
+                crate::menu::pages::options::instruments::voice_type_label(voice.voice_type, &loc),
+            )],
+        )),
         None => String::new(),
     };
     for mut label in &mut harp_labels {

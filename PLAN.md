@@ -103,6 +103,14 @@ gates 1.0. In order:
   them, hidden from the pause menu), the Song Editor (note and
   fingering views) and the Note Trainer's flute tabs are in. Next:
   - a recorded corpus aimed at octave errors, before any detection tuning.
+- **Voice** (phase 6). The model (`instrument::voice`, six choral voice
+  types), chart format 1.17.0, octave-fitting substitution and score
+  import, a sung synth voice, Play 2D pitch rows, the Song Editor and the
+  Note Trainer's Notes and Slides tabs are in. Next:
+  - a sung corpus (vibrato width, soft onsets, vowel formants) before any
+    detection tuning;
+  - singing lessons in the lessons pack, and voice parts in the songs pack
+    (`port-part voice`).
 - **Content and progress** (phase 5). In: one chosen instrument for the
   whole game (`MyInstruments::active`, picked on the Select Instrument
   screen every launch opens on; songs, lessons, the trainer and new editor

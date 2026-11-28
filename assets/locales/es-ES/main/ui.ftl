@@ -1259,3 +1259,20 @@ editor-finger-ring = 3 · Anular
 editor-finger-little = 4 · Meñique
 editor-barre = Cejilla con el dedo
 editor-no-barre = Sin cejilla con el dedo
+
+## Voz
+song-instrument-voice = Voz
+voice-kind-slide = Glisandos
+voice-target-instruction = Escucha, luego canta {$note} y sostenla firme
+voice-slide-instruction = Canta {$start} y desliza suavemente hasta {$note}
+editor-voice-invalid = Una voz canta una nota a la vez, y solo dentro de su tesitura.
+options-voice-type = Tipo de voz
+voice-type-soprano = Soprano · {$low}–{$high}
+voice-type-mezzo = Mezzosoprano · {$low}–{$high}
+voice-type-alto = Contralto · {$low}–{$high}
+voice-type-tenor = Tenor · {$low}–{$high}
+voice-type-baritone = Barítono · {$low}–{$high}
+voice-type-bass = Bajo · {$low}–{$high}
+instrument-check-title-voice = Tu voz
+instrument-check-intro-voice = Una parte cantada se mueve por octavas enteras para ajustarse a tu tipo de voz, elegido en Opciones → Mis instrumentos. Las notas que siguen fuera de tu tesitura se muestran pero no cuentan.
+instrument-check-chart-voice = Escrito para {$voice}.

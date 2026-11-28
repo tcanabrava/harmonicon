@@ -7,7 +7,7 @@ use bevy::prelude::*;
 use bevy::ui::ComputedNode;
 use harmonicon_app::app::{EffectiveHarmonica, SelectedSong};
 use harmonicon_core::chart::{Action, Modifier};
-use harmonicon_core::instrument::{LaneLayout, PlayPosition, ScrollAxis};
+use harmonicon_core::instrument::{Instrument, LaneLayout, PlayPosition, ScrollAxis};
 
 use super::highway_axis::{
     across, along_px, along_size, placed, set_across, set_along, set_along_size,
@@ -112,8 +112,8 @@ pub fn setup(
     let instrument = effective.instrument_for(chart);
     *highway_lanes = HighwayLanes::for_instrument(instrument.as_ref());
     *song_notes = SongNotes { notes, cursor: 0 };
-    // A flute's highway is a row per pitch the song uses, not its keys.
-    if matches!(instrument, Some(harmonicon_core::instrument::Instrument::Flute(_))) {
+    // A flute's or a voice's highway is a row per pitch the song uses.
+    if matches!(instrument, Some(Instrument::Flute(_) | Instrument::Voice(_))) {
         let used = song_notes.notes.iter().filter_map(|n| n.expected_pitch).collect();
         highway_lanes.0 = Some(LaneLayout::pitch_rows(&used));
     }
@@ -1035,7 +1035,9 @@ fn note_head_label(note: &ScheduledNote, show_numbers: bool) -> String {
         PlayPosition::Fret(a) => a.tab_label(),
         PlayPosition::Fingerboard(at) => harmonicon_core::midi::midi_to_note(i32::from(at.note)),
         PlayPosition::Fingering(a) => harmonicon_core::midi::midi_to_note(i32::from(a.note)),
-        PlayPosition::Key(note) => harmonicon_core::midi::midi_to_note(i32::from(*note)),
+        PlayPosition::Key(note) | PlayPosition::Sung(note) => {
+            harmonicon_core::midi::midi_to_note(i32::from(*note))
+        }
         position => HoleTab::of(position)
             .map(|tab| head_label(tab.hole, tab.is_blow, &note.modifiers, show_numbers))
             .unwrap_or_default(),

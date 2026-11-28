@@ -693,6 +693,10 @@ pub(super) fn group_move_valid(
 /// highway's fingering blocks.
 pub(super) const FLUTE_NOTE_COLOR: Color = Color::srgb(0.55, 0.65, 0.80);
 
+/// A sung note's colour on the grid: a warm rose, apart from every
+/// instrument's own.
+pub(super) const VOICE_NOTE_COLOR: Color = Color::srgb(0.82, 0.45, 0.55);
+
 /// What a note block shows, and on what colour: a harmonica note's breath
 /// arrow on its pitch technique's colour, a guitar note's tab label (`7`,
 /// `7b9`, `<12>`) on its string's colour, the same as the highway draws it.
@@ -732,6 +736,9 @@ pub(super) fn note_face(note: &GridNote) -> (Color, String) {
         ),
         Some(PlayPosition::Key(key)) => {
             (Color::srgb(0.28, 0.52, 0.78), harmonicon_core::midi::midi_to_note(i32::from(key)))
+        }
+        Some(PlayPosition::Sung(pitch)) => {
+            (VOICE_NOTE_COLOR, harmonicon_core::midi::midi_to_note(i32::from(pitch)))
         }
         Some(PlayPosition::Hole(_)) => {
             (pitch_color(note.technique()), note.dir().arrow().to_string())

@@ -74,7 +74,8 @@ pub(crate) fn tuner_family(kind: InstrumentKind) -> Option<TunerFamily> {
         InstrumentKind::Harmonica
         | InstrumentKind::Piano
         | InstrumentKind::Flute
-        | InstrumentKind::Clarinet => None,
+        | InstrumentKind::Clarinet
+        | InstrumentKind::Voice => None,
     }
 }
 fn presets(family: TunerFamily) -> impl Iterator<Item = &'static Tuning> {

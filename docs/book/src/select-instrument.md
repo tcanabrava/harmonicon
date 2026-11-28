@@ -3,8 +3,10 @@
 ![Select Instrument](images/select-instrument.png)
 
 Harmonicon opens on **Select Instrument**: a grid of every instrument it
-teaches, each with its picture and name. Click one, or move to it with
-**Tab** and press **Enter**, and the main menu opens.
+teaches, each with its picture and name — the harmonica, guitar, bass,
+cavaquinho, piano, flute, clarinet, violin, viola, and your own **voice**.
+Click one, or move to it with **Tab** and press **Enter**, and the main
+menu opens.
 
 That one choice is used everywhere:
 

@@ -238,6 +238,9 @@ pub(super) const FLUTE_TOP_NOTE: u8 = 96;
 /// The piano's highest key, C8: the grid's top row on a piano.
 pub(super) const PIANO_TOP_NOTE: u8 = 108;
 
+/// A soprano's highest note, A5: the grid's top row for a voice.
+pub(super) const VOICE_TOP_NOTE: u8 = 81;
+
 impl GridNote {
     /// Stable construction boundary for editor notes. Family-specific guidance
     /// is optional and cannot become a required field in another family's UI.
@@ -276,6 +279,9 @@ impl GridNote {
             Some(harmonicon_core::instrument::PlayPosition::Key(key)) => {
                 PIANO_TOP_NOTE.saturating_sub(key) + 1
             }
+            Some(harmonicon_core::instrument::PlayPosition::Sung(pitch)) => {
+                VOICE_TOP_NOTE.saturating_sub(pitch) + 1
+            }
             None => 1,
         }
     }
@@ -304,6 +310,7 @@ impl GridNote {
                 })
             }
             Some(PlayPosition::Key(_)) => PlayPosition::Key(PIANO_TOP_NOTE + 1 - row),
+            Some(PlayPosition::Sung(_)) => PlayPosition::Sung(VOICE_TOP_NOTE + 1 - row),
             Some(PlayPosition::Fingerboard(mut at)) => {
                 at.string = row;
                 at.finger = None;

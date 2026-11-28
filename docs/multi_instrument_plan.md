@@ -458,6 +458,20 @@ behaviour.
    across packs: a second pack's lesson for another instrument with an id
    already in use would share that lesson's progress.
 
+6. **Voice** (landed but for its corpus). Chart format 1.17.0
+   (`{"type": "voice", "range": "tenor"}`), a monophonic model whose
+   position is its pitch (`PlayPosition::Sung`) inside a choral range
+   (`VoiceType`, saved in "My instruments" as `voice_type`). Play 2D draws
+   pitch rows as for the flute's note view; the Song Editor uses pitch
+   rows over the voice's range with vibrato as its one expression; the
+   Note Trainer drills `Target` (hear it, sing it, hold it) and `Glide`
+   (slide up a third or a fifth). Unlike every other substitution, a part
+   for another voice type moves whole octaves to fit
+   (`substitute::onto_voice`), and score import keeps the top note of a
+   chord and fits the line the same way. **Open:** a sung corpus — vibrato
+   width and vowel formants are untested against the detectors, and
+   sung onsets are softer than any instrument's.
+
 ## Scheduling
 
 Every phase above is required for 1.0 (`ROADMAP.md`). Phases 1–4 have

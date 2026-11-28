@@ -194,6 +194,9 @@ pub struct MyInstruments {
     pub flute_foot: Option<harmonicon_core::instrument::flute::FootJoint>,
     /// How Play 2D draws a flute part, switched from its pause menu.
     pub flute_view: FluteView,
+    /// The singer's voice type, deciding the range a voice is trained and
+    /// scored in. `None` follows each song's own.
+    pub voice_type: Option<harmonicon_core::instrument::voice::VoiceType>,
 }
 
 impl MyInstruments {
@@ -222,6 +225,7 @@ impl MyInstruments {
             }
             Instrument::Flute(setup) => setup.foot = self.flute_foot.unwrap_or_default(),
             Instrument::Clarinet(setup) => setup.key = self.clarinet_key.unwrap_or_default(),
+            Instrument::Voice(setup) => setup.voice_type = self.voice_type.unwrap_or_default(),
             _ => {}
         }
         instrument
@@ -713,12 +717,14 @@ mod tests {
             guitar_capo: Some(2),
             flute_foot: Some(harmonicon_core::instrument::flute::FootJoint::B),
             flute_view: FluteView::Notes,
+            voice_type: Some(harmonicon_core::instrument::voice::VoiceType::Baritone),
         };
         let json =
             serde_json::to_string(&Settings { my_instruments: mine.clone(), ..default() }).unwrap();
         assert!(json.contains(r#""flute_foot":"b""#), "{json}");
         assert!(json.contains(r#""flute_view":"notes""#), "{json}");
         assert!(json.contains(r#""active":"flute""#), "{json}");
+        assert!(json.contains(r#""voice_type":"baritone""#), "{json}");
         let back: Settings = serde_json::from_str(&json).unwrap();
         assert_eq!(back.my_instruments, mine);
     }

@@ -230,6 +230,17 @@ pub fn choose_clef(notes: &[NotationNote]) -> Clef {
     }
 }
 
+/// The clef a voice type's music is written in: treble for the upper
+/// voices, the octave-down treble a tenor line uses, and bass below that.
+pub fn voice_clef(voice: harmonicon_core::instrument::voice::VoiceType) -> Clef {
+    use harmonicon_core::instrument::voice::VoiceType;
+    match voice {
+        VoiceType::Soprano | VoiceType::Mezzo | VoiceType::Alto => Clef::Treble,
+        VoiceType::Tenor => Clef::Treble8vb,
+        VoiceType::Baritone | VoiceType::Bass => Clef::Bass,
+    }
+}
+
 /// Horizontal room one note needs: its notehead plus the accidental that
 /// may sit in front of it, plus a little air.
 ///
@@ -913,6 +924,20 @@ mod tests {
             choose_clef(&[note_at(64, 0.0), note_at(67, 0.0), note_at(71, 0.0)]),
             Clef::Treble
         );
+    }
+
+    /// Every voice's range sits within a few ledger lines of its clef.
+    #[test]
+    fn each_voice_type_reads_on_its_own_clef() {
+        use harmonicon_core::instrument::voice::VoiceType;
+        for voice in VoiceType::ALL {
+            let clef = voice_clef(voice);
+            let (low, high) = voice.range();
+            for midi in [low, high] {
+                let step = staff_step(midi, clef);
+                assert!((-6..=14).contains(&step), "{voice:?} {midi} at step {step}");
+            }
+        }
     }
 
     #[test]

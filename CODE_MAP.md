@@ -51,7 +51,7 @@ Open work: `PLAN.md` (ordered), `TODO.md`, `ROADMAP.md`. Designs: `docs/*_plan.m
 - `build.rs` (1082) — (no `//!` header)
 - `src/bin/gen_synthetic_dataset.rs` (39) — Writes a synthesized benchmark dataset under `assets/debug_songs/` (or a path given on the command line) so `note_bench` has something to run against…
 - `src/bin/note_bench.rs` (280) — Offline pitch-detection benchmark: replays every "debug recording" (`song_editor::debug_record`, the Song Editor's dev-only "Debug Recording" checkbo…
-- `src/bin/port_part.rs` (319) — `port-part`: writes a guitar, flute or piano part from a harmonica chart, for a song folder that has only the harmonica's.
+- `src/bin/port_part.rs` (334) — `port-part`: writes a guitar, flute, piano or voice part from a harmonica chart, for a song folder that has only the harmonica's.
 - `src/bin/validate_pack.rs` (148) — Checks a lesson or song pack the way this build of the game will read it.
 - `src/dev_capture.rs` (189) — Dev-only screen capture, driven from *outside* the running game over the Bevy Remote Protocol (`bevy_remote`, JSON-RPC on `127.0.0.1:15702`).
 - `src/lib.rs` (233) — The composition root: every plugin the game is assembled from, and the `run()` that starts it.
@@ -91,18 +91,18 @@ Open work: `PLAN.md` (ordered), `TODO.md`, `ROADMAP.md`. Designs: `docs/*_plan.m
 
 ### harmonicon-core
 
-- `crates/harmonicon-core/src/chart.rs` (1246) — (no `//!` header)
-- `crates/harmonicon-core/src/chart_check.rs` (324) — The rules a chart must follow that the schema can't state: its tempo and meter maps run in tick order, its scoring windows nest, and its events fit t…
+- `crates/harmonicon-core/src/chart.rs` (1256) — (no `//!` header)
+- `crates/harmonicon-core/src/chart_check.rs` (349) — The rules a chart must follow that the schema can't state: its tempo and meter maps run in tick order, its scoring windows nest, and its events fit t…
 - `crates/harmonicon-core/src/config_file.rs` (122) — Atomic writes for persisted settings, profiles, and editor documents.
 - `crates/harmonicon-core/src/harmonica.rs` (854) — (no `//!` header)
 - `crates/harmonicon-core/src/harmonica/summary.rs` (69) — A harmonica's one-line description, as parts a UI can word in the player's language and as the English join used by logs and tests.
 - `crates/harmonicon-core/src/harmonica_constraints.rs` (377) — Post-detection harmonica-constraint filtering — the "Harmonica Constraint Solver" stage from `Harmonicon Note Detection Roadmap.md` (repo root): a ha…
 - `crates/harmonicon-core/src/harp_remap.rs` (298) — Playing a chart on a harmonica other than the one it was written for.
-- `crates/harmonicon-core/src/instrument.rs` (824) — The instrument a chart is played on, behind one interface.
+- `crates/harmonicon-core/src/instrument.rs` (893) — The instrument a chart is played on, behind one interface.
 - `crates/harmonicon-core/src/instrument/adapters/bowed.rs` (33) — (no `//!` header)
 - `crates/harmonicon-core/src/instrument/adapters/fretted.rs` (31) — (no `//!` header)
 - `crates/harmonicon-core/src/instrument/adapters/harmonica.rs` (24) — (no `//!` header)
-- `crates/harmonicon-core/src/instrument/adapters/mod.rs` (74) — Family registration and presentation metadata.
+- `crates/harmonicon-core/src/instrument/adapters/mod.rs` (75) — Family registration and presentation metadata.
 - `crates/harmonicon-core/src/instrument/adapters/piano.rs` (24) — (no `//!` header)
 - `crates/harmonicon-core/src/instrument/adapters/wind_family.rs` (46) — (no `//!` header)
 - `crates/harmonicon-core/src/instrument/bass.rs` (116) — Fretted electric bass presets, highest string first.
@@ -114,14 +114,14 @@ Open work: `PLAN.md` (ordered), `TODO.md`, `ROADMAP.md`. Designs: `docs/*_plan.m
 - `crates/harmonicon-core/src/instrument/guitar.rs` (264) — A fretted, six-string-style guitar: where each pitch lives on the neck, and what a hand can hold at once.
 - `crates/harmonicon-core/src/instrument/guitar/fingering.rs` (165) — Choosing where a whole part is played on the neck.
 - `crates/harmonicon-core/src/instrument/piano.rs` (79) — A piano: a keyboard of so many keys, every key one pitch.
-- `crates/harmonicon-core/src/instrument/substitute.rs` (335) — A chart played on the instrument the player holds rather than the one it was written for: a guitar in another tuning, a flute with the other foot joi…
+- `crates/harmonicon-core/src/instrument/substitute.rs` (398) — A chart played on the instrument the player holds rather than the one it was written for: a guitar in another tuning, a flute with the other foot joi…
 - `crates/harmonicon-core/src/instrument/wind.rs` (195) — Shared wind fingering vocabulary.
 - `crates/harmonicon-core/src/lib.rs` (40) — Harmonicon's pure-logic core: no Bevy, no ECS, no I/O beyond a couple of plain file writes.
 - `crates/harmonicon-core/src/lyrics.rs` (300) — A chart's lyrics as karaoke lines: which syllables make up each line, and how far through them the singer is at a given moment.
 - `crates/harmonicon-core/src/midi.rs` (152) — (no `//!` header)
 - `crates/harmonicon-core/src/midi_file.rs` (445) — Pure MIDI-file parsing used by `song_editor::midi_import`'s track listing/pitch mapping/note import: reading track names/note counts, tempo maps, and…
 - `crates/harmonicon-core/src/notation.rs` (321) — Written notation is a projection of sounding pitch, never the identity used by the detector, judge or synthesizer.
-- `crates/harmonicon-core/src/note_event_codec.rs` (401) — Conversion between chart positions and layout-independent note intent.
+- `crates/harmonicon-core/src/note_event_codec.rs` (422) — Conversion between chart positions and layout-independent note intent.
 - `crates/harmonicon-core/src/note_performance.rs` (143) — Optional performance instructions carried by any note.
 - `crates/harmonicon-core/src/note_target.rs` (188) — Musical intent, independent of an editor row or screen coordinate.
 - `crates/harmonicon-core/src/note_tracker.rs` (219) — Turning a detector's per-frame pitch guesses into notes: which pitches are sounding, and which just started.
@@ -130,7 +130,7 @@ Open work: `PLAN.md` (ordered), `TODO.md`, `ROADMAP.md`. Designs: `docs/*_plan.m
 - `crates/harmonicon-core/src/repeats.rs` (412) — Plays a chart's repeat signs out into one flat, linear track.
 - `crates/harmonicon-core/src/scoring.rs` (308) — Pure scoring math shared by every mode that judges a player's timing and pitch against a schedule of notes: the main scored gameplay screens (`crate:…
 - `crates/harmonicon-core/src/snap.rs` (284) — Which within-beat tick positions a click on the note grid can land a new note on — split out of `state.rs` purely to stay under its line budget (`doc…
-- `crates/harmonicon-core/src/synth.rs` (598) — The synth shared by every feature that needs to render notes to PCM without a sampled/GM instrument: the Song Editor's Play/Practice preview and MIDI…
+- `crates/harmonicon-core/src/synth.rs` (607) — The synth shared by every feature that needs to render notes to PCM without a sampled/GM instrument: the Song Editor's Play/Practice preview and MIDI…
 - `crates/harmonicon-core/src/synth/piano.rs` (101) — A struck piano string, additively: a handful of partials, each a little sharp of its harmonic (a stiff string's inharmonicity, which is much of why a…
 - `crates/harmonicon-core/src/synth/pluck.rs` (163) — A plucked string, by Karplus–Strong: a delay line one period long, filled with a burst of noise, fed back through a two-point average.
 - `crates/harmonicon-core/src/training.rs` (371) — Generated practice drills — the *training* half of a lesson.
@@ -157,13 +157,13 @@ Open work: `PLAN.md` (ordered), `TODO.md`, `ROADMAP.md`. Designs: `docs/*_plan.m
 - `crates/harmonicon-editor/src/song_editor/expected_notes.rs` (619) — Dev-only ("--features dev") benchmark-authoring workflow — never wired up outside it, see `mod.rs`'s conditional `mod expected_notes;`.
 - `crates/harmonicon-editor/src/song_editor/flute_note.rs` (268) — Adapter for flute notes on the shared grid, the counterpart of `harmonica_note.rs` and `guitar_note.rs`.
 - `crates/harmonicon-editor/src/song_editor/fretting_controls.rs` (212) — Author fretting-hand instructions on the selected note.
-- `crates/harmonicon-editor/src/song_editor/grid.rs` (1038) — (no `//!` header)
+- `crates/harmonicon-editor/src/song_editor/grid.rs` (1045) — (no `//!` header)
 - `crates/harmonicon-editor/src/song_editor/grid_cache.rs` (168) — Grid invalidation tracks rendered content, independently of editor metadata and selection.
 - `crates/harmonicon-editor/src/song_editor/guitar_note.rs` (362) — Adapter for guitar notes on the shared grid, the counterpart of `harmonica_note.rs`.
 - `crates/harmonicon-editor/src/song_editor/guitar_setup.rs` (445) — Guitar setup edits are atomic, undoable, and retain authored fret positions.
 - `crates/harmonicon-editor/src/song_editor/harmonica_note.rs` (71) — Adapter for the existing harmonica grid and its editing tools.
 - `crates/harmonicon-editor/src/song_editor/harpchart.rs` (832) — (no `//!` header)
-- `crates/harmonicon-editor/src/song_editor/instrument_adapter.rs` (141) — The editor's single family registration point.
+- `crates/harmonicon-editor/src/song_editor/instrument_adapter.rs` (154) — The editor's single family registration point.
 - `crates/harmonicon-editor/src/song_editor/instrument_chart.rs` (303) — Instrument-specific event encoding at the editor's document boundary.
 - `crates/harmonicon-editor/src/song_editor/instrument_ui.rs` (150) — Editor document capabilities and instrument-specific form adapters.
 - `crates/harmonicon-editor/src/song_editor/interaction.rs` (911) — (no `//!` header)
@@ -175,13 +175,13 @@ Open work: `PLAN.md` (ordered), `TODO.md`, `ROADMAP.md`. Designs: `docs/*_plan.m
 - `crates/harmonicon-editor/src/song_editor/metadata_sync.rs` (243) — Keeps the two metadata stores that live *beside* the notes in step with bulk edits to the notes themselves.
 - `crates/harmonicon-editor/src/song_editor/metronome.rs` (423) — A click track for Record/Play/Practice, reusing `gameplay:: metronome_overlay`'s pure tick math, shared click-audio resources (`MetronomeSounds`), an…
 - `crates/harmonicon-editor/src/song_editor/midi_import.rs` (819) — Imports a MIDI file's track into the note grid as `GridNote`s in memory (destination is `EditorState`, not disk), generalized to whatever harmonica k…
-- `crates/harmonicon-editor/src/song_editor/mod.rs` (427) — Song authoring in a note grid (`AppState::SongEditor2`).
+- `crates/harmonicon-editor/src/song_editor/mod.rs` (428) — Song authoring in a note grid (`AppState::SongEditor2`).
 - `crates/harmonicon-editor/src/song_editor/mod_panel.rs` (696) — The editor's scrollable tool sidebar, built from button helpers in `super::panel_widgets`.
 - `crates/harmonicon-editor/src/song_editor/music_score_bridge.rs` (201) — Converts editor notes and playhead ticks for the shared music score.
 - `crates/harmonicon-editor/src/song_editor/note_edit.rs` (29) — Shared note-edit constraints, independent of any teaching instrument.
-- `crates/harmonicon-editor/src/song_editor/note_model.rs` (412) — The editor's note vocabulary: what a placed note is (`GridNote`, `HarpTechnique`, `Dir`), what the editor is currently doing to one (`DragState`, `Ed…
+- `crates/harmonicon-editor/src/song_editor/note_model.rs` (419) — The editor's note vocabulary: what a placed note is (`GridNote`, `HarpTechnique`, `Dir`), what the editor is currently doing to one (`DragState`, `Ed…
 - `crates/harmonicon-editor/src/song_editor/note_motion.rs` (72) — Transient feedback follows logical note IDs, even when the grid rebuilds.
-- `crates/harmonicon-editor/src/song_editor/panel.rs` (1051) — (no `//!` header)
+- `crates/harmonicon-editor/src/song_editor/panel.rs` (1065) — (no `//!` header)
 - `crates/harmonicon-editor/src/song_editor/panel_widgets.rs` (242) — Reusable mod-panel button builders — one `spawn` helper per button "shape" (a themed toggle, a themed action button, a distinctly-colored transport b…
 - `crates/harmonicon-editor/src/song_editor/phrase_editor.rs` (278) — The click-to-edit popover for a phrase's section, chord, groove and lyric — the text half of the annotation lane (`annotation_lane` draws the markers…
 - `crates/harmonicon-editor/src/song_editor/piano_note.rs` (218) — Adapter for piano notes on the shared grid, the counterpart of `flute_note.rs`.
@@ -229,7 +229,7 @@ Open work: `PLAN.md` (ordered), `TODO.md`, `ROADMAP.md`. Designs: `docs/*_plan.m
 - `crates/harmonicon-gameplay/src/gameplay/coaching.rs` (481) — What a finished run *means*, as pure functions over `SongStats` — the results screen (`results.rs`, the only consumer) just renders what these return.
 - `crates/harmonicon-gameplay/src/gameplay/countdown_overlay.rs` (172) — (no `//!` header)
 - `crates/harmonicon-gameplay/src/gameplay/flute_visuals.rs` (953) — The flute in Play 2D: the note highway, one row per pitch the song uses with each row named, and under it a **fingering strip**.
-- `crates/harmonicon-gameplay/src/gameplay/gameplay_2d.rs` (1479) — (no `//!` header)
+- `crates/harmonicon-gameplay/src/gameplay/gameplay_2d.rs` (1481) — (no `//!` header)
 - `crates/harmonicon-gameplay/src/gameplay/guitar_visuals.rs` (1130) — Guitar-only guidance.
 - `crates/harmonicon-gameplay/src/gameplay/harmonica_overlay.rs` (556) — A "Let's Bend"-style harmonica diagram: holes as columns, with a row for each way a hole can sound, each cell labelled with its note and lit up live…
 - `crates/harmonicon-gameplay/src/gameplay/highway_2d.rs` (336) — The static furniture of the 2D play area: the highway's lane stripes and hit zone, the harmonica hole strip beneath it, and the blow/draw key.
@@ -246,7 +246,7 @@ Open work: `PLAN.md` (ordered), `TODO.md`, `ROADMAP.md`. Designs: `docs/*_plan.m
 - `crates/harmonicon-gameplay/src/gameplay/note_feedback.rs` (274) — What a judged note does *on the highway*, as pure functions the 2D renderer applies: the hold-progress uniform a sustained note's tail draws from, an…
 - `crates/harmonicon-gameplay/src/gameplay/note_ribbon.rs` (92) — What a note ribbon draws for a note's techniques — shared by the highway's ribbons and the technique legend's previews, so both read the same.
 - `crates/harmonicon-gameplay/src/gameplay/note_ribbon_2d.rs` (77) — (no `//!` header)
-- `crates/harmonicon-gameplay/src/gameplay/note_trainer.rs` (1073) — The Note Trainer for a guitar or a flute: the drills `harmonicon_core::note_trainer` lists, one at a time, against a live tuner.
+- `crates/harmonicon-gameplay/src/gameplay/note_trainer.rs` (1085) — The Note Trainer for a guitar or a flute: the drills `harmonicon_core::note_trainer` lists, one at a time, against a live tuner.
 - `crates/harmonicon-gameplay/src/gameplay/note_trainer/bend.rs` (142) — A bend is a gesture from an established starting pitch, not a target alone.
 - `crates/harmonicon-gameplay/src/gameplay/note_trainer/bowed.rs` (88) — (no `//!` header)
 - `crates/harmonicon-gameplay/src/gameplay/note_trainer/chords.rs` (609) — Standard open-chord shapes with simultaneous, pitch-based feedback.
@@ -255,7 +255,7 @@ Open work: `PLAN.md` (ordered), `TODO.md`, `ROADMAP.md`. Designs: `docs/*_plan.m
 - `crates/harmonicon-gameplay/src/gameplay/note_trainer/flute_setup.rs` (186) — Keep the trainer's playable range and fingering chart on the player's flute.
 - `crates/harmonicon-gameplay/src/gameplay/note_trainer/layout.rs` (424) — (no `//!` header)
 - `crates/harmonicon-gameplay/src/gameplay/note_trainer/piano.rs` (141) — Full keyboard and conservative, explicitly suggested five-finger positions.
-- `crates/harmonicon-gameplay/src/gameplay/note_trainer/pitch_picker.rs` (259) — Select drill targets on a staff, using the family's practice range.
+- `crates/harmonicon-gameplay/src/gameplay/note_trainer/pitch_picker.rs` (266) — Select drill targets on a staff, using the family's practice range.
 - `crates/harmonicon-gameplay/src/gameplay/note_trainer/selection.rs` (336) — Choosing a musical target without stepping through a long drill sequence.
 - `crates/harmonicon-gameplay/src/gameplay/note_trainer/teaching.rs` (124) — The trainer's notation and instrument guides, driven by its current drill.
 - `crates/harmonicon-gameplay/src/gameplay/notes.rs` (909) — The chart note model: `ScheduledNote`/`SongNotes` (score state, kept as plain data rather than ECS components — see the doc comment on `ScheduledNote…
@@ -269,7 +269,7 @@ Open work: `PLAN.md` (ordered), `TODO.md`, `ROADMAP.md`. Designs: `docs/*_plan.m
 - `crates/harmonicon-gameplay/src/gameplay/results.rs` (625) — Post-song results screen, read as coaching: accuracy and the one thing worth working on lead, then the grade and score, then the evidence — the hit t…
 - `crates/harmonicon-gameplay/src/gameplay/song_info.rs` (172) — What the HUD says about the *song* rather than about the performance: title, key/tempo/meter, which harp to hold, the chart's description and author.
 - `crates/harmonicon-gameplay/src/gameplay/song_progress_overlay.rs` (298) — A song-progress bar pinned to the top of Jam Session's screen: a thin red playhead sweeping the song's length, and the A–B loop range when one is act…
-- `crates/harmonicon-gameplay/src/gameplay/state.rs` (762) — Shared gameplay resources and components: score/combo state, per-song stats, the attack-freshness gate, scoring/loop configuration, and the small mar…
+- `crates/harmonicon-gameplay/src/gameplay/state.rs` (763) — Shared gameplay resources and components: score/combo state, per-song stats, the attack-freshness gate, scoring/loop configuration, and the small mar…
 - `crates/harmonicon-gameplay/src/gameplay/technique_coach.rs` (298) — The 2D technique coach: a fixed row between the highway and the hole strip that coaches the bend/vibrato/wah note arriving at the hit line.
 - `crates/harmonicon-gameplay/src/gameplay/technique_cue.rs` (572) — What a technique note asks of the player, in terms they can act on while playing: how far to bend and which note to land on, how fast to wobble a vib…
 - `crates/harmonicon-gameplay/src/gameplay/twelve_bar_blues_overlay.rs` (61) — (no `//!` header)
@@ -325,21 +325,21 @@ Open work: `PLAN.md` (ordered), `TODO.md`, `ROADMAP.md`. Designs: `docs/*_plan.m
 - `crates/harmonicon-menu/src/menu/pages/content_sources.rs` (629) — Options → Lessons & songs: the configured lesson and song repositories, what state each is in, and the controls to check, update, add and remove them…
 - `crates/harmonicon-menu/src/menu/pages/content_sync.rs` (240) — The first-run download screen (`AppState::Syncing`): shown only while a configured lesson or song pack has never been downloaded, since the game has…
 - `crates/harmonicon-menu/src/menu/pages/credits.rs` (278) — Scrolling credits on a plain background.
-- `crates/harmonicon-menu/src/menu/pages/harp_check.rs` (990) — "Which harmonica are you holding?" — or which tuning is the guitar in, which foot joint has the flute — shown after picking a song, before it loads.
+- `crates/harmonicon-menu/src/menu/pages/harp_check.rs` (1008) — "Which harmonica are you holding?" — or which tuning is the guitar in, which foot joint has the flute — shown after picking a song, before it loads.
 - `crates/harmonicon-menu/src/menu/pages/help_about.rs` (132) — Help menu: documentation, Tutorial, first-time setup, and Credits.
 - `crates/harmonicon-menu/src/menu/pages/instrument_select.rs` (209) — Select Instrument: a grid of every instrument the game teaches, each a card with its picture and name.
 - `crates/harmonicon-menu/src/menu/pages/jam_generate.rs` (485) — Generated Jam Session setup: pick a key and tempo, then start an looping synthesized 12-bar backing (`harmonicon_jam::jam::backing`) without first pi…
 - `crates/harmonicon-menu/src/menu/pages/jam_session.rs` (59) — The "Jam Session" choice: pick a real song (`ArtistList`) or synthesize one (`JamGenerate` — see `pages::jam_generate`).
 - `crates/harmonicon-menu/src/menu/pages/main_menu.rs` (65) — The main menu: the chosen instrument (which reopens Select Instrument), Play, Options, Help, and — everywhere but the browser — Quit.
 - `crates/harmonicon-menu/src/menu/pages/mod.rs` (27) — One file per top-level menu page.
-- `crates/harmonicon-menu/src/menu/pages/options/instruments.rs` (254) — The Options page's "My instruments" section: the guitar's tuning and capo, the flute's foot joint and how a flute part is drawn, all persisted in `se…
+- `crates/harmonicon-menu/src/menu/pages/options/instruments.rs` (303) — The Options page's "My instruments" section: the guitar's tuning and capo, the flute's foot joint and how a flute part is drawn, the singer's voice t…
 - `crates/harmonicon-menu/src/menu/pages/options/microphone.rs` (297) — The microphone picker and the status banner beside it — the one place the `MicStatus::Failed` reason is shown in full, with a Retry button.
 - `crates/harmonicon-menu/src/menu/pages/options/mod.rs` (506) — The Options page: audio volume sliders, the microphone and pitch-detection pickers, display toggles, and "My instruments" (`instruments`).
 - `crates/harmonicon-menu/src/menu/pages/options/sliders.rs` (227) — The music / metronome volume sliders and the input-latency slider, plus the systems that mirror `AudioSettings` back onto their fills.
 - `crates/harmonicon-menu/src/menu/pages/options/zoom.rs` (131) — The UI zoom slider: `UiScale` as a percentage, with the track kept in step when the scale changes from the keyboard shortcut instead.
 - `crates/harmonicon-menu/src/menu/pages/play.rs` (91) — The Play menu: choose Play Song, Create Song, Jam Session, Note Trainer, Lessons, or the Tuner — all on the instrument chosen on Select Instrument.
 - `crates/harmonicon-menu/src/menu/pages/theme_picker.rs` (128) — Live appearance selection with palette swatches.
-- `crates/harmonicon-menu/src/menu/pages/tuner.rs` (1228) — Guided, microphone-driven tuning for the instrument chosen on Select Instrument.
+- `crates/harmonicon-menu/src/menu/pages/tuner.rs` (1229) — Guided, microphone-driven tuning for the instrument chosen on Select Instrument.
 - `crates/harmonicon-menu/src/menu/pages/tutorial.rs` (561) — Guided tour of menu pages and selected live screens, driven by timed state changes.
 - `crates/harmonicon-menu/src/menu/pages/welcome.rs` (102) — First-launch steps for microphone setup, the guided tour, and lessons.
 - `crates/harmonicon-menu/src/menu/routing.rs` (372) — The menu's own sub-state (`MenuPage`) and the systems that route between pages: `route_menu_entry` (deciding which page `AppState::Menu` lands on), `…
@@ -369,13 +369,13 @@ Open work: `PLAN.md` (ordered), `TODO.md`, `ROADMAP.md`. Designs: `docs/*_plan.m
 - `crates/harmonicon-platform/src/localization/packs.rs` (261) — Translations shipped inside lesson and song packs.
 - `crates/harmonicon-platform/src/paths.rs` (173) — Where this game keeps the files it writes.
 - `crates/harmonicon-platform/src/responsive.rs` (90) — Shared "is the window small enough to need a compact layout" signal — `CompactLayout`, read by Play 2D and the Song Editor to decide which of two lay…
-- `crates/harmonicon-platform/src/settings.rs` (895) — Persisted player settings (audio levels, chosen note theme).
+- `crates/harmonicon-platform/src/settings.rs` (901) — Persisted player settings (audio levels, chosen note theme).
 - `crates/harmonicon-platform/src/song_library.rs` (108) — Persistent song exclusions, scoped to their asset source and song folder.
 - `crates/harmonicon-platform/src/theme.rs` (600) — The two built-in palettes and shared UI colors.
 
 ### harmonicon-score
 
-- `crates/harmonicon-score/src/convert.rs` (559) — Turning any `ScoreFile` track into a playable `HarpChart` for an `Instrument`.
+- `crates/harmonicon-score/src/convert.rs` (602) — Turning any `ScoreFile` track into a playable `HarpChart` for an `Instrument`.
 - `crates/harmonicon-score/src/guitar_pro.rs` (685) — Guitar Pro, MuseScore and MusicXML, behind `ScoreFile`.
 - `crates/harmonicon-score/src/harpchart.rs` (125) — Harmonicon's own `.harpchart`, behind `ScoreFile`.
 - `crates/harmonicon-score/src/lib.rs` (260) — Reading a playable score out of whatever file the player has.
@@ -394,7 +394,7 @@ Open work: `PLAN.md` (ordered), `TODO.md`, `ROADMAP.md`. Designs: `docs/*_plan.m
 - `crates/harmonicon-song/src/lessons/units.rs` (247) — Units as a chain of gates: the curriculum's second, coarser level.
 - `crates/harmonicon-song/src/lessons/validate.rs` (479) — Checks a lesson pack the way the game will read it.
 - `crates/harmonicon-song/src/lib.rs` (12) — Playable content: the chart/manifest asset pipeline (`song`) and the curriculum built on top of it (`lessons`).
-- `crates/harmonicon-song/src/song/loader.rs` (491) — (no `//!` header)
+- `crates/harmonicon-song/src/song/loader.rs` (514) — (no `//!` header)
 - `crates/harmonicon-song/src/song/mod.rs` (161) — (no `//!` header)
 - `crates/harmonicon-song/src/song/score_song.rs` (154) — Playing a score file directly, without authoring a chart first.
 - `crates/harmonicon-song/src/song/validate.rs` (209) — Checks a song pack's content the way the game will read it, so a broken chart is caught in the pack's CI rather than when a player picks it.
@@ -403,7 +403,7 @@ Open work: `PLAN.md` (ordered), `TODO.md`, `ROADMAP.md`. Designs: `docs/*_plan.m
 
 - `crates/harmonicon-ui/benches/notation.rs` (75) — Pure preparation performed when the music-score window is rebuilt.
 - `crates/harmonicon-ui/src/dialogs/algo_picker.rs` (111) — Shared pitch-detection algorithm picker: a `combobox` whose tooltip explains whichever algorithm is selected, instead of a separate static panel.
-- `crates/harmonicon-ui/src/dialogs/button.rs` (340) — (no `//!` header)
+- `crates/harmonicon-ui/src/dialogs/button.rs` (376) — (no `//!` header)
 - `crates/harmonicon-ui/src/dialogs/checkbox.rs` (123) — Reusable labelled checkbox: a small box (checkmark shown while checked) plus a label, wired to `bevy_ui_widgets`' headless `Checkbox`.
 - `crates/harmonicon-ui/src/dialogs/circle_of_fifths.rs` (186) — A circle-of-fifths diagram: the 12 keys arranged so each neighbor is a perfect fifth away, with a reference harmonica key and its available `harmonic…
 - `crates/harmonicon-ui/src/dialogs/combobox.rs` (614) — Reusable combobox: a labelled toggle button showing the current selection, which opens an overlay list of choices above the rest of the page when cli…
@@ -430,9 +430,9 @@ Open work: `PLAN.md` (ordered), `TODO.md`, `ROADMAP.md`. Designs: `docs/*_plan.m
 - `crates/harmonicon-ui/src/music_score/key_signature.rs` (102) — A fixed key-signature strip, shared by live scores and the paused full score.
 - `crates/harmonicon-ui/src/music_score/meter_map.rs` (421) — Where the bars fall when the meter changes mid-piece.
 - `crates/harmonicon-ui/src/music_score/mod.rs` (1521) — A scrolling music-notation staff, rendered with the Bravura SMuFL font — shared by the Song Editor and Play 2D, both of which spawn `spawn_music_scor…
-- `crates/harmonicon-ui/src/music_score/notation.rs` (1608) — The staff's decisions, with no Bevy in them: which clef the music wants, where a pitch sits on that clef, which notehead a duration takes, where bar…
+- `crates/harmonicon-ui/src/music_score/notation.rs` (1633) — The staff's decisions, with no Bevy in them: which clef the music wants, where a pitch sits on that clef, which notehead a duration takes, where bar…
 - `crates/harmonicon-ui/src/music_score/note_glyphs.rs` (213) — Rendering for a single notation note and its marks.
-- `crates/harmonicon-ui/src/music_score/pitch_picker.rs` (228) — Static pitch choices reuse the score's engraving without its song resources.
+- `crates/harmonicon-ui/src/music_score/pitch_picker.rs` (257) — Static pitch choices reuse the score's engraving without its song resources.
 - `crates/harmonicon-ui/src/music_score/projection.rs` (152) — Convert sounding pitches into notation at the boundary of the score view.
 - `crates/harmonicon-ui/src/music_score/rests.rs` (201) — Rests for silent spans of the shared staff.
 - `crates/harmonicon-ui/src/music_score/staff_window.rs` (131) — Spawning one staff's visible window of notation: noteheads, stems, beams, ledger lines, ties, rests, clef and time signature for the beats `super::sp…

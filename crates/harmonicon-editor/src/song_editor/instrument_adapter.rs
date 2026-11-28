@@ -103,6 +103,19 @@ pub(super) fn for_instrument(instrument: &Instrument) -> EditorAdapter {
             window: Some(super::piano_note::WINDOW_ROWS),
             invalid_message: "editor-piano-invalid",
         },
+        Instrument::Voice(voice) => EditorAdapter {
+            labels: RowStyle::Pitches {
+                top: super::note_model::VOICE_TOP_NOTE,
+                dark_accidentals: true,
+            },
+            place: Some(super::voice_note::place),
+            modify: Some(super::voice_note::apply_modifier),
+            transpose: Some(super::voice_note::transpose),
+            buttons: NoteButtons::Voice,
+            rows: super::note_model::VOICE_TOP_NOTE + 1 - voice.lowest(),
+            window: None,
+            invalid_message: "editor-voice-invalid",
+        },
     }
 }
 
