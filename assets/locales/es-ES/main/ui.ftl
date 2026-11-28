@@ -1201,10 +1201,6 @@ theme-subtitle = Elige la apariencia de todo Harmonicon.
 # Afinador de instrumentos
 tuner-title = Afinar instrumentos
 tuner-subtitle = Cuerdas al aire · La₄ = 440 Hz
-tuner-classical = Guitarra clásica
-tuner-electric = Guitarra eléctrica
-tuner-classical-tip = Guitarra clásica: pulsa la cuerda suavemente cerca de la boca.
-tuner-electric-tip = Guitarra eléctrica: usa un sonido limpio, sin efectos.
 tuner-pluck = Toca solo esta cuerda al aire y silencia las demás.
 tuner-string = Cuerda { $number } · { $note }
 tuner-restart = Volver a empezar

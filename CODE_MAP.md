@@ -198,7 +198,7 @@ Open work: `PLAN.md` (ordered), `TODO.md`, `ROADMAP.md`. Designs: `docs/*_plan.m
 - `crates/harmonicon-editor/src/song_editor/state.rs` (1132) — (no `//!` header)
 - `crates/harmonicon-editor/src/song_editor/timeline.rs` (496) — The timeline ruler's Select, Erase, Remove, Tempo, Meter, Repeat, Ending and Record seek interactions.
 - `crates/harmonicon-editor/src/song_editor/timeline_overlay.rs` (187) — The timeline tools' rendering half: the persistent split-line/highlight overlay entities and the per-frame pass that redraws them from `TimelineSelec…
-- `crates/harmonicon-editor/src/song_editor/transport.rs` (438) — Editor file, playback, practice, and recording controls, built with `panel_widgets`' shared button helpers.
+- `crates/harmonicon-editor/src/song_editor/transport.rs` (445) — Editor file, playback, practice, and recording controls, built with `panel_widgets`' shared button helpers.
 - `crates/harmonicon-editor/src/song_editor/transpose.rs` (205) — Transposing placed notes by semitones on the harp the chart is written for.
 - `crates/harmonicon-editor/src/song_editor/ui.rs` (1095) — (no `//!` header)
 - `crates/harmonicon-editor/src/song_editor/undo.rs` (435) — Undo/redo for the note grid — `Ctrl+Z`/`Ctrl+Y` (see `interaction::handle_undo_redo`) step through a history of the editor's *content*: notes, timing…
@@ -221,7 +221,7 @@ Open work: `PLAN.md` (ordered), `TODO.md`, `ROADMAP.md`. Designs: `docs/*_plan.m
 - `crates/harmonicon-gameplay/src/gameplay/bending_trainer/gesture.rs` (272) — Pure practice-gesture state machines driven by classified pitch frames.
 - `crates/harmonicon-gameplay/src/gameplay/bending_trainer/layout.rs` (537) — Bending Trainer layout: a control strip, bend path, and selectable diagram.
 - `crates/harmonicon-gameplay/src/gameplay/bending_trainer/mod.rs` (593) — Standalone harmonica bending practice with a live tuner, drill, and metronome.
-- `crates/harmonicon-gameplay/src/gameplay/bending_trainer/teaching.rs` (106) — A focused reading of the selected hole: breath, natural pitch and target.
+- `crates/harmonicon-gameplay/src/gameplay/bending_trainer/teaching.rs` (114) — A focused reading of the selected hole: breath, natural pitch and target.
 - `crates/harmonicon-gameplay/src/gameplay/bending_trainer/trace.rs` (552) — Short pitch history shared by signal-quality feedback and the bend-path UI.
 - `crates/harmonicon-gameplay/src/gameplay/bowed_visuals.rs` (301) — A fretless fingerboard.
 - `crates/harmonicon-gameplay/src/gameplay/call_response.rs` (332) — Chart call phrases are synthesized once and played before their scored response.
@@ -230,7 +230,7 @@ Open work: `PLAN.md` (ordered), `TODO.md`, `ROADMAP.md`. Designs: `docs/*_plan.m
 - `crates/harmonicon-gameplay/src/gameplay/countdown_overlay.rs` (172) — (no `//!` header)
 - `crates/harmonicon-gameplay/src/gameplay/flute_visuals.rs` (953) — The flute in Play 2D: the note highway, one row per pitch the song uses with each row named, and under it a **fingering strip**.
 - `crates/harmonicon-gameplay/src/gameplay/gameplay_2d.rs` (1479) — (no `//!` header)
-- `crates/harmonicon-gameplay/src/gameplay/guitar_visuals.rs` (1128) — Guitar-only guidance.
+- `crates/harmonicon-gameplay/src/gameplay/guitar_visuals.rs` (1130) — Guitar-only guidance.
 - `crates/harmonicon-gameplay/src/gameplay/harmonica_overlay.rs` (556) — A "Let's Bend"-style harmonica diagram: holes as columns, with a row for each way a hole can sound, each cell labelled with its note and lit up live…
 - `crates/harmonicon-gameplay/src/gameplay/highway_2d.rs` (336) — The static furniture of the 2D play area: the highway's lane stripes and hit zone, the harmonica hole strip beneath it, and the blow/draw key.
 - `crates/harmonicon-gameplay/src/gameplay/highway_axis.rs` (123) — Which `Node` edges mean what on a highway scrolling along `axis`.
@@ -247,17 +247,17 @@ Open work: `PLAN.md` (ordered), `TODO.md`, `ROADMAP.md`. Designs: `docs/*_plan.m
 - `crates/harmonicon-gameplay/src/gameplay/note_ribbon.rs` (92) — What a note ribbon draws for a note's techniques — shared by the highway's ribbons and the technique legend's previews, so both read the same.
 - `crates/harmonicon-gameplay/src/gameplay/note_ribbon_2d.rs` (77) — (no `//!` header)
 - `crates/harmonicon-gameplay/src/gameplay/note_trainer.rs` (1073) — The Note Trainer for a guitar or a flute: the drills `harmonicon_core::note_trainer` lists, one at a time, against a live tuner.
-- `crates/harmonicon-gameplay/src/gameplay/note_trainer/bend.rs` (138) — A bend is a gesture from an established starting pitch, not a target alone.
+- `crates/harmonicon-gameplay/src/gameplay/note_trainer/bend.rs` (142) — A bend is a gesture from an established starting pitch, not a target alone.
 - `crates/harmonicon-gameplay/src/gameplay/note_trainer/bowed.rs` (88) — (no `//!` header)
 - `crates/harmonicon-gameplay/src/gameplay/note_trainer/chords.rs` (609) — Standard open-chord shapes with simultaneous, pitch-based feedback.
 - `crates/harmonicon-gameplay/src/gameplay/note_trainer/chords/recorded_tests.rs` (93) — (no `//!` header)
 - `crates/harmonicon-gameplay/src/gameplay/note_trainer/clarinet.rs` (73) — (no `//!` header)
 - `crates/harmonicon-gameplay/src/gameplay/note_trainer/flute_setup.rs` (186) — Keep the trainer's playable range and fingering chart on the player's flute.
-- `crates/harmonicon-gameplay/src/gameplay/note_trainer/layout.rs` (422) — (no `//!` header)
+- `crates/harmonicon-gameplay/src/gameplay/note_trainer/layout.rs` (424) — (no `//!` header)
 - `crates/harmonicon-gameplay/src/gameplay/note_trainer/piano.rs` (141) — Full keyboard and conservative, explicitly suggested five-finger positions.
-- `crates/harmonicon-gameplay/src/gameplay/note_trainer/pitch_picker.rs` (240) — Select drill targets on a staff, using the family's practice range.
+- `crates/harmonicon-gameplay/src/gameplay/note_trainer/pitch_picker.rs` (259) — Select drill targets on a staff, using the family's practice range.
 - `crates/harmonicon-gameplay/src/gameplay/note_trainer/selection.rs` (336) — Choosing a musical target without stepping through a long drill sequence.
-- `crates/harmonicon-gameplay/src/gameplay/note_trainer/teaching.rs` (121) — The trainer's notation and instrument guides, driven by its current drill.
+- `crates/harmonicon-gameplay/src/gameplay/note_trainer/teaching.rs` (124) — The trainer's notation and instrument guides, driven by its current drill.
 - `crates/harmonicon-gameplay/src/gameplay/notes.rs` (909) — The chart note model: `ScheduledNote`/`SongNotes` (score state, kept as plain data rather than ECS components — see the doc comment on `ScheduledNote…
 - `crates/harmonicon-gameplay/src/gameplay/pause_menu.rs` (1168) — The in-game pause overlay: a translucent menu with Resume / Restart / Quit, toggled with Escape.
 - `crates/harmonicon-gameplay/src/gameplay/pause_score.rs` (421) — A scrollable full score with a beat-aligned practice selection band.
@@ -327,6 +327,7 @@ Open work: `PLAN.md` (ordered), `TODO.md`, `ROADMAP.md`. Designs: `docs/*_plan.m
 - `crates/harmonicon-menu/src/menu/pages/credits.rs` (278) — Scrolling credits on a plain background.
 - `crates/harmonicon-menu/src/menu/pages/harp_check.rs` (990) — "Which harmonica are you holding?" — or which tuning is the guitar in, which foot joint has the flute — shown after picking a song, before it loads.
 - `crates/harmonicon-menu/src/menu/pages/help_about.rs` (132) — Help menu: documentation, Tutorial, first-time setup, and Credits.
+- `crates/harmonicon-menu/src/menu/pages/instrument_select.rs` (209) — Select Instrument: a grid of every instrument the game teaches, each a card with its picture and name.
 - `crates/harmonicon-menu/src/menu/pages/jam_generate.rs` (485) — Generated Jam Session setup: pick a key and tempo, then start an looping synthesized 12-bar backing (`harmonicon_jam::jam::backing`) without first pi…
 - `crates/harmonicon-menu/src/menu/pages/jam_session.rs` (59) — The "Jam Session" choice: pick a real song (`ArtistList`) or synthesize one (`JamGenerate` — see `pages::jam_generate`).
 - `crates/harmonicon-menu/src/menu/pages/main_menu.rs` (65) — The main menu: the chosen instrument (which reopens Select Instrument), Play, Options, Help, and — everywhere but the browser — Quit.
@@ -336,9 +337,9 @@ Open work: `PLAN.md` (ordered), `TODO.md`, `ROADMAP.md`. Designs: `docs/*_plan.m
 - `crates/harmonicon-menu/src/menu/pages/options/mod.rs` (506) — The Options page: audio volume sliders, the microphone and pitch-detection pickers, display toggles, and "My instruments" (`instruments`).
 - `crates/harmonicon-menu/src/menu/pages/options/sliders.rs` (227) — The music / metronome volume sliders and the input-latency slider, plus the systems that mirror `AudioSettings` back onto their fills.
 - `crates/harmonicon-menu/src/menu/pages/options/zoom.rs` (131) — The UI zoom slider: `UiScale` as a percentage, with the track kept in step when the scale changes from the keyboard shortcut instead.
-- `crates/harmonicon-menu/src/menu/pages/play.rs` (86) — The Play menu: choose Play Song, Create Song, Jam Session, Note Trainer, or Lessons — all on the instrument chosen on Select Instrument.
+- `crates/harmonicon-menu/src/menu/pages/play.rs` (91) — The Play menu: choose Play Song, Create Song, Jam Session, Note Trainer, Lessons, or the Tuner — all on the instrument chosen on Select Instrument.
 - `crates/harmonicon-menu/src/menu/pages/theme_picker.rs` (128) — Live appearance selection with palette swatches.
-- `crates/harmonicon-menu/src/menu/pages/tuner.rs` (1111) — Guided, microphone-driven standard six-string guitar tuning.
+- `crates/harmonicon-menu/src/menu/pages/tuner.rs` (1156) — Guided, microphone-driven tuning for the instrument chosen on Select Instrument.
 - `crates/harmonicon-menu/src/menu/pages/tutorial.rs` (561) — Guided tour of menu pages and selected live screens, driven by timed state changes.
 - `crates/harmonicon-menu/src/menu/pages/welcome.rs` (102) — First-launch steps for microphone setup, the guided tour, and lessons.
 - `crates/harmonicon-menu/src/menu/routing.rs` (372) — The menu's own sub-state (`MenuPage`) and the systems that route between pages: `route_menu_entry` (deciding which page `AppState::Menu` lands on), `…
@@ -428,7 +429,7 @@ Open work: `PLAN.md` (ordered), `TODO.md`, `ROADMAP.md`. Designs: `docs/*_plan.m
 - `crates/harmonicon-ui/src/music_score/full_score.rs` (202) — The paused full score: the whole song's notation laid out at once, which unlike the live staff never follows the playhead (its parent viewport scroll…
 - `crates/harmonicon-ui/src/music_score/key_signature.rs` (102) — A fixed key-signature strip, shared by live scores and the paused full score.
 - `crates/harmonicon-ui/src/music_score/meter_map.rs` (421) — Where the bars fall when the meter changes mid-piece.
-- `crates/harmonicon-ui/src/music_score/mod.rs` (1518) — A scrolling music-notation staff, rendered with the Bravura SMuFL font — shared by the Song Editor and Play 2D, both of which spawn `spawn_music_scor…
+- `crates/harmonicon-ui/src/music_score/mod.rs` (1521) — A scrolling music-notation staff, rendered with the Bravura SMuFL font — shared by the Song Editor and Play 2D, both of which spawn `spawn_music_scor…
 - `crates/harmonicon-ui/src/music_score/notation.rs` (1608) — The staff's decisions, with no Bevy in them: which clef the music wants, where a pitch sits on that clef, which notehead a duration takes, where bar…
 - `crates/harmonicon-ui/src/music_score/note_glyphs.rs` (213) — Rendering for a single notation note and its marks.
 - `crates/harmonicon-ui/src/music_score/pitch_picker.rs` (228) — Static pitch choices reuse the score's engraving without its song resources.

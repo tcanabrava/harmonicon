@@ -1199,10 +1199,6 @@ theme-subtitle = Escolha a aparência de todo o Harmonicon.
 # Afinador de instrumentos
 tuner-title = Afinar instrumentos
 tuner-subtitle = Cordas soltas · Lá₄ = 440 Hz
-tuner-classical = Violão clássico
-tuner-electric = Guitarra elétrica
-tuner-classical-tip = Violão clássico: toque a corda de leve perto da boca do violão.
-tuner-electric-tip = Guitarra elétrica: use um som limpo, sem efeitos.
 tuner-pluck = Toque apenas esta corda solta e abafe as outras.
 tuner-string = Corda { $number } · { $note }
 tuner-restart = Recomeçar

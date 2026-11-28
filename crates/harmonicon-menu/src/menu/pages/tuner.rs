@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: MIT
 
-//! Guided, microphone-driven standard six-string guitar tuning.
+//! Guided, microphone-driven tuning for the instrument chosen on Select
+//! Instrument. Only the fretted instruments have one (`tuner_family`); the
+//! Play menu offers it for those alone, and the page opens on that
+//! instrument's saved tuning and capo.
 use crate::menu::{
     routing::MenuPage,
     scene::{self, spawn_back_button, spawn_button, spawn_menu_root},
@@ -15,23 +18,47 @@ use harmonicon_audio::{
     },
 };
 use harmonicon_core::instrument::{
-    bass,
+    InstrumentKind, bass, cavaquinho,
+    fretted_strings::FrettedKind,
     guitar::{self, Tuning},
 };
 use harmonicon_core::midi::{freq_to_midi, midi_to_freq_hz, midi_to_note};
 use harmonicon_platform::localization::{Localization, LocalizationExt};
+use harmonicon_platform::settings::MyInstruments;
 use harmonicon_platform::theme::{LoadedTheme, ThemeSurface};
 use harmonicon_ui::dialogs::combobox::{ComboboxSelect, spawn_combobox};
-use harmonicon_ui::dialogs::tab_bar::{TabSelect, spawn_tab_bar};
 
-const INSTRUMENTS: [&str; 3] = ["tuner-classical", "tuner-electric", "song-instrument-bass"];
 const EXTENDED_GUITAR: &[Tuning] = &[
     Tuning { id: "seven-string", strings: &[64, 59, 55, 50, 45, 40, 35] },
     Tuning { id: "eight-string", strings: &[64, 59, 55, 50, 45, 40, 35, 30] },
 ];
-fn presets(instrument: usize) -> impl Iterator<Item = &'static Tuning> {
-    let base = if instrument == 2 { bass::TUNINGS } else { guitar::TUNINGS };
-    base.iter().chain(EXTENDED_GUITAR.iter().filter(move |_| instrument == 1))
+/// The instrument family the tuner tunes for `kind`, if it has a tuner.
+pub(crate) fn tuner_family(kind: InstrumentKind) -> Option<FrettedKind> {
+    match kind {
+        InstrumentKind::Guitar => Some(FrettedKind::Guitar),
+        InstrumentKind::Bass => Some(FrettedKind::Bass),
+        InstrumentKind::Cavaquinho => Some(FrettedKind::Cavaquinho),
+        _ => None,
+    }
+}
+fn presets(family: FrettedKind) -> impl Iterator<Item = &'static Tuning> {
+    let base = match family {
+        FrettedKind::Guitar => guitar::TUNINGS,
+        FrettedKind::Bass => bass::TUNINGS,
+        FrettedKind::Cavaquinho => cavaquinho::TUNINGS,
+    };
+    base.iter().chain(EXTENDED_GUITAR.iter().filter(move |_| family == FrettedKind::Guitar))
+}
+/// The page's starting choice: the family's saved tuning and capo, and the
+/// split headstock a guitar usually has.
+fn initial_choice(family: FrettedKind, mine: &MyInstruments) -> SetupChoice {
+    let preset = mine
+        .fretted_tuning(family)
+        .and_then(|id| presets(family).position(|preset| preset.id == id))
+        .unwrap_or(0);
+    let capo = if family == FrettedKind::Bass { 0 } else { mine.fretted_capo(family).unwrap_or(0) };
+    let layout = if family == FrettedKind::Guitar { PegLayout::Split } else { PegLayout::Inline };
+    SetupChoice { family, preset, capo: capo.min(12), layout }
 }
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 enum PegLayout {
@@ -58,12 +85,17 @@ impl PegLayout {
     }
 }
 
-#[derive(Resource, Clone, Copy, Default, PartialEq, Eq)]
+#[derive(Resource, Clone, Copy, PartialEq, Eq)]
 struct SetupChoice {
-    instrument: usize,
+    family: FrettedKind,
     preset: usize,
     capo: u8,
     layout: PegLayout,
+}
+impl Default for SetupChoice {
+    fn default() -> Self {
+        Self { family: FrettedKind::Guitar, preset: 0, capo: 0, layout: PegLayout::default() }
+    }
 }
 #[derive(Component)]
 struct PresetPicker(Entity);
@@ -192,12 +224,19 @@ fn setup(
     mut tuner: ResMut<Tuner>,
     mut range: ResMut<PitchRange>,
     mut choice: ResMut<SetupChoice>,
+    mine: Res<MyInstruments>,
+    mut page_state: ResMut<NextState<MenuPage>>,
 ) {
+    let Some(family) = tuner_family(mine.active()) else {
+        // The Play menu hides the tuner for these; a stray route goes back.
+        page_state.set(MenuPage::Play);
+        return;
+    };
     commands.insert_resource(PitchSilenceThreshold(INPUT_THRESHOLD));
     commands.insert_resource(PitchAlgorithmOverride(PitchAlgorithm::Yin));
     let saved = *range;
     *tuner = Tuner { saved_range: Some(saved), ..default() };
-    *choice = SetupChoice { layout: PegLayout::Split, ..default() };
+    *choice = initial_choice(family, &mine);
     *range = tuner.range();
     let (root, header, page) = spawn_menu_root(
         &mut commands,
@@ -224,21 +263,6 @@ fn setup(
         ))
         .id();
     commands.entity(root).add_child(card);
-    let labels = INSTRUMENTS.map(|key| loc.msg(key).to_string());
-    let tabs = spawn_tab_bar(
-        &mut commands,
-        card,
-        &labels,
-        0,
-        |ev: On<TabSelect>, mut choice: ResMut<SetupChoice>| {
-            *choice = SetupChoice {
-                instrument: ev.index,
-                layout: if ev.index == 0 { PegLayout::Split } else { PegLayout::Inline },
-                ..default()
-            };
-        },
-    );
-    commands.entity(tabs).insert(wrapping_row());
     let picker = commands
         .spawn((
             Node {
@@ -373,17 +397,6 @@ fn spawn_readout(
         .id();
     commands.entity(parent).add_child(row);
 }
-fn wrapping_row() -> Node {
-    Node {
-        width: Val::Percent(100.0),
-        max_width: Val::Percent(100.0),
-        flex_wrap: FlexWrap::Wrap,
-        justify_content: JustifyContent::Center,
-        column_gap: Val::Px(6.0),
-        row_gap: Val::Px(6.0),
-        ..default()
-    }
-}
 fn rebuild_pickers(
     mut commands: Commands,
     choice: Res<SetupChoice>,
@@ -404,13 +417,13 @@ fn rebuild_pickers(
     if *last == Some(selection) && !picker_new {
         return;
     }
-    if last.is_none_or(|old| old.instrument != selection.instrument) || picker_new {
+    if last.is_none_or(|old| old.family != selection.family) || picker_new {
         commands.entity(picker).despawn_related::<Children>();
-        let labels: Vec<_> = presets(choice.instrument)
+        let labels: Vec<_> = presets(choice.family)
             .map(|preset| loc.msg(&format!("guitar-tuning-{}", preset.id)).to_string())
             .collect();
         // The overlay sits outside the scrolling card. Replace it along
-        // with the picker when switching instrument families.
+        // with the picker.
         if let Some(old_host) = backdrop_host.take().filter(|_| !picker_new) {
             commands.entity(old_host).despawn();
         }
@@ -450,7 +463,7 @@ fn rebuild_pickers(
                 choice.layout = PegLayout::ALL[ev.index]
             },
         );
-        if choice.instrument != 2 {
+        if choice.family != FrettedKind::Bass {
             let capo_labels: Vec<_> = std::iter::once(loc.msg("guitar-capo-none").to_string())
                 .chain((1..=12).map(|fret| {
                     loc.msg_args("guitar-capo-fret", &[("fret", fret.to_string())]).to_string()
@@ -471,12 +484,12 @@ fn rebuild_pickers(
     }
     let layout_only = last.is_some_and(|old| {
         !picker_new
-            && old.instrument == selection.instrument
+            && old.family == selection.family
             && old.preset == selection.preset
             && old.capo == selection.capo
     });
     *last = Some(selection);
-    let preset = presets(choice.instrument).nth(choice.preset).expect("valid tuning tab");
+    let preset = presets(choice.family).nth(choice.preset).expect("valid tuning tab");
     if !layout_only {
         let (saved_range, selected) = (tuner.saved_range, tuner.selected);
         *tuner = Tuner { saved_range, ..Tuner::new(preset).with_capo(choice.capo) };
@@ -977,12 +990,44 @@ mod tests {
     }
 
     #[test]
+    fn only_fretted_instruments_have_a_tuner() {
+        let tunable: Vec<_> =
+            InstrumentKind::ALL.into_iter().filter(|kind| tuner_family(*kind).is_some()).collect();
+        assert_eq!(
+            tunable,
+            [InstrumentKind::Guitar, InstrumentKind::Bass, InstrumentKind::Cavaquinho]
+        );
+        for kind in tunable {
+            assert_eq!(tuner_family(kind).unwrap().instrument_kind(), kind);
+        }
+    }
+
+    #[test]
+    fn the_page_opens_on_the_saved_tuning_and_capo() {
+        let mine = MyInstruments {
+            guitar_tuning: Some("drop-d".into()),
+            guitar_capo: Some(3),
+            bass_tuning: Some("bass-five".into()),
+            bass_capo: Some(2),
+            ..default()
+        };
+        let guitar = initial_choice(FrettedKind::Guitar, &mine);
+        assert_eq!(presets(FrettedKind::Guitar).nth(guitar.preset).unwrap().id, "drop-d");
+        assert_eq!((guitar.capo, guitar.layout), (3, PegLayout::Split));
+        let bass = initial_choice(FrettedKind::Bass, &mine);
+        assert_eq!(presets(FrettedKind::Bass).nth(bass.preset).unwrap().id, "bass-five");
+        assert_eq!((bass.capo, bass.layout), (0, PegLayout::Inline));
+        assert_eq!(initial_choice(FrettedKind::Cavaquinho, &mine).preset, 0);
+    }
+
+    #[test]
     fn presets_preserve_string_counts_and_detect_low_bass_b() {
         use harmonicon_audio::pitch_detect::{FftState, analyze_with_silence_threshold};
-        assert_eq!(presets(0).next().unwrap().strings.len(), 6);
-        assert_eq!(presets(1).last().unwrap().strings.len(), 8);
-        assert_eq!(presets(2).next().unwrap().strings.len(), 4);
-        let tuner = Tuner::new(presets(2).nth(1).unwrap());
+        assert_eq!(presets(FrettedKind::Guitar).next().unwrap().strings.len(), 6);
+        assert_eq!(presets(FrettedKind::Guitar).last().unwrap().strings.len(), 8);
+        assert_eq!(presets(FrettedKind::Bass).next().unwrap().strings.len(), 4);
+        assert_eq!(presets(FrettedKind::Cavaquinho).next().unwrap().strings.len(), 4);
+        let tuner = Tuner::new(presets(FrettedKind::Bass).nth(1).unwrap());
         assert_eq!(tuner.notes, [23, 28, 33, 38, 43]);
         for sample_rate in [44100, 48000] {
             let target = midi_to_freq_hz(23.0);

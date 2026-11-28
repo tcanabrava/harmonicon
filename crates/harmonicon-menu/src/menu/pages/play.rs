@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: MIT
 
 //! The Play menu: choose Play Song, Create Song, Jam Session, Note
-//! Trainer, or Lessons — all on the instrument chosen on Select Instrument.
-//! The Note Trainer for a harmonica is the Bending Trainer.
+//! Trainer, Lessons, or the Tuner — all on the instrument chosen on Select
+//! Instrument. The Note Trainer for a harmonica is the Bending Trainer; the
+//! Tuner is offered only for an instrument that has one.
 
 use bevy::prelude::*;
 use bevy::ui_widgets::Activate;
@@ -14,6 +15,7 @@ use harmonicon_platform::settings::MyInstruments;
 use harmonicon_platform::localization::{Localization, LocalizationExt};
 use harmonicon_platform::theme::LoadedTheme;
 
+use crate::menu::pages::tuner::tuner_family;
 use crate::menu::routing::MenuPage;
 use crate::menu::scene::{spawn_back_button, spawn_button, spawn_menu_root};
 
@@ -46,6 +48,7 @@ pub(crate) fn setup_play_menu(
     mut commands: Commands,
     theme: Res<LoadedTheme>,
     loc: Res<Localization>,
+    mine: Res<MyInstruments>,
 ) {
     let (root, header, _page_root) =
         spawn_menu_root(&mut commands, &loc.msg("menu-play"), None, &theme);
@@ -71,12 +74,14 @@ pub(crate) fn setup_play_menu(
             page.set(MenuPage::LessonInstrument)
         },
     );
-    spawn_button(
-        &mut commands,
-        root,
-        &loc.msg("tuner-title"),
-        |_: On<Activate>, mut page: ResMut<NextState<MenuPage>>| page.set(MenuPage::Tuner),
-    );
+    if tuner_family(mine.active()).is_some() {
+        spawn_button(
+            &mut commands,
+            root,
+            &loc.msg("tuner-title"),
+            |_: On<Activate>, mut page: ResMut<NextState<MenuPage>>| page.set(MenuPage::Tuner),
+        );
+    }
     spawn_back_button(
         &mut commands,
         header,

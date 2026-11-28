@@ -1199,10 +1199,6 @@ song-instrument-viola = Viola
 # Guided guitar tuner
 tuner-title = Tune instruments
 tuner-subtitle = Open strings · A4 = 440 Hz
-tuner-classical = Classical guitar
-tuner-electric = Electric guitar
-tuner-classical-tip = Classical guitar: pluck gently near the sound hole.
-tuner-electric-tip = Electric guitar: use a clean sound, without effects.
 tuner-pluck = Pluck only this open string; mute the others.
 tuner-string = String { $number } · { $note }
 tuner-restart = Start again
