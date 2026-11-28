@@ -20,12 +20,17 @@ impl BowedKind {
         }
     }
 
+    /// The standard open strings, string 1 first: E5 A4 D4 G3 for the
+    /// violin, a fifth lower (A4 D4 G3 C3) for the viola.
+    pub const fn open_strings(self) -> &'static [u8] {
+        match self {
+            Self::Violin => &[76, 69, 62, 55],
+            Self::Viola => &[69, 62, 55, 48],
+        }
+    }
+
     pub fn standard(self) -> BowedStrings {
-        let strings = match self {
-            Self::Violin => vec![76, 69, 62, 55],
-            Self::Viola => vec![69, 62, 55, 48],
-        };
-        BowedStrings { kind: self, strings, stopped_semitones: 24 }
+        BowedStrings { kind: self, strings: self.open_strings().to_vec(), stopped_semitones: 24 }
     }
 }
 

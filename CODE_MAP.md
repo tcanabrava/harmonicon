@@ -106,7 +106,7 @@ Open work: `PLAN.md` (ordered), `TODO.md`, `ROADMAP.md`. Designs: `docs/*_plan.m
 - `crates/harmonicon-core/src/instrument/adapters/piano.rs` (24) — (no `//!` header)
 - `crates/harmonicon-core/src/instrument/adapters/wind_family.rs` (46) — (no `//!` header)
 - `crates/harmonicon-core/src/instrument/bass.rs` (116) — Fretted electric bass presets, highest string first.
-- `crates/harmonicon-core/src/instrument/bowed_strings.rs` (333) — Bowed, fretless strings.
+- `crates/harmonicon-core/src/instrument/bowed_strings.rs` (338) — Bowed, fretless strings.
 - `crates/harmonicon-core/src/instrument/cavaquinho.rs` (49) — Brazilian cavaquinho presets, with sounding pitches and string 1 first.
 - `crates/harmonicon-core/src/instrument/clarinet.rs` (296) — Basic Boehm soprano clarinet finger contacts, written E3–C6.
 - `crates/harmonicon-core/src/instrument/flute.rs` (413) — The transverse (Boehm) concert flute: one voice, a fingering per note, and a foot joint that decides the lowest one.
@@ -339,7 +339,7 @@ Open work: `PLAN.md` (ordered), `TODO.md`, `ROADMAP.md`. Designs: `docs/*_plan.m
 - `crates/harmonicon-menu/src/menu/pages/options/zoom.rs` (131) — The UI zoom slider: `UiScale` as a percentage, with the track kept in step when the scale changes from the keyboard shortcut instead.
 - `crates/harmonicon-menu/src/menu/pages/play.rs` (91) — The Play menu: choose Play Song, Create Song, Jam Session, Note Trainer, Lessons, or the Tuner — all on the instrument chosen on Select Instrument.
 - `crates/harmonicon-menu/src/menu/pages/theme_picker.rs` (128) — Live appearance selection with palette swatches.
-- `crates/harmonicon-menu/src/menu/pages/tuner.rs` (1156) — Guided, microphone-driven tuning for the instrument chosen on Select Instrument.
+- `crates/harmonicon-menu/src/menu/pages/tuner.rs` (1228) — Guided, microphone-driven tuning for the instrument chosen on Select Instrument.
 - `crates/harmonicon-menu/src/menu/pages/tutorial.rs` (561) — Guided tour of menu pages and selected live screens, driven by timed state changes.
 - `crates/harmonicon-menu/src/menu/pages/welcome.rs` (102) — First-launch steps for microphone setup, the guided tour, and lessons.
 - `crates/harmonicon-menu/src/menu/routing.rs` (372) — The menu's own sub-state (`MenuPage`) and the systems that route between pages: `route_menu_entry` (deciding which page `AppState::Menu` lands on), `…

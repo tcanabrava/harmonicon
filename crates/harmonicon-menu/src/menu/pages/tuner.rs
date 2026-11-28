@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 
 //! Guided, microphone-driven tuning for the instrument chosen on Select
-//! Instrument. Only the fretted instruments have one (`tuner_family`); the
-//! Play menu offers it for those alone, and the page opens on that
-//! instrument's saved tuning and capo.
+//! Instrument. The fretted and bowed strings have one (`tuner_family`); the
+//! Play menu offers it for those alone. A fretted instrument opens on its
+//! saved tuning and capo, a violin or viola on its standard fifths.
 use crate::menu::{
     routing::MenuPage,
     scene::{self, spawn_back_button, spawn_button, spawn_menu_root},
@@ -18,7 +18,9 @@ use harmonicon_audio::{
     },
 };
 use harmonicon_core::instrument::{
-    InstrumentKind, bass, cavaquinho,
+    InstrumentKind, bass,
+    bowed_strings::BowedKind,
+    cavaquinho,
     fretted_strings::FrettedKind,
     guitar::{self, Tuning},
 };
@@ -32,32 +34,76 @@ const EXTENDED_GUITAR: &[Tuning] = &[
     Tuning { id: "seven-string", strings: &[64, 59, 55, 50, 45, 40, 35] },
     Tuning { id: "eight-string", strings: &[64, 59, 55, 50, 45, 40, 35, 30] },
 ];
-/// The instrument family the tuner tunes for `kind`, if it has a tuner.
-pub(crate) fn tuner_family(kind: InstrumentKind) -> Option<FrettedKind> {
-    match kind {
-        InstrumentKind::Guitar => Some(FrettedKind::Guitar),
-        InstrumentKind::Bass => Some(FrettedKind::Bass),
-        InstrumentKind::Cavaquinho => Some(FrettedKind::Cavaquinho),
-        _ => None,
+const VIOLIN: &[Tuning] =
+    &[Tuning { id: "violin-standard", strings: BowedKind::Violin.open_strings() }];
+const VIOLA: &[Tuning] = &[Tuning { id: "viola-standard", strings: BowedKind::Viola.open_strings() }];
+
+/// What the tuner tunes: one of the instruments that has one.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum TunerFamily {
+    Fretted(FrettedKind),
+    Bowed(BowedKind),
+}
+impl TunerFamily {
+    #[cfg(test)]
+    fn instrument_kind(self) -> InstrumentKind {
+        match self {
+            Self::Fretted(kind) => kind.instrument_kind(),
+            Self::Bowed(kind) => kind.instrument_kind(),
+        }
+    }
+    /// A bass is played without a capo, and a bowed instrument has no frets.
+    fn has_capo(self) -> bool {
+        matches!(self, Self::Fretted(FrettedKind::Guitar | FrettedKind::Cavaquinho))
+    }
+    /// Only a fretted headstock comes in more than one peg layout; a
+    /// pegbox always has its pegs on both sides.
+    fn has_layouts(self) -> bool {
+        matches!(self, Self::Fretted(_))
     }
 }
-fn presets(family: FrettedKind) -> impl Iterator<Item = &'static Tuning> {
-    let base = match family {
-        FrettedKind::Guitar => guitar::TUNINGS,
-        FrettedKind::Bass => bass::TUNINGS,
-        FrettedKind::Cavaquinho => cavaquinho::TUNINGS,
-    };
-    base.iter().chain(EXTENDED_GUITAR.iter().filter(move |_| family == FrettedKind::Guitar))
+
+/// The instrument family the tuner tunes for `kind`, if it has a tuner.
+pub(crate) fn tuner_family(kind: InstrumentKind) -> Option<TunerFamily> {
+    match kind {
+        InstrumentKind::Guitar => Some(TunerFamily::Fretted(FrettedKind::Guitar)),
+        InstrumentKind::Bass => Some(TunerFamily::Fretted(FrettedKind::Bass)),
+        InstrumentKind::Cavaquinho => Some(TunerFamily::Fretted(FrettedKind::Cavaquinho)),
+        InstrumentKind::Violin => Some(TunerFamily::Bowed(BowedKind::Violin)),
+        InstrumentKind::Viola => Some(TunerFamily::Bowed(BowedKind::Viola)),
+        InstrumentKind::Harmonica
+        | InstrumentKind::Piano
+        | InstrumentKind::Flute
+        | InstrumentKind::Clarinet => None,
+    }
 }
-/// The page's starting choice: the family's saved tuning and capo, and the
-/// split headstock a guitar usually has.
-fn initial_choice(family: FrettedKind, mine: &MyInstruments) -> SetupChoice {
-    let preset = mine
-        .fretted_tuning(family)
-        .and_then(|id| presets(family).position(|preset| preset.id == id))
-        .unwrap_or(0);
-    let capo = if family == FrettedKind::Bass { 0 } else { mine.fretted_capo(family).unwrap_or(0) };
-    let layout = if family == FrettedKind::Guitar { PegLayout::Split } else { PegLayout::Inline };
+fn presets(family: TunerFamily) -> impl Iterator<Item = &'static Tuning> {
+    let base = match family {
+        TunerFamily::Fretted(FrettedKind::Guitar) => guitar::TUNINGS,
+        TunerFamily::Fretted(FrettedKind::Bass) => bass::TUNINGS,
+        TunerFamily::Fretted(FrettedKind::Cavaquinho) => cavaquinho::TUNINGS,
+        TunerFamily::Bowed(BowedKind::Violin) => VIOLIN,
+        TunerFamily::Bowed(BowedKind::Viola) => VIOLA,
+    };
+    let guitar = family == TunerFamily::Fretted(FrettedKind::Guitar);
+    base.iter().chain(EXTENDED_GUITAR.iter().filter(move |_| guitar))
+}
+/// The page's starting choice: a fretted family's saved tuning and capo, and
+/// the split headstock a guitar (or a pegbox) usually has.
+fn initial_choice(family: TunerFamily, mine: &MyInstruments) -> SetupChoice {
+    let (preset, capo) = match family {
+        TunerFamily::Fretted(kind) => (
+            mine.fretted_tuning(kind)
+                .and_then(|id| presets(family).position(|preset| preset.id == id))
+                .unwrap_or(0),
+            mine.fretted_capo(kind).filter(|_| family.has_capo()).unwrap_or(0),
+        ),
+        TunerFamily::Bowed(_) => (0, 0),
+    };
+    let layout = match family {
+        TunerFamily::Fretted(FrettedKind::Guitar) | TunerFamily::Bowed(_) => PegLayout::Split,
+        TunerFamily::Fretted(_) => PegLayout::Inline,
+    };
     SetupChoice { family, preset, capo: capo.min(12), layout }
 }
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -87,14 +133,14 @@ impl PegLayout {
 
 #[derive(Resource, Clone, Copy, PartialEq, Eq)]
 struct SetupChoice {
-    family: FrettedKind,
+    family: TunerFamily,
     preset: usize,
     capo: u8,
     layout: PegLayout,
 }
 impl Default for SetupChoice {
     fn default() -> Self {
-        Self { family: FrettedKind::Guitar, preset: 0, capo: 0, layout: PegLayout::default() }
+        Self { family: TunerFamily::Fretted(FrettedKind::Guitar), preset: 0, capo: 0, layout: PegLayout::default() }
     }
 }
 #[derive(Component)]
@@ -449,21 +495,23 @@ fn rebuild_pickers(
             &labels[choice.preset],
             |ev: On<ComboboxSelect>, mut choice: ResMut<SetupChoice>| choice.preset = ev.index,
         );
-        let layout_labels = PegLayout::LABELS.map(|key| loc.msg(key).to_string());
-        let current_layout =
-            PegLayout::ALL.iter().position(|layout| *layout == choice.layout).unwrap_or(0);
-        spawn_combobox(
-            &mut commands,
-            picker,
-            host,
-            &loc.msg("tuner-layout-label"),
-            &layout_labels,
-            &layout_labels[current_layout],
-            |ev: On<ComboboxSelect>, mut choice: ResMut<SetupChoice>| {
-                choice.layout = PegLayout::ALL[ev.index]
-            },
-        );
-        if choice.family != FrettedKind::Bass {
+        if choice.family.has_layouts() {
+            let layout_labels = PegLayout::LABELS.map(|key| loc.msg(key).to_string());
+            let current_layout =
+                PegLayout::ALL.iter().position(|layout| *layout == choice.layout).unwrap_or(0);
+            spawn_combobox(
+                &mut commands,
+                picker,
+                host,
+                &loc.msg("tuner-layout-label"),
+                &layout_labels,
+                &layout_labels[current_layout],
+                |ev: On<ComboboxSelect>, mut choice: ResMut<SetupChoice>| {
+                    choice.layout = PegLayout::ALL[ev.index]
+                },
+            );
+        }
+        if choice.family.has_capo() {
             let capo_labels: Vec<_> = std::iter::once(loc.msg("guitar-capo-none").to_string())
                 .chain((1..=12).map(|fret| {
                     loc.msg_args("guitar-capo-fret", &[("fret", fret.to_string())]).to_string()
@@ -971,6 +1019,9 @@ fn update(
 #[cfg(test)]
 mod tests {
     use super::*;
+    const GUITAR: TunerFamily = TunerFamily::Fretted(FrettedKind::Guitar);
+    const BASS: TunerFamily = TunerFamily::Fretted(FrettedKind::Bass);
+    const CAVAQUINHO: TunerFamily = TunerFamily::Fretted(FrettedKind::Cavaquinho);
     #[test]
     fn capo_transposes_open_targets_and_split_layout_handles_odd_string_counts() {
         let tuner = Tuner::new(&guitar::TUNINGS[0]).with_capo(2);
@@ -995,7 +1046,13 @@ mod tests {
             InstrumentKind::ALL.into_iter().filter(|kind| tuner_family(*kind).is_some()).collect();
         assert_eq!(
             tunable,
-            [InstrumentKind::Guitar, InstrumentKind::Bass, InstrumentKind::Cavaquinho]
+            [
+                InstrumentKind::Guitar,
+                InstrumentKind::Bass,
+                InstrumentKind::Cavaquinho,
+                InstrumentKind::Violin,
+                InstrumentKind::Viola,
+            ]
         );
         for kind in tunable {
             assert_eq!(tuner_family(kind).unwrap().instrument_kind(), kind);
@@ -1011,23 +1068,38 @@ mod tests {
             bass_capo: Some(2),
             ..default()
         };
-        let guitar = initial_choice(FrettedKind::Guitar, &mine);
-        assert_eq!(presets(FrettedKind::Guitar).nth(guitar.preset).unwrap().id, "drop-d");
+        let guitar = initial_choice(GUITAR, &mine);
+        assert_eq!(presets(GUITAR).nth(guitar.preset).unwrap().id, "drop-d");
         assert_eq!((guitar.capo, guitar.layout), (3, PegLayout::Split));
-        let bass = initial_choice(FrettedKind::Bass, &mine);
-        assert_eq!(presets(FrettedKind::Bass).nth(bass.preset).unwrap().id, "bass-five");
+        let bass = initial_choice(BASS, &mine);
+        assert_eq!(presets(BASS).nth(bass.preset).unwrap().id, "bass-five");
         assert_eq!((bass.capo, bass.layout), (0, PegLayout::Inline));
-        assert_eq!(initial_choice(FrettedKind::Cavaquinho, &mine).preset, 0);
+        assert_eq!(initial_choice(CAVAQUINHO, &mine).preset, 0);
+    }
+
+    #[test]
+    fn bowed_strings_tune_to_their_fifths_without_capo_or_layouts() {
+        for kind in [BowedKind::Violin, BowedKind::Viola] {
+            let family = TunerFamily::Bowed(kind);
+            let choice = initial_choice(family, &MyInstruments::default());
+            assert_eq!((choice.capo, choice.layout), (0, PegLayout::Split));
+            assert!(!family.has_capo() && !family.has_layouts());
+            let tuner = Tuner::new(presets(family).next().unwrap());
+            let mut open = kind.standard().strings;
+            open.reverse();
+            assert_eq!(tuner.notes, open);
+        }
+        assert_eq!(presets(TunerFamily::Bowed(BowedKind::Viola)).next().unwrap().strings[3], 48);
     }
 
     #[test]
     fn presets_preserve_string_counts_and_detect_low_bass_b() {
         use harmonicon_audio::pitch_detect::{FftState, analyze_with_silence_threshold};
-        assert_eq!(presets(FrettedKind::Guitar).next().unwrap().strings.len(), 6);
-        assert_eq!(presets(FrettedKind::Guitar).last().unwrap().strings.len(), 8);
-        assert_eq!(presets(FrettedKind::Bass).next().unwrap().strings.len(), 4);
-        assert_eq!(presets(FrettedKind::Cavaquinho).next().unwrap().strings.len(), 4);
-        let tuner = Tuner::new(presets(FrettedKind::Bass).nth(1).unwrap());
+        assert_eq!(presets(GUITAR).next().unwrap().strings.len(), 6);
+        assert_eq!(presets(GUITAR).last().unwrap().strings.len(), 8);
+        assert_eq!(presets(BASS).next().unwrap().strings.len(), 4);
+        assert_eq!(presets(CAVAQUINHO).next().unwrap().strings.len(), 4);
+        let tuner = Tuner::new(presets(BASS).nth(1).unwrap());
         assert_eq!(tuner.notes, [23, 28, 33, 38, 43]);
         for sample_rate in [44100, 48000] {
             let target = midi_to_freq_hz(23.0);

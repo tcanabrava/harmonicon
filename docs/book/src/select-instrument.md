@@ -14,9 +14,10 @@ That one choice is used everywhere:
   [Note Trainer](note-trainer.md) for anything else.
 - **Lessons** loads only its curriculum.
 - **Create Song** starts a document for it.
-- **Tuner** tunes it, starting on its saved tuning and capo. Only the
-  guitar, bass and cavaquinho have a tuner, so the Play menu shows the
-  button for those alone.
+- **Tuner** tunes it. A guitar, bass or cavaquinho starts on its saved
+  tuning and capo; a violin or viola on its standard fifths (E A D G and
+  A D G C). Only those five have a tuner, so the Play menu shows the
+  button for them alone.
 
 The game remembers your choice, so on the next launch that card is already
 highlighted and focused: press **Enter** to carry on with it.
