@@ -50,3 +50,6 @@ jni = { version = "0.22", default-features = false }
 # builds in one tree (root CLAUDE.md, "A new crate must forward...").
 dev = ["harmonicon/dev"]
 trace_tracy = ["harmonicon/trace_tracy"]
+
+[lints]
+workspace = true
